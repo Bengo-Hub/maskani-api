@@ -1,0 +1,163 @@
+name: Build and Deploy Maskani API
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Vet and test
+        run: |
+          go vet ./...
+          go test ./...
+
+  sync-secrets:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.sync.outputs.result }}
+    steps:
+      - name: Check and sync missing secrets
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          _REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          _REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          _REGISTRY_EMAIL: ${{ secrets.REGISTRY_EMAIL }}
+          _POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          _REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          _KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          REQUIRED_SECRETS="REGISTRY_USERNAME REGISTRY_PASSWORD REGISTRY_EMAIL POSTGRES_PASSWORD REDIS_PASSWORD KUBE_CONFIG"
+          EXISTING=$(gh secret list --repo "${{ github.repository }}" --json name -q '.[].name' 2>/dev/null || echo "")
+          for secret in $REQUIRED_SECRETS; do
+            env_var="_${secret}"
+            if echo "$EXISTING" | grep -qx "$secret" && [ -z "${!env_var}" ]; then
+              gh secret delete "$secret" --repo "${{ github.repository }}" 2>/dev/null || true
+            fi
+          done
+          EXISTING=$(gh secret list --repo "${{ github.repository }}" --json name -q '.[].name' 2>/dev/null || echo "")
+          MISSING=()
+          for secret in $REQUIRED_SECRETS; do
+            echo "$EXISTING" | grep -qx "$secret" || MISSING+=("$secret")
+          done
+          if [ ${#MISSING[@]} -eq 0 ]; then
+            echo "All secrets present"
+            echo "result=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "Syncing: ${MISSING[*]}"
+          gh workflow run sync-secrets.yml --repo Bengo-Hub/devops-k8s --ref main \
+            -f target_repo="${{ github.repository }}" -f secrets="${MISSING[*]}"
+          for i in $(seq 1 18); do
+            sleep 10
+            CURRENT=$(gh secret list --repo "${{ github.repository }}" --json name -q '.[].name' 2>/dev/null || echo "")
+            LEFT=0
+            for secret in "${MISSING[@]}"; do echo "$CURRENT" | grep -qx "$secret" || LEFT=$((LEFT + 1)); done
+            if [ $LEFT -eq 0 ]; then echo "result=synced" >> $GITHUB_OUTPUT; exit 0; fi
+          done
+          echo "result=partial" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: sync-secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Re-trigger after a fresh secret sync
+        if: needs.sync-secrets.outputs.result == 'synced'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: gh workflow run deploy.yml --repo "${{ github.repository }}" --ref "${{ github.ref }}"
+
+      - name: Abort on partial sync
+        if: needs.sync-secrets.outputs.result == 'partial'
+        run: |
+          echo "Secret sync timed out, see https://github.com/Bengo-Hub/devops-k8s/actions"
+          exit 1
+
+      - uses: actions/checkout@v4
+        if: needs.sync-secrets.outputs.result != 'synced'
+
+      - uses: docker/setup-buildx-action@v3
+        if: needs.sync-secrets.outputs.result != 'synced'
+
+      - name: Install DevOps tools
+        if: needs.sync-secrets.outputs.result != 'synced'
+        uses: Bengo-Hub/devops-k8s/.github/actions/install-devops-tools@main
+
+      - name: Verify secrets
+        if: needs.sync-secrets.outputs.result != 'synced'
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        run: |
+          FAIL=0
+          check() { if [[ ${#3} -lt $2 ]]; then echo "FAIL $1 (${#3} chars, need $2)"; FAIL=1; else echo "OK $1"; fi; }
+          check REGISTRY_USERNAME 5 "$REGISTRY_USERNAME"
+          check REGISTRY_PASSWORD 12 "$REGISTRY_PASSWORD"
+          check KUBE_CONFIG 1000 "$KUBE_CONFIG"
+          check POSTGRES_PASSWORD 8 "$POSTGRES_PASSWORD"
+          check REDIS_PASSWORD 8 "$REDIS_PASSWORD"
+          exit $FAIL
+
+      - name: Build and deploy
+        if: needs.sync-secrets.outputs.result != 'synced'
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          GITHUB_SHA: ${{ github.sha }}
+          DEPLOY: true
+          SETUP_DATABASES: true
+          NAMESPACE: maskani
+          ENV_SECRET_NAME: maskani-api-secrets
+          REGISTRY_SERVER: docker.io
+          REGISTRY_NAMESPACE: codevertex
+          VALUES_FILE_PATH: apps/maskani-api/values.yaml
+          APP_NAME: maskani-api
+          GIT_USER: ${{ secrets.GIT_USER || 'Maskani Bot' }}
+          GIT_EMAIL: ${{ secrets.GIT_EMAIL || 'dev@bengobox.com' }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Tag and push latest
+        if: success() && needs.sync-secrets.outputs.result != 'synced'
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          IMAGE_REPO="docker.io/codevertex/maskani-api"
+          echo "$REGISTRY_PASSWORD" | docker login docker.io -u "$REGISTRY_USERNAME" --password-stdin
+          docker pull "${IMAGE_REPO}:${GITHUB_SHA::8}" || true
+          docker tag "${IMAGE_REPO}:${GITHUB_SHA::8}" "${IMAGE_REPO}:latest"
+          docker push "${IMAGE_REPO}:latest"
+
+      - name: Refresh ArgoCD and check health
+        if: success() && needs.sync-secrets.outputs.result != 'synced'
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          [ -z "$KUBE_CONFIG_B64" ] && exit 0
+          mkdir -p ~/.kube
+          echo "$KUBE_CONFIG_B64" | base64 -d > ~/.kube/config 2>/dev/null || echo "$KUBE_CONFIG_B64" > ~/.kube/config
+          kubectl patch application maskani-api -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' || true
+          if kubectl get deployment maskani-api -n maskani >/dev/null 2>&1; then
+            kubectl rollout status deployment/maskani-api -n maskani --timeout=900s
+            curl -sk --max-time 10 https://maskaniapi.codevertexafrica.com/healthz | grep -qi ok && echo "Health OK"
+          fi

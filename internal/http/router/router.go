@@ -1,0 +1,295 @@
+// Package router builds the chi route table: platform middleware, tenant resolution, access, then
+// per-route module gates and permissions (docs/architecture.md, request pipeline).
+package router
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/Bengo-Hub/httpware"
+	authclient "github.com/Bengo-Hub/shared-auth-client"
+	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
+	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/http/handlers"
+	mw "github.com/bengobox/maskani-api/internal/http/middleware"
+	"github.com/bengobox/maskani-api/internal/modules/rbac"
+	"github.com/bengobox/maskani-api/internal/modules/settings"
+	"github.com/bengobox/maskani-api/internal/modules/tenant"
+)
+
+// Deps are the router's dependencies.
+type Deps struct {
+	Log            *zap.Logger
+	Limiter        *ratelimit.Limiter
+	Auth           *authclient.AuthMiddleware
+	AllowedOrigins []string
+	Ent            *ent.Client
+	RBAC           *rbac.Service
+	Settings       *settings.Service
+	TenantSyncer   *tenant.Syncer
+	H              *handlers.H
+	Health         *handlers.Health
+	MediaRoot      string
+	MediaSigner    *httpware.MediaSigner
+}
+
+// New returns the HTTP handler.
+func New(d Deps) http.Handler {
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(ratelimit.TrustedRealIP) // never chi RealIP: it trusts client-sent forwarding headers
+	r.Use(httpware.RequestID)
+	r.Use(httpware.Logging(d.Log))
+	r.Use(httpware.Recover(d.Log))
+	r.Use(httpware.BypassForStreaming(middleware.Timeout(60 * time.Second)))
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   d.AllowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Origin", "X-Request-ID", "X-Tenant-ID", "X-Tenant-Slug", "X-API-Key", "Idempotency-Key", "X-Outlet-ID", "X-Device-Key"},
+		ExposedHeaders:   []string{"Link", "Retry-After"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+	if d.Limiter != nil {
+		r.Use(d.Limiter.Middleware(ratelimit.IPKey, 300, time.Minute))
+	}
+
+	r.Get("/healthz", d.Health.Liveness)
+	r.Get("/readyz", d.Health.Readiness)
+	r.Get("/metrics", d.Health.Metrics)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/v1/docs/", http.StatusFound) })
+	r.Get("/v1/docs/*", docsHandler)
+
+	if d.MediaRoot != "" {
+		r.Handle("/media/*", http.StripPrefix("/media", httpware.StaticMedia(d.MediaRoot, httpware.MediaOptions{
+			Private: func(string) bool { return true },
+			Signer:  d.MediaSigner,
+		})))
+	}
+
+	h := d.H
+	// Public market (showcase). Tighter limits; enquiries are rate limited hardest.
+	r.Route("/api/v1/market", func(pr chi.Router) {
+		if d.Limiter != nil {
+			pr.Use(d.Limiter.Middleware(ratelimit.IPKey, 60, time.Minute))
+		}
+		pr.Get("/estates", h.PublicEstates)
+		pr.Get("/estates/{slug}", h.PublicEstate)
+		if d.Limiter != nil {
+			pr.With(d.Limiter.Middleware(ratelimit.IPKey, 5, time.Minute)).Post("/enquiries", h.PublicEnquiry)
+		} else {
+			pr.Post("/enquiries", h.PublicEnquiry)
+		}
+	})
+
+	// Gate tablets authenticate with their device key.
+	r.Route("/api/v1/gate", func(gr chi.Router) {
+		gr.Use(h.DeviceAuth)
+		gr.Post("/verify", h.DeviceVerify)
+		gr.Post("/events", h.DeviceEvents)
+		gr.Get("/sync", h.DeviceSync)
+		gr.Get("/units", h.DeviceUnits)
+		gr.Get("/walk-ins/{id}", h.DeviceWalkIn)
+		gr.Post("/incidents", h.DeviceIncident)
+	})
+
+	r.Route("/api/v1/{tenant}/maskani", func(tr chi.Router) {
+		tr.Use(d.Auth.RequireAuth)
+		tr.Use(authclient.RequireActiveSubscriptionForMutationsWithGrace(7))
+		tr.Use(httpware.TenantV2(httpware.TenantConfig{
+			ClaimsExtractor: func(ctx context.Context) (string, string, bool, bool) {
+				c, ok := authclient.ClaimsFromContext(ctx)
+				if !ok {
+					return "", "", false, false
+				}
+				return c.TenantID, c.GetTenantSlug(), c.IsPlatformOwner, true
+			},
+			URLParamFunc: chi.URLParam, URLParamName: "tenant", Required: true,
+		}))
+		tr.Use(tenantSync(d))
+		tr.Use(mw.ResolveAccess(d.Ent, d.RBAC, d.Log))
+		mount(tr, d)
+	})
+	routes = r
+	return r
+}
+
+// tenantSync resolves slug to the auth-api UUID when TenantV2 left the id empty (platform owners
+// visiting another tenant, S2S callers), and keeps the local projection current.
+func tenantSync(d Deps) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			slug := httpware.GetTenantSlug(ctx)
+			if slug == "" {
+				slug = chi.URLParam(r, "tenant")
+			}
+			if id := httpware.GetTenantID(ctx); id == "" || slug != "" {
+				if tid, err := d.TenantSyncer.SyncTenant(ctx, slug); err == nil && tid != uuid.Nil {
+					if httpware.GetTenantID(ctx) == "" {
+						ctx = context.WithValue(ctx, httpware.TenantIDKey, tid.String())
+					}
+				} else if err != nil {
+					d.Log.Warn("tenant sync failed", zap.String("slug", slug), zap.Error(err))
+				}
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func mount(r chi.Router, d Deps) {
+	h := d.H
+	perm := mw.RequirePermission
+	mod := func(m string) func(http.Handler) http.Handler { return mw.RequireModule(d.Settings, m) }
+
+	r.Get("/auth/me", h.Me)
+	r.Post("/media/upload", h.Media.Upload)
+	r.Post("/media/sign", h.Media.Sign)
+
+	// Settings, users, catalogues.
+	r.With(perm(rbac.PermSettingsView)).Get("/settings", h.GetSettings)
+	r.With(perm(rbac.PermSettingsManage)).Put("/settings", h.UpdateSettings)
+	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
+	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
+	r.Get("/catalogues/{kind}", h.Catalogue)
+	r.With(perm(rbac.PermSettingsManage)).Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
+	r.With(perm(rbac.PermUsersView)).Get("/users", h.ListUsers)
+	r.With(perm(rbac.PermUsersView)).Get("/roles", h.ListRoles)
+	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/roles", h.SetUserRoles)
+
+	// Register.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModProperties))
+		g.With(perm(rbac.PermPropertiesView)).Get("/properties", h.ListProperties)
+		g.With(perm(rbac.PermPropertiesManage)).Post("/properties", h.CreateProperty)
+		g.With(perm(rbac.PermPropertiesView)).Get("/properties/{id}", h.GetProperty)
+		g.With(perm(rbac.PermPropertiesManage)).Patch("/properties/{id}", h.UpdateProperty)
+		g.With(perm(rbac.PermPropertiesManage)).Post("/properties/{id}/blocks", h.CreateBlock)
+		g.With(perm(rbac.PermUsersView)).Get("/properties/{id}/staff", h.ListStaff)
+		g.With(perm(rbac.PermUsersManage)).Post("/properties/{id}/staff", h.AssignStaff)
+		g.With(perm(rbac.PermUsersManage)).Delete("/staff-assignments/{id}", h.RemoveStaff)
+		g.With(perm(rbac.PermUnitsView)).Get("/units", h.ListUnits)
+		g.With(perm(rbac.PermUnitsManage)).Post("/units", h.CreateUnit)
+		g.With(perm(rbac.PermUnitsView)).Get("/units/{id}", h.GetUnit)
+		g.With(perm(rbac.PermUnitsManage)).Patch("/units/{id}", h.UpdateUnit)
+		g.With(perm(rbac.PermPartiesManage)).Post("/units/{id}/parties", h.LinkParty)
+		g.With(perm(rbac.PermPartiesManage)).Post("/units/{id}/vehicles", h.AddVehicle)
+		g.With(perm(rbac.PermPartiesManage)).Post("/unit-parties/{id}/end", h.EndLink)
+		g.With(perm(rbac.PermPartiesView)).Get("/parties", h.ListParties)
+		g.With(perm(rbac.PermPartiesManage)).Post("/parties", h.CreateParty)
+		g.With(perm(rbac.PermPartiesManage)).Patch("/parties/{id}", h.UpdateParty)
+		g.With(perm(rbac.PermPartiesManage)).Post("/parties/{id}/invite", h.InviteParty)
+	})
+
+	// Billing and collections.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModBilling))
+		g.With(perm(rbac.PermBillingView)).Get("/funds", h.ListFunds)
+		g.With(perm(rbac.PermBillingManage)).Patch("/funds/{id}", h.UpdateFund)
+		g.With(perm(rbac.PermBillingView)).Get("/charge-types", h.ListCharges)
+		g.With(perm(rbac.PermBillingManage)).Post("/charge-types", h.CreateCharge)
+		g.With(perm(rbac.PermBillingManage)).Post("/charge-types/enable", h.EnableCharge)
+		g.With(perm(rbac.PermBillingManage)).Patch("/charge-types/{id}", h.UpdateCharge)
+		g.With(perm(rbac.PermBillingManage)).Post("/charge-types/{id}/rates", h.AddRate)
+		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs/preview", h.PreviewRun)
+		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs", h.IssueRun)
+		g.With(perm(rbac.PermBillingView)).Get("/billing-runs", h.ListRuns)
+		g.With(perm(rbac.PermBillingView)).Get("/billing-runs/{id}/lines", h.RunLines)
+		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs/{id}/retry", h.RetryRun)
+		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts", h.ListAccounts)
+		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts/{id}/statement", h.Statement)
+		g.With(perm(rbac.PermBillingCollect)).Post("/unit-accounts/{id}/pay", h.StaffPay)
+		g.With(perm(rbac.PermBillingCollect)).Get("/collections/suspense", h.Suspense)
+		g.With(perm(rbac.PermBillingCollect)).Post("/collections/suspense/{trans_id}/assign", h.AssignSuspense)
+		g.With(perm(rbac.PermReportsView)).Get("/reports/arrears", h.Arrears)
+	})
+
+	// Utilities.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModUtilities))
+		g.With(perm(rbac.PermUtilitiesView, rbac.PermUtilitiesRead)).Get("/meters", h.ListMeters)
+		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters", h.CreateMeter)
+		g.With(perm(rbac.PermUtilitiesRead)).Get("/reading-rounds/{period}", h.GetRound)
+		g.With(perm(rbac.PermUtilitiesRead)).Post("/meters/{id}/readings", h.RecordReading)
+		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters/{id}/estimate", h.EstimateReading)
+		g.With(perm(rbac.PermUtilitiesManage)).Post("/meter-readings/{id}/verify", h.VerifyReading)
+		g.With(perm(rbac.PermUtilitiesView)).Get("/water-balance", h.WaterBalance)
+	})
+
+	// Sales.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModSales))
+		g.With(perm(rbac.PermSalesView)).Get("/price-lists", h.ListPriceLists)
+		g.With(perm(rbac.PermSalesManage)).Post("/price-lists", h.CreatePriceList)
+		g.With(perm(rbac.PermSalesView)).Get("/availability", h.Availability)
+		g.With(perm(rbac.PermSalesManage)).Post("/reservations", h.Reserve)
+		g.With(perm(rbac.PermSalesView)).Get("/sale-contracts", h.ListContracts)
+		g.With(perm(rbac.PermSalesManage)).Post("/sale-contracts", h.CreateContract)
+		g.With(perm(rbac.PermSalesView)).Get("/sale-contracts/{id}", h.GetContract)
+		g.With(perm(rbac.PermSalesManage)).Post("/sale-contracts/{id}/activate", h.ActivateContract)
+		g.With(perm(rbac.PermSalesManage)).Post("/instalments/{id}/release", h.ReleaseMilestone)
+		g.With(perm(rbac.PermReportsView, rbac.PermSalesView)).Get("/reports/sales-position", h.SalesPosition)
+		g.With(perm(rbac.PermSalesView)).Get("/enquiries", h.ListEnquiries)
+		g.With(perm(rbac.PermSalesManage)).Patch("/enquiries/{id}", h.UpdateEnquiry)
+	})
+
+	// Works and vendors.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModMaintenance))
+		g.With(perm(rbac.PermWorksView)).Get("/work-orders", h.ListWorkOrders)
+		g.With(perm(rbac.PermWorksManage)).Post("/work-orders", h.CreateWorkOrder)
+		g.With(perm(rbac.PermWorksView)).Get("/work-orders/{id}", h.GetWorkOrder)
+		g.With(perm(rbac.PermWorksManage)).Post("/work-orders/{id}/actions", h.ActWorkOrder)
+		g.With(perm(rbac.PermVendorsView)).Get("/vendors", h.ListVendors)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendors", h.CreateVendor)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendors/{id}/documents", h.AddVendorDocument)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendors/{id}/personnel", h.AddPersonnel)
+	})
+
+	// Gate (staff side).
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModGate))
+		g.With(perm(rbac.PermGateManage)).Post("/gate/devices", h.RegisterDevice)
+		g.With(perm(rbac.PermGateView)).Get("/gate/events", h.ListGateEvents)
+		g.With(perm(rbac.PermGateView)).Get("/visitor-passes", h.ListPasses)
+		g.With(perm(rbac.PermGateManage)).Post("/visitor-passes", h.StaffCreatePass)
+		g.With(perm(rbac.PermGateView)).Get("/incidents", h.ListIncidents)
+		g.With(perm(rbac.PermGateView)).Post("/incidents", h.ReportIncident)
+	})
+
+	// Communication and reports.
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModCommunication))
+		g.With(perm(rbac.PermNoticesManage)).Get("/notices", h.ListNotices)
+		g.With(perm(rbac.PermNoticesManage)).Post("/notices", h.CreateNotice)
+		g.With(perm(rbac.PermNoticesManage)).Post("/notices/{id}/send", h.SendNotice)
+		g.With(perm(rbac.PermNoticesManage)).Get("/notices/{id}/deliveries", h.NoticeDeliveries)
+	})
+	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
+
+	// Portal: scoped by the caller's own unit links.
+	r.Route("/me", func(m chi.Router) {
+		m.Use(mw.RequirePortalUser)
+		m.Get("/units", h.MyUnits)
+		m.Get("/accounts/{id}/statement", h.MyStatement)
+		m.Post("/accounts/{id}/pay", h.MyPay)
+		m.Get("/purchase", h.MyPurchase)
+		m.Get("/passes", h.MyPasses)
+		m.Post("/passes", h.MyCreatePass)
+		m.Post("/passes/{id}/cancel", h.MyCancelPass)
+		m.Get("/requests", h.MyRequests)
+		m.Post("/requests", h.MyCreateRequest)
+		m.Post("/requests/{id}/actions", h.MyRequestAction)
+		m.Get("/notices", h.MyNotices)
+		m.Post("/terms/accept", h.MyAcceptTerms)
+		m.Post("/walk-ins/{id}/decide", h.MyDecideWalkIn)
+	})
+}

@@ -1,0 +1,327 @@
+package rbac
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
+	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
+	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
+	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
+	"github.com/bengobox/maskani-api/internal/ent/rolepermission"
+	"github.com/bengobox/maskani-api/internal/ent/userroleassignment"
+)
+
+// cacheTTL bounds how stale a pod's permission view can be after a role change on another pod.
+const cacheTTL = 60 * time.Second
+
+type cached struct {
+	roles []string
+	perms []string
+	at    time.Time
+}
+
+// Service seeds the catalogue and resolves users, roles and permissions.
+type Service struct {
+	client *ent.Client
+	log    *zap.Logger
+
+	mu    sync.RWMutex
+	cache map[string]cached
+	seen  map[string]time.Time
+}
+
+// NewService creates the RBAC service.
+func NewService(client *ent.Client, log *zap.Logger) *Service {
+	return &Service{client: client, log: log.Named("rbac"), cache: map[string]cached{}, seen: map[string]time.Time{}}
+}
+
+// Seed upserts the permission catalogue and system roles with their permission sets. Idempotent.
+func (s *Service) Seed(ctx context.Context) error {
+	permIDs := map[string]uuid.UUID{}
+	for _, p := range Catalogue {
+		id, err := s.client.MaskaniPermission.Create().
+			SetPermissionCode(p.Code).SetName(p.Name).SetModule(p.Module).SetAction(p.Action).
+			OnConflictColumns(maskanipermission.FieldPermissionCode).
+			UpdateName().UpdateModule().UpdateAction().
+			ID(ctx)
+		if err != nil {
+			return fmt.Errorf("rbac seed permission %s: %w", p.Code, err)
+		}
+		permIDs[p.Code] = id
+	}
+	for _, r := range Roles {
+		role, err := s.client.MaskaniRole.Query().
+			Where(maskanirole.RoleCode(r.Code), maskanirole.TenantIDIsNil()).Only(ctx)
+		if ent.IsNotFound(err) {
+			role, err = s.client.MaskaniRole.Create().
+				SetRoleCode(r.Code).SetName(r.Name).SetDescription(r.Description).
+				SetIsSystemRole(true).SetIsCustomerRole(r.Customer).Save(ctx)
+		} else if err == nil {
+			role, err = role.Update().SetName(r.Name).SetDescription(r.Description).
+				SetIsCustomerRole(r.Customer).Save(ctx)
+		}
+		if err != nil {
+			return fmt.Errorf("rbac seed role %s: %w", r.Code, err)
+		}
+		if _, err := s.client.RolePermission.Delete().Where(rolepermission.RoleID(role.ID)).Exec(ctx); err != nil {
+			return err
+		}
+		bulk := make([]*ent.RolePermissionCreate, 0, len(r.Permissions))
+		for _, code := range r.Permissions {
+			if pid, ok := permIDs[code]; ok {
+				bulk = append(bulk, s.client.RolePermission.Create().SetRoleID(role.ID).SetPermissionID(pid))
+			}
+		}
+		if len(bulk) > 0 {
+			if err := s.client.RolePermission.CreateBulk(bulk...).Exec(ctx); err != nil {
+				return fmt.Errorf("rbac seed role permissions %s: %w", r.Code, err)
+			}
+		}
+	}
+	return nil
+}
+
+// Identity is what the token tells us about a caller.
+type Identity struct {
+	TenantID   uuid.UUID
+	AuthUserID uuid.UUID
+	Email      string
+	Name       string
+	Phone      string
+	SSORoles   []string
+}
+
+// EnsureUser creates or refreshes the local user and, when the user has no role yet, assigns the
+// role mapped from their SSO roles. Throttled per pod so it does not write on every request.
+func (s *Service) EnsureUser(ctx context.Context, id Identity) (*ent.MaskaniUser, error) {
+	key := id.TenantID.String() + ":" + id.AuthUserID.String()
+	s.mu.RLock()
+	last, ok := s.seen[key]
+	s.mu.RUnlock()
+	if ok && time.Since(last) < 5*time.Minute {
+		return s.client.MaskaniUser.Query().
+			Where(maskaniuser.TenantID(id.TenantID), maskaniuser.AuthServiceUserID(id.AuthUserID)).Only(ctx)
+	}
+
+	roleCode := ""
+	for _, r := range id.SSORoles {
+		if m := MapSSORole(r); m != "" {
+			if roleCode == "" || m == RoleTenantAdmin {
+				roleCode = m
+			}
+		}
+	}
+	kind := maskaniuser.KindStaff
+	switch roleCode {
+	case RoleOwner, RoleOccupant:
+		kind = maskaniuser.KindCustomer
+	case RoleVendorSupervisor:
+		kind = maskaniuser.KindVendorSupervisor
+	case RoleGuard:
+		kind = maskaniuser.KindGuard
+	}
+
+	create := s.client.MaskaniUser.Create().
+		SetTenantID(id.TenantID).SetAuthServiceUserID(id.AuthUserID).SetKind(kind).
+		SetSyncStatus("synced").SetLastSyncAt(time.Now())
+	if id.Email != "" {
+		create.SetEmail(id.Email)
+	}
+	if id.Name != "" {
+		create.SetName(id.Name)
+	}
+	if id.Phone != "" {
+		create.SetPhone(id.Phone)
+	}
+	userID, err := create.
+		OnConflictColumns(maskaniuser.FieldTenantID, maskaniuser.FieldAuthServiceUserID).
+		UpdateLastSyncAt().
+		ID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("rbac ensure user: %w", err)
+	}
+
+	if roleCode != "" {
+		has, err := s.client.UserRoleAssignment.Query().
+			Where(userroleassignment.TenantID(id.TenantID), userroleassignment.UserID(userID)).Exist(ctx)
+		if err == nil && !has {
+			if role, rerr := s.client.MaskaniRole.Query().
+				Where(maskanirole.RoleCode(roleCode), maskanirole.TenantIDIsNil()).Only(ctx); rerr == nil {
+				_ = s.client.UserRoleAssignment.Create().
+					SetTenantID(id.TenantID).SetUserID(userID).SetRoleID(role.ID).SetAssignedBy(id.AuthUserID).
+					OnConflictColumns(userroleassignment.FieldTenantID, userroleassignment.FieldUserID, userroleassignment.FieldRoleID).
+					DoNothing().Exec(ctx)
+				s.invalidate(id.TenantID, id.AuthUserID)
+			}
+		}
+	}
+
+	s.mu.Lock()
+	s.seen[key] = time.Now()
+	s.mu.Unlock()
+	return s.client.MaskaniUser.Get(ctx, userID)
+}
+
+// Resolve returns the caller's Maskani roles and permissions within the tenant.
+func (s *Service) Resolve(ctx context.Context, tenantID, authUserID uuid.UUID) (roles, perms []string, err error) {
+	key := tenantID.String() + ":" + authUserID.String()
+	s.mu.RLock()
+	c, ok := s.cache[key]
+	s.mu.RUnlock()
+	if ok && time.Since(c.at) < cacheTTL {
+		return c.roles, c.perms, nil
+	}
+
+	user, err := s.client.MaskaniUser.Query().
+		Where(maskaniuser.TenantID(tenantID), maskaniuser.AuthServiceUserID(authUserID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if user.Status != "active" {
+		return nil, nil, nil
+	}
+	now := time.Now()
+	assignments, err := s.client.UserRoleAssignment.Query().
+		Where(userroleassignment.TenantID(tenantID), userroleassignment.UserID(user.ID),
+			userroleassignment.Or(userroleassignment.ExpiresAtIsNil(), userroleassignment.ExpiresAtGT(now))).
+		WithRole(func(q *ent.MaskaniRoleQuery) { q.WithPermissions() }).
+		All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	roleSet, permSet := map[string]bool{}, map[string]bool{}
+	for _, a := range assignments {
+		if a.Edges.Role == nil {
+			continue
+		}
+		roleSet[a.Edges.Role.RoleCode] = true
+		for _, p := range a.Edges.Role.Edges.Permissions {
+			permSet[p.PermissionCode] = true
+		}
+	}
+	roles, perms = keys(roleSet), keys(permSet)
+	s.mu.Lock()
+	s.cache[key] = cached{roles: roles, perms: perms, at: time.Now()}
+	s.mu.Unlock()
+	return roles, perms, nil
+}
+
+// HasAny reports whether the caller holds any of the permissions.
+func (s *Service) HasAny(ctx context.Context, tenantID, authUserID uuid.UUID, codes ...string) bool {
+	_, perms, err := s.Resolve(ctx, tenantID, authUserID)
+	if err != nil {
+		s.log.Warn("permission resolve failed", zap.Error(err))
+		return false
+	}
+	for _, c := range codes {
+		for _, p := range perms {
+			if p == c {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SetUserRoles replaces a user's role assignments within the tenant.
+func (s *Service) SetUserRoles(ctx context.Context, tenantID, userID, actor uuid.UUID, roleCodes []string) error {
+	user, err := s.client.MaskaniUser.Get(ctx, userID)
+	if err != nil || user.TenantID != tenantID {
+		return fmt.Errorf("user not found")
+	}
+	roles, err := s.client.MaskaniRole.Query().
+		Where(maskanirole.RoleCodeIn(roleCodes...),
+			maskanirole.Or(maskanirole.TenantIDIsNil(), maskanirole.TenantID(tenantID))).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(roles) == 0 {
+		return fmt.Errorf("no valid roles")
+	}
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.UserRoleAssignment.Delete().
+		Where(userroleassignment.TenantID(tenantID), userroleassignment.UserID(userID)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	for _, r := range roles {
+		if err := tx.UserRoleAssignment.Create().SetTenantID(tenantID).SetUserID(userID).
+			SetRoleID(r.ID).SetAssignedBy(actor).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.invalidate(tenantID, user.AuthServiceUserID)
+	return nil
+}
+
+// ListRoles returns the global roles plus the tenant's own.
+func (s *Service) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]*ent.MaskaniRole, error) {
+	return s.client.MaskaniRole.Query().
+		Where(maskanirole.Or(maskanirole.TenantIDIsNil(), maskanirole.TenantID(tenantID))).
+		WithPermissions().Order(ent.Asc(maskanirole.FieldName)).All(ctx)
+}
+
+// UserView is a user row with role codes for the admin screen.
+type UserView struct {
+	*ent.MaskaniUser
+	Roles []string `json:"roles"`
+}
+
+// ListUsers returns the tenant's users of a kind with their roles. Bounded by limit.
+func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind string, limit int) ([]UserView, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	q := s.client.MaskaniUser.Query().Where(maskaniuser.TenantID(tenantID))
+	if kind != "" {
+		q = q.Where(maskaniuser.KindEQ(maskaniuser.Kind(kind)))
+	}
+	users, err := q.WithRoleAssignments(func(a *ent.UserRoleAssignmentQuery) { a.WithRole() }).
+		Order(ent.Asc(maskaniuser.FieldName)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]UserView, 0, len(users))
+	for _, u := range users {
+		v := UserView{MaskaniUser: u, Roles: []string{}}
+		for _, a := range u.Edges.RoleAssignments {
+			if a.Edges.Role != nil {
+				v.Roles = append(v.Roles, a.Edges.Role.RoleCode)
+			}
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+func (s *Service) invalidate(tenantID, authUserID uuid.UUID) {
+	s.mu.Lock()
+	delete(s.cache, tenantID.String()+":"+authUserID.String())
+	s.mu.Unlock()
+}
+
+func keys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}

@@ -1,0 +1,185 @@
+// Package rbac holds the Maskani permission catalogue and roles (global, never tenant scoped) and
+// resolves a user's effective permissions within a tenant.
+package rbac
+
+// Permission codes. Format maskani.{module}.{action}.
+const (
+	PermTenantAdmin      = "maskani.tenant.admin"
+	PermSettingsView     = "maskani.settings.view"
+	PermSettingsManage   = "maskani.settings.manage"
+	PermUsersView        = "maskani.users.view"
+	PermUsersManage      = "maskani.users.manage"
+	PermPropertiesView   = "maskani.properties.view"
+	PermPropertiesManage = "maskani.properties.manage"
+	PermUnitsView        = "maskani.units.view"
+	PermUnitsManage      = "maskani.units.manage"
+	PermPartiesView      = "maskani.parties.view"
+	PermPartiesManage    = "maskani.parties.manage"
+	PermImportsRun       = "maskani.imports.run"
+	PermBillingView      = "maskani.billing.view"
+	PermBillingManage    = "maskani.billing.manage"
+	PermBillingRun       = "maskani.billing.run"
+	PermBillingCollect   = "maskani.billing.collect"
+	PermBillingAdjust    = "maskani.billing.adjust"
+	PermBillingApprove   = "maskani.billing.approve"
+	PermUtilitiesRead    = "maskani.utilities.read"
+	PermUtilitiesView    = "maskani.utilities.view"
+	PermUtilitiesManage  = "maskani.utilities.manage"
+	PermSalesView        = "maskani.sales.view"
+	PermSalesManage      = "maskani.sales.manage"
+	PermWorksView        = "maskani.works.view"
+	PermWorksManage      = "maskani.works.manage"
+	PermVendorsView      = "maskani.vendors.view"
+	PermVendorsManage    = "maskani.vendors.manage"
+	PermGateView         = "maskani.gate.view"
+	PermGateManage       = "maskani.gate.manage"
+	PermNoticesManage    = "maskani.notices.manage"
+	PermDocumentsManage  = "maskani.documents.manage"
+	PermReportsView      = "maskani.reports.view"
+	PermPrivacyManage    = "maskani.privacy.manage"
+)
+
+// PermissionDef describes one catalogue entry.
+type PermissionDef struct {
+	Code   string
+	Name   string
+	Module string
+	Action string
+}
+
+// Catalogue is the full permission list, seeded on start.
+var Catalogue = []PermissionDef{
+	{PermTenantAdmin, "Administer the tenant", "tenant", "admin"},
+	{PermSettingsView, "View settings", "settings", "view"},
+	{PermSettingsManage, "Manage settings, modules and catalogues", "settings", "manage"},
+	{PermUsersView, "View users and roles", "users", "view"},
+	{PermUsersManage, "Manage users, roles and property staff", "users", "manage"},
+	{PermPropertiesView, "View properties", "properties", "view"},
+	{PermPropertiesManage, "Manage properties and blocks", "properties", "manage"},
+	{PermUnitsView, "View units", "units", "view"},
+	{PermUnitsManage, "Manage units", "units", "manage"},
+	{PermPartiesView, "View owners and occupants", "parties", "view"},
+	{PermPartiesManage, "Manage owners, occupants and household", "parties", "manage"},
+	{PermImportsRun, "Run data imports", "imports", "run"},
+	{PermBillingView, "View accounts, invoices and statements", "billing", "view"},
+	{PermBillingManage, "Manage charges, rates and funds", "billing", "manage"},
+	{PermBillingRun, "Run billing", "billing", "run"},
+	{PermBillingCollect, "Record and assign payments", "billing", "collect"},
+	{PermBillingAdjust, "Request credit notes and adjustments", "billing", "adjust"},
+	{PermBillingApprove, "Approve credit notes and adjustments", "billing", "approve"},
+	{PermUtilitiesRead, "Capture meter readings", "utilities", "read"},
+	{PermUtilitiesView, "View meters, readings and water balance", "utilities", "view"},
+	{PermUtilitiesManage, "Manage meters and verify readings", "utilities", "manage"},
+	{PermSalesView, "View sales, contracts and statements", "sales", "view"},
+	{PermSalesManage, "Manage price lists, reservations and contracts", "sales", "manage"},
+	{PermWorksView, "View work orders", "works", "view"},
+	{PermWorksManage, "Manage work orders and maintenance", "works", "manage"},
+	{PermVendorsView, "View vendors", "vendors", "view"},
+	{PermVendorsManage, "Manage vendors, contracts and personnel", "vendors", "manage"},
+	{PermGateView, "View gate logs, passes and incidents", "gate", "view"},
+	{PermGateManage, "Manage gate devices, posts and incidents", "gate", "manage"},
+	{PermNoticesManage, "Send notices", "notices", "manage"},
+	{PermDocumentsManage, "Manage templates and documents", "documents", "manage"},
+	{PermReportsView, "View reports and dashboards", "reports", "view"},
+	{PermPrivacyManage, "Handle data subject requests", "privacy", "manage"},
+}
+
+// RoleDef describes a seeded system role.
+type RoleDef struct {
+	Code        string
+	Name        string
+	Description string
+	Customer    bool
+	Permissions []string
+}
+
+func allCodes() []string {
+	out := make([]string, 0, len(Catalogue))
+	for _, p := range Catalogue {
+		out = append(out, p.Code)
+	}
+	return out
+}
+
+// Role codes.
+const (
+	RoleTenantAdmin      = "tenant_admin"
+	RolePropertyManager  = "property_manager"
+	RoleFinanceOfficer   = "finance_officer"
+	RoleSalesOfficer     = "sales_officer"
+	RoleCaretaker        = "caretaker"
+	RoleSecurityManager  = "security_manager"
+	RoleViewer           = "viewer"
+	RoleOwner            = "owner"
+	RoleOccupant         = "occupant"
+	RoleVendorSupervisor = "vendor_supervisor"
+	RoleGuard            = "guard"
+)
+
+// Roles is the seeded role catalogue. Portal roles carry no staff permissions: what a customer can
+// see is decided by their unit links, not by permissions.
+var Roles = []RoleDef{
+	{RoleTenantAdmin, "Tenant administrator", "All settings, staff, roles and approvals", false, allCodes()},
+	{RolePropertyManager, "Property manager", "Runs assigned properties", false, []string{
+		PermSettingsView, PermUsersView, PermPropertiesView, PermPropertiesManage, PermUnitsView, PermUnitsManage,
+		PermPartiesView, PermPartiesManage, PermImportsRun, PermBillingView, PermUtilitiesView, PermUtilitiesManage,
+		PermUtilitiesRead, PermSalesView, PermWorksView, PermWorksManage, PermVendorsView, PermVendorsManage,
+		PermGateView, PermGateManage, PermNoticesManage, PermDocumentsManage, PermReportsView,
+	}},
+	{RoleFinanceOfficer, "Finance officer", "Billing, collections and adjustments", false, []string{
+		PermSettingsView, PermPropertiesView, PermUnitsView, PermPartiesView, PermBillingView, PermBillingManage,
+		PermBillingRun, PermBillingCollect, PermBillingAdjust, PermUtilitiesView, PermSalesView, PermVendorsView,
+		PermReportsView,
+	}},
+	{RoleSalesOfficer, "Sales officer", "Price lists, reservations and sale contracts", false, []string{
+		PermPropertiesView, PermUnitsView, PermPartiesView, PermPartiesManage, PermSalesView, PermSalesManage,
+		PermBillingView, PermDocumentsManage, PermReportsView,
+	}},
+	{RoleCaretaker, "Caretaker", "On-site readings, work orders and notices", false, []string{
+		PermPropertiesView, PermUnitsView, PermPartiesView, PermUtilitiesRead, PermUtilitiesView, PermWorksView,
+		PermWorksManage, PermGateView,
+	}},
+	{RoleSecurityManager, "Security manager", "Gate, passes, patrols and incidents", false, []string{
+		PermPropertiesView, PermUnitsView, PermGateView, PermGateManage, PermVendorsView,
+	}},
+	{RoleViewer, "Viewer", "Read-only staff access", false, []string{
+		PermPropertiesView, PermUnitsView, PermPartiesView, PermBillingView, PermReportsView,
+	}},
+	{RoleOwner, "Owner or buyer", "Portal access to own units", true, nil},
+	{RoleOccupant, "Occupant", "Portal access to the unit they live in", true, nil},
+	{RoleVendorSupervisor, "Vendor supervisor", "Vendor portal", true, nil},
+	{RoleGuard, "Guard", "Gate tablet only", true, nil},
+}
+
+// MapSSORole maps a global auth-api role onto a Maskani role. Unknown staff roles map to viewer so a
+// new staff member sees something read-only until an admin assigns a role.
+func MapSSORole(role string) string {
+	// In auth-api "owner" is the business owner (an admin-level role) and "member" is the default
+	// staff membership. Portal users are created with explicit maskani_* roles so they can never
+	// be confused with staff.
+	switch role {
+	case "superuser", "super_admin", "admin", "owner", "tenant_admin", "administrator", "director":
+		return RoleTenantAdmin
+	case "manager", "property_manager", "estate_manager", "supervisor":
+		return RolePropertyManager
+	case "accountant", "finance", "finance_officer", "cashier":
+		return RoleFinanceOfficer
+	case "sales", "sales_officer", "letting_officer":
+		return RoleSalesOfficer
+	case "caretaker", "maskani_caretaker":
+		return RoleCaretaker
+	case "security", "security_manager":
+		return RoleSecurityManager
+	case "maskani_owner", "customer":
+		return RoleOwner
+	case "maskani_occupant":
+		return RoleOccupant
+	case "maskani_vendor":
+		return RoleVendorSupervisor
+	case "maskani_guard":
+		return RoleGuard
+	case "member", "staff":
+		return RoleViewer
+	}
+	return ""
+}
