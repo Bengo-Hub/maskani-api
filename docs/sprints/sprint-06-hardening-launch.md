@@ -17,6 +17,18 @@ SRDD weeks 13 and 14 (hardening week, launch week, milestone 4).
 | Configuration tests | Each preset and module switched on and off; no screen, route, job or message of a disabled module reachable |
 | UAT and launch | Shaba staff and pilot owners; owner invitations; training; handover |
 
+## Progress
+
+As of 2026-10-08.
+
+- [x] Ent tenant guard, fails closed, integration tested (ahead of this sprint)
+- [x] Gate event BRIN and composite indexes (ahead of this sprint)
+- [ ] Row-level security (gap tracked in `docs/backlog.md`)
+- [ ] Partitions for `gate_events` and `patrol_scans`
+- [ ] Security review, load test, restore drill
+- [ ] Parallel billing run, live payment tests, offline gate test
+- [ ] Configuration tests, UAT and launch
+
 ## Rules to apply in this sprint
 
 Standing backend rules in [README.md](README.md), plus:

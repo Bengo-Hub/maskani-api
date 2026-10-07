@@ -505,7 +505,7 @@ func (s *Service) invoice(ctx context.Context, acc *ent.UnitAccount, refType str
 	if f.TreasuryBankAccountID != nil {
 		req.SettlementAccountID = f.TreasuryBankAccountID
 	}
-	return s.treasury.CreateInvoice(ctx, tenantID, req)
+	return s.treasury.IssueInvoice(ctx, tenantID, req)
 }
 
 // ReleaseMilestone makes a milestone instalment due now, with evidence.

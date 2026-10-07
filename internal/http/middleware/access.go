@@ -36,7 +36,7 @@ type Access struct {
 	// PropertyIDs are the properties a limited staff user may see.
 	PropertyIDs []uuid.UUID
 	// PartyIDs are the parties linked to a portal user.
-	PartyIDs []uuid.UUID
+	PartyIDs  []uuid.UUID
 	IsService bool
 	Claims    *authclient.Claims
 }

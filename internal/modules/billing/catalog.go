@@ -109,30 +109,30 @@ func (s *Service) ListCharges(ctx context.Context, includeInactive bool) ([]Char
 
 // ChargeInput creates or edits a charge type.
 type ChargeInput struct {
-	Code              *string         `json:"code"`
-	Name              *string         `json:"name"`
-	Description       *string         `json:"description"`
-	ChargeGroup       *string         `json:"charge_group"`
-	Basis             *string         `json:"basis"`
-	Frequency         *string         `json:"frequency"`
-	EventTrigger      *string         `json:"event_trigger"`
-	AppliesTo         map[string]any  `json:"applies_to"`
-	BillTo            *string         `json:"bill_to"`
-	Reassignable      *bool           `json:"reassignable"`
-	FundCode          *string         `json:"fund_code"`
-	LedgerAccountCode *string         `json:"ledger_account_code"`
-	CostCenterCode    *string         `json:"cost_center_code"`
-	VATRate           *float64        `json:"vat_rate"`
-	TaxExempt         *bool           `json:"tax_exempt"`
-	ETIMSItemCode     *string         `json:"etims_item_code"`
-	WHTApplicable     *bool           `json:"wht_applicable"`
-	Proration         *string         `json:"proration"`
-	Penalty           map[string]any  `json:"penalty"`
-	Priority          *int            `json:"allocation_priority"`
-	PercentageOfCode  *string         `json:"percentage_of_code"`
-	TariffKind        *string         `json:"tariff_kind"`
-	Sort              *int            `json:"sort"`
-	Active            *bool           `json:"active"`
+	Code              *string        `json:"code"`
+	Name              *string        `json:"name"`
+	Description       *string        `json:"description"`
+	ChargeGroup       *string        `json:"charge_group"`
+	Basis             *string        `json:"basis"`
+	Frequency         *string        `json:"frequency"`
+	EventTrigger      *string        `json:"event_trigger"`
+	AppliesTo         map[string]any `json:"applies_to"`
+	BillTo            *string        `json:"bill_to"`
+	Reassignable      *bool          `json:"reassignable"`
+	FundCode          *string        `json:"fund_code"`
+	LedgerAccountCode *string        `json:"ledger_account_code"`
+	CostCenterCode    *string        `json:"cost_center_code"`
+	VATRate           *float64       `json:"vat_rate"`
+	TaxExempt         *bool          `json:"tax_exempt"`
+	ETIMSItemCode     *string        `json:"etims_item_code"`
+	WHTApplicable     *bool          `json:"wht_applicable"`
+	Proration         *string        `json:"proration"`
+	Penalty           map[string]any `json:"penalty"`
+	Priority          *int           `json:"allocation_priority"`
+	PercentageOfCode  *string        `json:"percentage_of_code"`
+	TariffKind        *string        `json:"tariff_kind"`
+	Sort              *int           `json:"sort"`
+	Active            *bool          `json:"active"`
 }
 
 // CreateCharge adds a custom charge to the catalogue.

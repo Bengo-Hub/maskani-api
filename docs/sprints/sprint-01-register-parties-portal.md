@@ -20,6 +20,26 @@ SRDD weeks 2 to 3. Requirements FR-01 to FR-04, FR-06 to FR-15, FR-18, FR-19.
 | `/auth/me` | Roles, permissions, assigned properties, modules, party links | Yes |
 | Cross-tenant tests | Two tenants with overlapping unit codes | Yes |
 
+## Progress
+
+API state as of 2026-10-08. The console and portal screens are in maskani-ui sprint 01 (not started).
+
+- [x] Tenant settings and modules: `/settings`, `/settings/modules`, module gate on every route group
+- [x] Catalogues: 79 platform entries seeded, `/catalogues/{kind}` with tenant overrides
+- [x] Custom fields schema
+- [ ] Custom field definition and value endpoints
+- [x] Properties and blocks: CRUD, auth-api outlet created on property create
+- [x] Units: CRUD
+- [x] Parties: CRUD with encrypted ID and KRA PIN, phone hash
+- [x] Unit parties: link and end with dates
+- [x] Vehicles per unit
+- [x] Staff per property: list, assign, remove
+- [ ] CSV import with dry run
+- [x] Owner portal API: party invite, `/me/*` routes, terms acceptance
+- [ ] Phone OTP sign-in (waits on auth-api)
+- [x] Cross-tenant test: tenant guard integration test passes on the local database
+- [ ] maskani-ui console and portal screens
+
 ## Acceptance
 
 - A staff user assigned to one property cannot list or open another property's units (403 or empty).

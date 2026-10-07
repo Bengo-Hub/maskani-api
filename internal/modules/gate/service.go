@@ -80,18 +80,18 @@ func (s *Service) Device(ctx context.Context, key string) (*ent.GateDevice, cont
 
 // PassInput creates a pass.
 type PassInput struct {
-	PropertyID    uuid.UUID      `json:"property_id"`
-	UnitID        *uuid.UUID     `json:"unit_id"`
-	PassType      string         `json:"pass_type"`
-	VisitorName   string         `json:"visitor_name"`
-	VisitorPhone  string         `json:"visitor_phone"`
-	VehiclePlate  string         `json:"vehicle_plate"`
-	ValidFrom     *time.Time     `json:"valid_from"`
-	ValidTo       *time.Time     `json:"valid_to"`
-	Recurrence    map[string]any `json:"recurrence"`
-	MaxEntries    int            `json:"max_entries"`
-	WorkOrderID   *uuid.UUID     `json:"work_order_id"`
-	Notes         string         `json:"notes"`
+	PropertyID   uuid.UUID      `json:"property_id"`
+	UnitID       *uuid.UUID     `json:"unit_id"`
+	PassType     string         `json:"pass_type"`
+	VisitorName  string         `json:"visitor_name"`
+	VisitorPhone string         `json:"visitor_phone"`
+	VehiclePlate string         `json:"vehicle_plate"`
+	ValidFrom    *time.Time     `json:"valid_from"`
+	ValidTo      *time.Time     `json:"valid_to"`
+	Recurrence   map[string]any `json:"recurrence"`
+	MaxEntries   int            `json:"max_entries"`
+	WorkOrderID  *uuid.UUID     `json:"work_order_id"`
+	Notes        string         `json:"notes"`
 }
 
 // IssuedPass returns the code and QR token once, at creation.
@@ -199,10 +199,10 @@ func (s *Service) CancelPass(ctx context.Context, id uuid.UUID) error {
 
 // VerifyResult is what the tablet shows.
 type VerifyResult struct {
-	Valid    bool               `json:"valid"`
-	Reason   string             `json:"reason,omitempty"`
-	Pass     *ent.VisitorPass   `json:"pass,omitempty"`
-	UnitCode string             `json:"unit_code,omitempty"`
+	Valid    bool             `json:"valid"`
+	Reason   string           `json:"reason,omitempty"`
+	Pass     *ent.VisitorPass `json:"pass,omitempty"`
+	UnitCode string           `json:"unit_code,omitempty"`
 }
 
 // Verify checks a 6-digit code or QR token at the device's property.
@@ -395,9 +395,9 @@ func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (
 
 // SyncPayload is what a tablet caches for offline operation.
 type SyncPayload struct {
-	ServerTime time.Time `json:"server_time"`
+	ServerTime time.Time    `json:"server_time"`
 	Passes     []CachedPass `json:"passes"`
-	Badges     []string  `json:"badges"`
+	Badges     []string     `json:"badges"`
 }
 
 // CachedPass carries only device-salted hashes: the tablet computes sha256(device_id + ":" + code)

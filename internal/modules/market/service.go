@@ -53,21 +53,21 @@ type PublicUnit struct {
 
 // PublicEstate is the published view of a property.
 type PublicEstate struct {
-	ID          uuid.UUID    `json:"id"`
-	TenantID    uuid.UUID    `json:"tenant_id"`
-	Slug        string       `json:"slug"`
-	Name        string       `json:"name"`
-	Description string       `json:"description,omitempty"`
-	Area        string       `json:"area,omitempty"`
-	Town        string       `json:"town,omitempty"`
-	County      string       `json:"county,omitempty"`
-	Latitude    *float64     `json:"latitude,omitempty"`
-	Longitude   *float64     `json:"longitude,omitempty"`
-	Amenities   []string     `json:"amenities,omitempty"`
-	Photos      []string     `json:"photos,omitempty"`
-	Verified    bool         `json:"verified"`
-	Units       []PublicUnit `json:"units"`
-	Available   int          `json:"available"`
+	ID          uuid.UUID        `json:"id"`
+	TenantID    uuid.UUID        `json:"tenant_id"`
+	Slug        string           `json:"slug"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Area        string           `json:"area,omitempty"`
+	Town        string           `json:"town,omitempty"`
+	County      string           `json:"county,omitempty"`
+	Latitude    *float64         `json:"latitude,omitempty"`
+	Longitude   *float64         `json:"longitude,omitempty"`
+	Amenities   []string         `json:"amenities,omitempty"`
+	Photos      []string         `json:"photos,omitempty"`
+	Verified    bool             `json:"verified"`
+	Units       []PublicUnit     `json:"units"`
+	Available   int              `json:"available"`
 	FromPrice   *decimal.Decimal `json:"from_price,omitempty"`
 }
 

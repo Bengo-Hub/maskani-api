@@ -93,14 +93,14 @@ func (s *Service) ListMeters(ctx context.Context, propertyID uuid.UUID) ([]*ent.
 
 // RoundRow is one meter on a round with its previous and current reading.
 type RoundRow struct {
-	MeterID         uuid.UUID          `json:"meter_id"`
-	Serial          string             `json:"serial"`
-	Kind            string             `json:"kind"`
-	UnitID          *uuid.UUID         `json:"unit_id,omitempty"`
-	UnitCode        string             `json:"unit_code,omitempty"`
-	Block           string             `json:"block,omitempty"`
-	PreviousReading decimal.Decimal    `json:"previous_reading"`
-	Current         *ent.MeterReading  `json:"current,omitempty"`
+	MeterID         uuid.UUID         `json:"meter_id"`
+	Serial          string            `json:"serial"`
+	Kind            string            `json:"kind"`
+	UnitID          *uuid.UUID        `json:"unit_id,omitempty"`
+	UnitCode        string            `json:"unit_code,omitempty"`
+	Block           string            `json:"block,omitempty"`
+	PreviousReading decimal.Decimal   `json:"previous_reading"`
+	Current         *ent.MeterReading `json:"current,omitempty"`
 }
 
 // Round is a property's reading round for a period.

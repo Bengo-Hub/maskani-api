@@ -172,6 +172,23 @@ func (c *Client) CreateInvoice(ctx context.Context, tenantID uuid.UUID, req Crea
 	return &out, nil
 }
 
+// IssueInvoice raises the invoice and sends it. treasury creates S2S invoices as drafts; sending
+// moves it to "sent", posts it to the GL, projects AR and makes it eligible for account payment
+// allocation. Safe to retry: the create is deduped by reference and a sent invoice is not resent.
+func (c *Client) IssueInvoice(ctx context.Context, tenantID uuid.UUID, req CreateInvoiceRequest) (*Invoice, error) {
+	inv, err := c.CreateInvoice(ctx, tenantID, req)
+	if err != nil {
+		return nil, err
+	}
+	if inv.Status == "" || inv.Status == "draft" {
+		if err := c.SendInvoice(ctx, tenantID, inv.ID); err != nil {
+			return nil, fmt.Errorf("send invoice %s: %w", inv.InvoiceNumber, err)
+		}
+		inv.Status = "sent"
+	}
+	return inv, nil
+}
+
 // InvoiceByReference finds the invoice raised for a maskani record.
 func (c *Client) InvoiceByReference(ctx context.Context, tenantID, refID uuid.UUID, refType string) (*Invoice, error) {
 	var out Invoice
@@ -189,20 +206,20 @@ func (c *Client) SendInvoice(ctx context.Context, tenantID, invoiceID uuid.UUID)
 
 // IntentRequest mirrors treasury's payments.CreateIntentRequest (subset).
 type IntentRequest struct {
-	ReferenceID    string         `json:"reference_id"`
-	ReferenceType  string         `json:"reference_type"`
-	PaymentMethod  string         `json:"payment_method"`
-	Currency       string         `json:"currency"`
+	ReferenceID    string          `json:"reference_id"`
+	ReferenceType  string          `json:"reference_type"`
+	PaymentMethod  string          `json:"payment_method"`
+	Currency       string          `json:"currency"`
 	Amount         decimal.Decimal `json:"amount"`
-	PhoneNumber    *string        `json:"phone_number,omitempty"`
-	CustomerEmail  *string        `json:"customer_email,omitempty"`
-	Description    *string        `json:"description,omitempty"`
-	IdempotencyKey string         `json:"idempotency_key,omitempty"`
-	SourceService  string         `json:"source_service"`
-	OutletID       *uuid.UUID     `json:"outlet_id,omitempty"`
-	Gateway        string         `json:"gateway,omitempty"`
-	CallbackURL    string         `json:"callback_url,omitempty"`
-	Metadata       map[string]any `json:"metadata,omitempty"`
+	PhoneNumber    *string         `json:"phone_number,omitempty"`
+	CustomerEmail  *string         `json:"customer_email,omitempty"`
+	Description    *string         `json:"description,omitempty"`
+	IdempotencyKey string          `json:"idempotency_key,omitempty"`
+	SourceService  string          `json:"source_service"`
+	OutletID       *uuid.UUID      `json:"outlet_id,omitempty"`
+	Gateway        string          `json:"gateway,omitempty"`
+	CallbackURL    string          `json:"callback_url,omitempty"`
+	Metadata       map[string]any  `json:"metadata,omitempty"`
 }
 
 // IntentResponse mirrors treasury's CreateIntentResponse (subset).
@@ -249,15 +266,15 @@ func (c *Client) RegisterC2BRoute(ctx context.Context, tenantID uuid.UUID, r C2B
 
 // C2BPayment is an inbox row (unmatched paybill payments form the suspense queue).
 type C2BPayment struct {
-	TransID          string          `json:"trans_id"`
-	BusinessShortcode string         `json:"business_shortcode"`
-	Amount           decimal.Decimal `json:"amount"`
-	BillRefNumber    string          `json:"bill_ref_number"`
-	Msisdn           string          `json:"msisdn"`
-	PayerName        string          `json:"payer_name"`
-	TransTime        string          `json:"trans_time"`
-	Status           string          `json:"status"`
-	CreatedAt        time.Time       `json:"created_at"`
+	TransID           string          `json:"trans_id"`
+	BusinessShortcode string          `json:"business_shortcode"`
+	Amount            decimal.Decimal `json:"amount"`
+	BillRefNumber     string          `json:"bill_ref_number"`
+	Msisdn            string          `json:"msisdn"`
+	PayerName         string          `json:"payer_name"`
+	TransTime         string          `json:"trans_time"`
+	Status            string          `json:"status"`
+	CreatedAt         time.Time       `json:"created_at"`
 }
 
 // SuspensePayments lists unreconciled paybill payments to the tenant's own shortcodes.
@@ -284,14 +301,14 @@ func (c *Client) AssignSuspense(ctx context.Context, tenantID uuid.UUID, transID
 
 // AccountLedger is treasury's view of one account reference: open invoices, payments, balance.
 type AccountLedger struct {
-	AccountRef   string          `json:"account_ref"`
-	Balance      decimal.Decimal `json:"balance"`
-	TotalBilled  decimal.Decimal `json:"total_billed"`
-	TotalPaid    decimal.Decimal `json:"total_paid"`
-	Credit       decimal.Decimal `json:"credit"`
-	LastPaidAt   *time.Time      `json:"last_paid_at,omitempty"`
-	Invoices     []LedgerInvoice `json:"invoices"`
-	Payments     []LedgerPayment `json:"payments"`
+	AccountRef  string          `json:"account_ref"`
+	Balance     decimal.Decimal `json:"balance"`
+	TotalBilled decimal.Decimal `json:"total_billed"`
+	TotalPaid   decimal.Decimal `json:"total_paid"`
+	Credit      decimal.Decimal `json:"credit"`
+	LastPaidAt  *time.Time      `json:"last_paid_at,omitempty"`
+	Invoices    []LedgerInvoice `json:"invoices"`
+	Payments    []LedgerPayment `json:"payments"`
 }
 
 // LedgerInvoice is one invoice line in the account ledger.
@@ -314,6 +331,7 @@ type LedgerPayment struct {
 	Method    string          `json:"method"`
 	Reference string          `json:"reference"`
 	PaidAt    time.Time       `json:"paid_at"`
+	Unapplied decimal.Decimal `json:"unapplied"`
 }
 
 // Ledger returns the account's invoices, payments and balance from treasury (authoritative).

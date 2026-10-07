@@ -378,7 +378,7 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 		req.Lines = append(req.Lines, treasury.InvoiceLine{Description: ln.Description, ItemSKU: ln.ChargeCode,
 			ItemType: "service", Quantity: qty, UnitPrice: price, TaxRate: ln.TaxRate})
 	}
-	inv, err := s.treasury.CreateInvoice(ctx, tenantID, req)
+	inv, err := s.treasury.IssueInvoice(ctx, tenantID, req)
 	if err != nil {
 		s.log.Warn("invoice failed", zap.String("unit", l.UnitCode), zap.Error(err))
 		_ = l.Update().SetStatus(billingrunline.StatusFailed).AddAttempts(1).SetLastError(err.Error()).Exec(ctx)

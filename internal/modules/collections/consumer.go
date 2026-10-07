@@ -109,15 +109,18 @@ func (c *Consumer) handle(msg *nats.Msg) {
 
 // resolveAccount finds the unit account a payment belongs to.
 func (c *Consumer) resolveAccount(ctx context.Context, refType string, p map[string]any) uuid.UUID {
+	meta, _ := p["metadata"].(map[string]any)
 	if refType == "account_payment" {
-		if id, err := uuid.Parse(str(p["reference_id"])); err == nil {
-			if ok, _ := c.client.UnitAccount.Query().Where(unitaccount.ID(id)).Exist(ctx); ok {
-				return id
+		// reference_id is per payment (C2B-<TransID>, MSK-PAY-...); the account is in metadata.
+		for _, cand := range []string{str(meta["unit_account_id"]), str(p["entity_id"]), str(p["reference_id"])} {
+			if id, err := uuid.Parse(cand); err == nil {
+				if ok, _ := c.client.UnitAccount.Query().Where(unitaccount.ID(id)).Exist(ctx); ok {
+					return id
+				}
 			}
 		}
 		return uuid.Nil
 	}
-	meta, _ := p["metadata"].(map[string]any)
 	invID, err := uuid.Parse(str(meta["invoice_id"]))
 	if err != nil {
 		return uuid.Nil

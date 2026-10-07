@@ -16,6 +16,21 @@ SRDD weeks 11 to 12, milestone 3 (feature complete). Requirements FR-46 to FR-49
 | Privacy | Data subject requests with deadlines, export, deletion with statutory retention | After demo |
 | Audit | Financial, contract and access changes in `audit_logs` | Yes |
 
+## Progress
+
+API state as of 2026-10-08.
+
+- [x] Dashboard: `/reports/dashboard`
+- [x] Arrears, sales position and water balance reports
+- [ ] Remaining reports, CSV and PDF exports
+- [x] Daily collections aggregate updated by the payment consumer
+- [ ] Nightly `daily_stats` rebuild
+- [x] Notices: create, send, scheduled job, deliveries, portal list
+- [ ] ERP staff picker
+- [ ] Audit log writes (schema exists)
+- [ ] Budgets, documents, privacy (after demo)
+- [ ] maskani-ui reports and notices screens
+
 ## Rules to apply in this sprint
 
 Standing backend rules in [README.md](README.md), plus:

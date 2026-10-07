@@ -127,9 +127,9 @@ Use case presets: `estate_developer` (Shaba), `developer_sales`, `owners_associa
 
 maskani-api never collects, holds or pays money.
 
-- **Invoices:** billing runs and instalments call `POST /api/v1/s2s/{tenant}/invoices` with
-  `reference_type: "maskani_unit_account"`, `reference_id` = unit account ID,
-  `settlement_account_id` = the fund's bank account and `metadata.fund`.
+- **Invoices:** billing runs and instalments create and send treasury invoices
+  (`reference_type` `maskani_bill` or `maskani_instalment`, `metadata.account_ref` linking the unit
+  account, `settlement_account_id` = the fund's bank account, `metadata.fund`).
 - **Portal payments:** an intent with `reference_type: "account_payment"` (pay balance) or the
   existing `"invoice"` public-token path (one invoice). The tenant's gateway resolver picks Daraja,
   PayHero or Paystack.

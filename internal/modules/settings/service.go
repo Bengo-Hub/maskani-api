@@ -252,20 +252,20 @@ func (s *Service) Get(ctx context.Context, tenantID uuid.UUID) (*ent.TenantSetti
 
 // UpdateInput carries editable settings.
 type UpdateInput struct {
-	TenantType          *string  `json:"tenant_type"`
-	BillingDay          *int     `json:"billing_day"`
-	DueDay              *int     `json:"due_day"`
-	ReadingWindowStart  *int     `json:"reading_window_start"`
-	ReadingWindowEnd    *int     `json:"reading_window_end"`
-	QuietHoursStart     *string  `json:"quiet_hours_start"`
-	QuietHoursEnd       *string  `json:"quiet_hours_end"`
-	AllocationOrder     *string  `json:"allocation_order"`
-	BillToRevertDays    *int     `json:"bill_to_revert_days"`
-	WaterLossAlertPct   *float64 `json:"water_loss_alert_pct"`
-	TermsVersion        *string  `json:"terms_version"`
-	PrivacyVersion      *string  `json:"privacy_version"`
-	PortalSupportPhone  *string  `json:"portal_support_phone"`
-	PortalSupportEmail  *string  `json:"portal_support_email"`
+	TenantType         *string  `json:"tenant_type"`
+	BillingDay         *int     `json:"billing_day"`
+	DueDay             *int     `json:"due_day"`
+	ReadingWindowStart *int     `json:"reading_window_start"`
+	ReadingWindowEnd   *int     `json:"reading_window_end"`
+	QuietHoursStart    *string  `json:"quiet_hours_start"`
+	QuietHoursEnd      *string  `json:"quiet_hours_end"`
+	AllocationOrder    *string  `json:"allocation_order"`
+	BillToRevertDays   *int     `json:"bill_to_revert_days"`
+	WaterLossAlertPct  *float64 `json:"water_loss_alert_pct"`
+	TermsVersion       *string  `json:"terms_version"`
+	PrivacyVersion     *string  `json:"privacy_version"`
+	PortalSupportPhone *string  `json:"portal_support_phone"`
+	PortalSupportEmail *string  `json:"portal_support_email"`
 }
 
 // Update applies settings changes with range checks.

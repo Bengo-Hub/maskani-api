@@ -85,23 +85,23 @@ func (s *Service) Invalidate(tenantID uuid.UUID) {
 
 // Dashboard is the manager dashboard (SRDD figure 14).
 type Dashboard struct {
-	Period            string          `json:"period"`
-	Billed            decimal.Decimal `json:"billed"`
-	Collected         decimal.Decimal `json:"collected"`
-	CollectionRate    decimal.Decimal `json:"collection_rate"`
-	Outstanding       decimal.Decimal `json:"outstanding"`
-	AccountsOwing     int             `json:"accounts_owing"`
-	Arrears60Accounts int             `json:"arrears_60_accounts"`
-	Arrears60Amount   decimal.Decimal `json:"arrears_60_amount"`
-	OpenWorkOrders    int             `json:"open_work_orders"`
-	PastSLA           int             `json:"past_sla"`
+	Period            string           `json:"period"`
+	Billed            decimal.Decimal  `json:"billed"`
+	Collected         decimal.Decimal  `json:"collected"`
+	CollectionRate    decimal.Decimal  `json:"collection_rate"`
+	Outstanding       decimal.Decimal  `json:"outstanding"`
+	AccountsOwing     int              `json:"accounts_owing"`
+	Arrears60Accounts int              `json:"arrears_60_accounts"`
+	Arrears60Amount   decimal.Decimal  `json:"arrears_60_amount"`
+	OpenWorkOrders    int              `json:"open_work_orders"`
+	PastSLA           int              `json:"past_sla"`
 	WaterLossPct      *decimal.Decimal `json:"water_loss_pct,omitempty"`
-	VendorsDue        int             `json:"vendors_due_for_renewal"`
-	Units             int             `json:"units"`
-	Occupied          int             `json:"occupied"`
-	UnitsSold         int             `json:"units_sold"`
-	SalesValue        decimal.Decimal `json:"sales_value"`
-	SalesCollected    decimal.Decimal `json:"sales_collected"`
+	VendorsDue        int              `json:"vendors_due_for_renewal"`
+	Units             int              `json:"units"`
+	Occupied          int              `json:"occupied"`
+	UnitsSold         int              `json:"units_sold"`
+	SalesValue        decimal.Decimal  `json:"sales_value"`
+	SalesCollected    decimal.Decimal  `json:"sales_collected"`
 }
 
 // Dashboard computes the dashboard for a property (or all visible properties) and month.

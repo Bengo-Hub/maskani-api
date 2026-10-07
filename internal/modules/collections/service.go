@@ -5,6 +5,7 @@ package collections
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,8 +38,8 @@ func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, 
 
 // Statement is an account with treasury's ledger.
 type Statement struct {
-	Account *ent.UnitAccount         `json:"account"`
-	Ledger  *treasury.AccountLedger  `json:"ledger"`
+	Account *ent.UnitAccount        `json:"account"`
+	Ledger  *treasury.AccountLedger `json:"ledger"`
 }
 
 // Statement returns the account's ledger from treasury and refreshes the cached balance.
@@ -94,6 +95,9 @@ type PayInput struct {
 	Gateway string  `json:"gateway"`
 	Email   string  `json:"email"`
 	Return  string  `json:"callback_url"`
+	// Key is one per pay attempt from the client, so a double tap reuses the same intent while a
+	// retry after a cancelled prompt starts a new one.
+	Key string `json:"idempotency_key"`
 }
 
 // Pay creates an account_payment intent through the tenant's gateway; treasury allocates it oldest
@@ -124,10 +128,17 @@ func (s *Service) Pay(ctx context.Context, accountID uuid.UUID, in PayInput) (*t
 	}
 	desc := fmt.Sprintf("%s payment", acc.AccountRef)
 	tenantID, _ := tenantguard.TenantID(ctx)
+	// treasury returns the existing intent for a known reference_id whatever its status, so each
+	// attempt needs its own reference; the account travels in metadata (unit_account_id).
+	key := strings.TrimSpace(in.Key)
+	if key == "" || len(key) > 64 {
+		key = uuid.NewString()
+	}
+	ref := "MSK-PAY-" + acc.ID.String()[:8] + "-" + key
 	req := treasury.IntentRequest{
-		ReferenceID: acc.ID.String(), ReferenceType: treasury.RefAccountPayment, PaymentMethod: method,
+		ReferenceID: ref, ReferenceType: treasury.RefAccountPayment, PaymentMethod: method,
 		Currency: "KES", Amount: amount.Round(2), Description: &desc, Gateway: in.Gateway, CallbackURL: in.Return,
-		IdempotencyKey: fmt.Sprintf("MSK-PAY-%s-%d", acc.ID, time.Now().Unix()/60),
+		IdempotencyKey: ref,
 		Metadata: map[string]any{"account_ref": acc.AccountRef, "unit_account_id": acc.ID.String(),
 			"entity_id": acc.ID.String(), "fund": acc.Edges.Fund.Code, "source_service": treasury.SourceService},
 	}

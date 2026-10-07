@@ -19,6 +19,23 @@ SRDD weeks 8 to 10. Requirements FR-51 to FR-58, FR-60 to FR-62.
 | Incidents | Categories, severity, photos, immediate alerts for serious incidents; occurrence book | Yes |
 | Vendor invoices | Through treasury `POST /expenses` until S2S vendor bills exist | After demo |
 
+## Progress
+
+API state as of 2026-10-08. Screens and the gate tablet app are in maskani-ui sprint 04 (not started).
+
+- [x] Vendors: list, create
+- [ ] Vendor link to treasury vendors
+- [x] Vendor documents with the daily `maskani:vendor-doc-expiry` alert job
+- [x] Personnel per vendor
+- [ ] Vendor contracts endpoints (schema exists)
+- [x] Work orders: create, actions, SLA breach job, resident requests in the portal
+- [x] Visitor passes: staff and portal, hashed codes
+- [x] Gate tablet API: verify, events, offline sync cache, walk-in decide, offline device job
+- [ ] Patrols and posts endpoints (schema exists)
+- [x] Incidents: staff and device reporting
+- [ ] Schedules and visits, preventive maintenance, vendor invoices (after demo)
+- [ ] maskani-ui works screens and gate tablet app
+
 ## Acceptance
 
 - Gate verify answers within 1 second; an offline entry queued on the tablet syncs once, with no

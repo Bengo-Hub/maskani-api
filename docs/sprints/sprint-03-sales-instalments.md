@@ -25,6 +25,24 @@ Requirements FR-20 to FR-25.
 Price 7,500,000; reservation fee 100,000 credited to deposit; deposit 20% = 1,500,000 including the
 fee; balance 6,000,000 over 24 monthly instalments of 250,000. Unit test.
 
+## Progress
+
+API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
+
+- [x] Price lists
+- [x] Availability
+- [x] Reservations: fee invoice and the `maskani:reservation-expiry` job
+- [x] Sale contracts: create, get, activate
+- [x] Schedules with the SRDD 9.2 test
+- [x] Instalment invoicing: hourly job, invoices sent through `IssueInvoice`
+- [x] Payments allocated oldest first by treasury
+- [ ] Overpayment applied to the next instalment (treasury backlog: held credit)
+- [ ] Reminders and default
+- [x] Purchase position: `/me/purchase`, `/reports/sales-position`
+- [ ] Purchase and completion statement PDF
+- [ ] Restructure, handover, title tracking (after demo)
+- [ ] maskani-ui sales screens
+
 ## Acceptance
 
 - A lapsed reservation releases the unit to available within 15 minutes.

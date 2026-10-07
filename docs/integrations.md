@@ -46,18 +46,22 @@ request a code, so the endpoint cannot be used to enumerate or create accounts.
   "invoice_date": "2026-11-01T00:00:00Z",
   "due_date": "2026-11-10T00:00:00Z",
   "currency": "KES",
-  "reference_type": "maskani_unit_account",
-  "reference_id": "<unit_account_id>",
-  "outlet_id": "<property outlet id>",
+  "reference_type": "maskani_bill",
+  "reference_id": "<billing run line id>",
   "settlement_account_id": "<fund bank account id>",
-  "lines": [{ "description": "Service charge, 3 bedroom", "quantity": 1, "unit_price": 4500, "tax_rate": 0 }],
-  "metadata": { "fund": "estate", "unit_code": "B07", "period": "2026-11", "billing_run_id": "...", "source_service": "maskani" }
+  "lines": [{ "description": "Service charge, 3 bedroom", "item_sku": "SERVICE_CHARGE", "item_type": "service", "quantity": 1, "unit_price": 4500 }],
+  "metadata": { "account_ref": "B07", "unit_account_id": "<unit account id>", "fund": "estate", "period": "2026-11", "source_service": "maskani" }
 }
 ```
 
-- Idempotency: maskani stores `invoice_id` on the run line or instalment; a retry first checks
-  `GET /api/v1/s2s/{tenant}/invoices/by-reference` before creating.
-- PDF and pay link: `GET /invoices/{id}/pdf-url`; send with `POST /invoices/{id}/send`.
+- Reference types: `maskani_bill` (run line id), `maskani_instalment` (instalment id). The account
+  link is `metadata.account_ref`, which treasury's allocator and account ledger filter on (GIN index).
+- `treasury.Client.IssueInvoice` creates then sends. treasury creates S2S invoices as drafts, and only
+  `POST /invoices/{id}/send` moves one to `sent`, posts it to the GL, projects AR and makes it
+  eligible for allocation. `treasury.invoice_sent` is also emitted on send.
+- Idempotency: a retry first checks `GET /api/v1/s2s/{tenant}/invoices/by-reference` and sends only a
+  draft, so a retried line never issues or posts twice. maskani stores `invoice_id` on the run line or
+  instalment.
 - Credit notes: `POST /invoices/{id}/create-credit-note` (behind maskani approval rules).
 
 ### Payments
@@ -67,24 +71,27 @@ request a code, so the endpoint cannot be used to enumerate or create accounts.
 ```json
 {
   "reference_type": "account_payment",
-  "reference_id": "<unit_account_id>",
+  "reference_id": "MSK-PAY-<account id prefix>-<attempt key>",
   "payment_method": "mpesa",
   "amount": 6450,
   "currency": "KES",
   "phone_number": "254712345678",
   "source_service": "maskani",
   "outlet_id": "<property outlet id>",
-  "idempotency_key": "MSK-...",
-  "metadata": { "fund": "estate", "unit_code": "B07", "entity_id": "<unit_account_id>" }
+  "idempotency_key": "<same as reference_id>",
+  "metadata": { "account_ref": "B07", "unit_account_id": "<unit account id>", "entity_id": "<unit account id>", "fund": "estate" }
 }
 ```
+
+- treasury returns the existing intent for a known `reference_id` whatever its status, so every pay
+  attempt has its own reference. The client sends one `idempotency_key` per attempt (a double tap
+  reuses the intent, a retry after a cancelled prompt starts a new one); with none, the API makes one.
 
 - The gateway is resolved by treasury from the tenant (or property outlet) configuration: Daraja,
   PayHero (`mpesa`, `payhero_momo`, card, bank) or Paystack. `gateway` may pin one when several
   serve the rail. The owner portal reads `GET /pay/{tenant}/gateways` and uses the shared
   `TreasuryPaymentModal`, so the choices match the tenant's real configuration.
 - One invoice can also be paid with `reference_type: "invoice"` and the invoice public token.
-- Payment references follow `payref`: `MSK-{SLUG6}-{ENTITY12}`.
 
 ### Paybill (C2B) account routes (new)
 
@@ -97,27 +104,29 @@ Registered by maskani whenever a unit account is created or its reference change
   "reference_type": "account_payment", "reference_id": "<unit_account_id>", "fund": "estate" }
 ```
 
-On a Daraja confirmation treasury normalises `BillRefNumber` (upper case, spaces and dashes
-removed, leading zeros of the numeric part normalised so `b 07`, `B-07` and `B7` resolve to `B07`),
-looks the route up within the tenant's own shortcodes, creates and settles an `account_payment`
-intent through `settleIntent` (provider `mpesa_c2b`), and marks the inbox row claimed. An unresolved
-reference stays `unreconciled`; maskani's suspense queue reads it with
-`GET /api/v1/s2s/{tenant}/c2b/payments?status=unreconciled` and finance assigns it manually.
+On a Daraja confirmation treasury normalises `BillRefNumber` with `payments.AccountMatchKey` (upper
+case, spaces and dashes removed, leading zeros dropped, so `b 07`, `B-07` and `B7` are one key),
+matches a route only on the route tenant's own shortcodes, books a succeeded `account_payment` intent
+(`reference_id = "C2B-" + TransID`, provider `mpesa_c2b`) and marks the inbox row claimed. A key that
+matches two tenants on one paybill, or no route, stays `unreconciled`; maskani's suspense queue reads
+it with `GET /api/v1/s2s/{tenant}/c2b/payments?status=unreconciled` and finance assigns it with
+`POST /c2b/payments/{trans_id}/claim` (`reference_type`, `reference_id`, `account_ref`).
 
 ### Allocation
 
-`account_payment` intents are settled by one treasury hook: oldest due first across the account's
-open invoices (`reference_type = maskani_unit_account`, `reference_id` = account), applied through
-the invoice payment path that locks the row and is idempotent on the intent. Late payment charges
-settle last. Any surplus is held as customer credit and applied to the next invoice.
+treasury's invoicing subscriber allocates every `account_payment` intent, paybill or STK alike:
+oldest due first across the account's open invoices (`metadata.account_ref`), each through
+`SettleInvoiceFromGatewayPayment` with a sub-intent derived from the payment and invoice ids, so a
+redelivery never settles twice. The rest is kept on the intent as `metadata.unapplied_amount`. Applying
+that credit to a later invoice is not built yet (treasury backlog).
 
 ### Statements and balances
 
-- Statement per account: maskani lists the account's invoices and payments from treasury
-  (`/invoices?reference_type=...&reference_id=...` and payment transactions) and shows them; it never
-  recomputes ledger figures.
-- `treasury.payment.succeeded` updates maskani's cached `unit_accounts.balance` and purchase
-  progress; the figure is display only, treasury stays authoritative.
+- Statement per account: `GET /api/v1/s2s/{tenant}/accounts/{account_ref}/ledger` returns invoices,
+  payments, billed and paid totals, held credit and balance. maskani never recomputes ledger figures.
+- `treasury.payment.succeeded` (account resolved from `metadata.unit_account_id`, then `entity_id`)
+  refreshes maskani's cached `unit_accounts.balance` and purchase progress and publishes
+  `maskani.payment.applied`; the cached figure is display only.
 
 ### Deferred (after the demo)
 

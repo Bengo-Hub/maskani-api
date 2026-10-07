@@ -19,27 +19,27 @@ import (
 
 // UnitInput is the create and update body.
 type UnitInput struct {
-	PropertyID      *uuid.UUID      `json:"property_id"`
-	BlockID         *uuid.UUID      `json:"block_id"`
-	Code            *string         `json:"code"`
-	UnitType        *string         `json:"unit_type"`
-	Use             *string         `json:"use"`
-	Bedrooms        *int            `json:"bedrooms"`
-	Bathrooms       *int            `json:"bathrooms"`
-	SizeSqm         *float64        `json:"size_sqm"`
-	PlotSizeSqm     *float64        `json:"plot_size_sqm"`
-	Floor           *string         `json:"floor"`
-	Entitlement     *float64        `json:"entitlement"`
-	ParkingBays     *int            `json:"parking_bays"`
-	Furnished       *bool           `json:"furnished"`
-	Phase           *string         `json:"phase"`
-	SaleStatus      *string         `json:"sale_status"`
-	OccupancyStatus *string         `json:"occupancy_status"`
-	Rentable        *bool           `json:"rentable"`
-	Features        []string        `json:"features"`
-	WalkingOrder    *int            `json:"walking_order"`
-	Status          *string         `json:"status"`
-	CustomFields    map[string]any  `json:"custom_fields"`
+	PropertyID      *uuid.UUID     `json:"property_id"`
+	BlockID         *uuid.UUID     `json:"block_id"`
+	Code            *string        `json:"code"`
+	UnitType        *string        `json:"unit_type"`
+	Use             *string        `json:"use"`
+	Bedrooms        *int           `json:"bedrooms"`
+	Bathrooms       *int           `json:"bathrooms"`
+	SizeSqm         *float64       `json:"size_sqm"`
+	PlotSizeSqm     *float64       `json:"plot_size_sqm"`
+	Floor           *string        `json:"floor"`
+	Entitlement     *float64       `json:"entitlement"`
+	ParkingBays     *int           `json:"parking_bays"`
+	Furnished       *bool          `json:"furnished"`
+	Phase           *string        `json:"phase"`
+	SaleStatus      *string        `json:"sale_status"`
+	OccupancyStatus *string        `json:"occupancy_status"`
+	Rentable        *bool          `json:"rentable"`
+	Features        []string       `json:"features"`
+	WalkingOrder    *int           `json:"walking_order"`
+	Status          *string        `json:"status"`
+	CustomFields    map[string]any `json:"custom_fields"`
 }
 
 func dec(f *float64) decimal.Decimal { return decimal.NewFromFloat(*f) }

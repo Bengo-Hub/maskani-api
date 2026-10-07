@@ -24,6 +24,27 @@ SRDD weeks 4 to 5. Requirements FR-06, FR-26 to FR-35.
 Unit B07, three bedroom, October 2026: service charge 4,500; water 1,284 less 1,275 = 9 m3 at 150 =
 1,350; garbage 300; sinking fund 300; total 6,450 due 10 November. This is a unit test.
 
+## Progress
+
+API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
+
+- [x] Funds: list and update (bank account, paybill, prefix)
+- [x] Charge catalogue: seeded, enable, create, update
+- [x] Rates: dated rates per charge
+- [x] Unit accounts with C2B routes registered by the `maskani:c2b-routes` job
+- [x] treasury C2B account routes, allocator and account ledger (treasury e8b5dbc, 059f27a)
+- [x] Meters and rounds: readings with flags, estimate, verify
+- [x] Water balance
+- [x] Billing run: preview, issue, retry; invoices created and sent through `IssueInvoice`
+- [x] Collections: STK with per-attempt references, paybill routes, suspense queue and assign
+- [x] Payment consumer: account resolved from `metadata.unit_account_id`
+- [x] Statements API from the treasury account ledger
+- [ ] Statement PDF and CSV
+- [ ] Reminder job (1, 7, 14 days)
+- [ ] Adjustments and bill queries (after demo)
+- [ ] KES 1 live tests on both paybills (user confirms first)
+- [ ] maskani-ui billing, meters and collections screens
+
 ## Acceptance
 
 - Retrying a billing run never creates a second invoice for a unit and period.

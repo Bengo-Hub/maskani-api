@@ -19,15 +19,27 @@ SRDD week 1 (discovery, data audit, architecture approval, environments).
 
 ## Progress
 
-| Date | Item | State |
-|---|---|---|
-| 2026-10-07 | Docs for all three repos | Done |
-| 2026-10-07 | SRDD moved to the private docs repo | Done |
-| 2026-10-07 | go.mod, config, migrate (lock 727271007), entrypoint, Dockerfile, logger, database, NATS stream | Done |
-| 2026-10-07 | Full R1 Ent schema with the tenant guard mixin; `go generate` clean | Done |
-| 2026-10-07 | Tenant syncer, RBAC catalogue and service | Done |
-| 2026-10-07 | Access middleware, module gate, handlers, first migration, build | In progress |
-| | UI scaffolds, devops-k8s apps, GitHub repos, platform registration | Pending |
+As of 2026-10-08.
+
+- [x] Docs for all three repos (2026-10-07)
+- [x] SRDD moved to the private docs repo (2026-10-07)
+- [x] go.mod, config, migrate (lock 727271007), entrypoint, Dockerfile, logger, database, NATS stream
+- [x] Full R1 Ent schema with the tenant guard mixin; `go generate` clean
+- [x] Tenant syncer, RBAC catalogue and service
+- [x] Access middleware, module gate, handlers, first migration, build (5bcca29)
+- [x] `Bengo-Hub/maskani-api` repo created and pushed
+- [x] devops-k8s: maskani-api app (replicas 0 until the first image), network policies, secrets script, Cloudflare hosts (cabcaf09)
+- [x] treasury C2B account routes, `account_payment` allocator, account ledger (treasury e8b5dbc, 059f27a)
+- [x] Per-attempt payment references, consumer reads the account from metadata, invoices sent after create (`IssueInvoice`) (2026-10-08)
+- [ ] First green CI run: run 37624525811 failed at secret sync because the repo has no `GH_PAT` yet
+- [ ] devops-k8s apps for maskani-ui and maskani-commerce committed
+- [ ] HA values (min 2 replicas, PDB) after the first image; fleet-health-watcher URLs
+- [ ] `seed-tenant` command and Swagger annotations
+- [ ] maskani-ui and maskani-commerce scaffolds and repos
+- [ ] auth-api: `property` use case, phone OTP, phone-only members, `maskani-ui` OAuth client
+- [ ] subscriptions-api: `plans_maskani.go`, feature codes, plan matrix doc
+- [ ] notifications-api: `maskani.>` subscription and templates
+- [ ] shared-ui-lib: app switcher entry
 
 ## Acceptance
 

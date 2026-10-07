@@ -12,20 +12,20 @@ import (
 
 // Charge is a resolved catalogue entry for computation.
 type Charge struct {
-	ID               uuid.UUID
-	Code             string
-	Name             string
-	Basis            string // fixed, per_unit_type, per_sqm, entitlement, metered, percentage, one_off
-	Frequency        string
-	AppliesScope     string // tenant, properties, unit_types, units, opt_in
-	AppliesIDs       []string
-	VATRate          float64
-	TaxExempt        bool
-	Proration        string // none, days, full_month
-	Priority         int
-	PercentageOf     string
-	TariffKind       string // flat, block
-	ETIMSCode        string
+	ID           uuid.UUID
+	Code         string
+	Name         string
+	Basis        string // fixed, per_unit_type, per_sqm, entitlement, metered, percentage, one_off
+	Frequency    string
+	AppliesScope string // tenant, properties, unit_types, units, opt_in
+	AppliesIDs   []string
+	VATRate      float64
+	TaxExempt    bool
+	Proration    string // none, days, full_month
+	Priority     int
+	PercentageOf string
+	TariffKind   string // flat, block
+	ETIMSCode    string
 }
 
 // Rate is a dated rate at a scope.
