@@ -41,7 +41,7 @@ As of 2026-10-08.
 - [ ] HA values (min 2 replicas, PDB) after the first image; fleet-health-watcher URLs
 - [ ] `seed-tenant` command and Swagger annotations
 - [ ] maskani-ui and maskani-commerce scaffolds and repos
-- [ ] subscriptions-api: `plans_maskani.go`, feature codes, plan matrix doc
+- [x] subscriptions-api: `plans_maskani.go` (four tiers from SRDD 25.3), `maskani_*` module codes, `max_units`, plan matrix doc, test (641e99c)
 - [ ] shared-ui-lib: app switcher entry
 
 ## Acceptance

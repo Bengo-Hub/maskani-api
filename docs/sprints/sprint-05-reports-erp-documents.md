@@ -26,6 +26,7 @@ API state as of 2026-10-08.
 - [x] Daily collections aggregate updated by the payment consumer
 - [ ] Nightly `daily_stats` rebuild
 - [x] Notices: create, send, scheduled job, deliveries, portal list
+- [x] Notices delivered by WhatsApp and email only, one-line WhatsApp parameter, urgent subject for emergencies (bddeb41, notifications 0cbe513)
 - [ ] ERP staff picker
 - [ ] Audit log writes (schema exists)
 - [ ] Budgets, documents, privacy (after demo)
