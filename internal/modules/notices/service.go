@@ -1,10 +1,12 @@
-// Package notices sends notices and emergency alerts to an audience of residents over SMS,
-// WhatsApp and email through notifications-api, with per-recipient delivery records (SRDD 16.5).
+// Package notices sends notices and emergency alerts to an audience of residents over WhatsApp and
+// email (the active channels) through notifications-api, with per-recipient delivery records
+// (SRDD 16.5).
 package notices
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,9 +56,7 @@ func (s *Service) Create(ctx context.Context, actor uuid.UUID, tenantSlug string
 	if in.Title == "" || in.Body == "" {
 		return nil, httpx.Invalid("title and body are required")
 	}
-	if len(in.Channels) == 0 {
-		in.Channels = []string{"sms"}
-	}
+	in.Channels = activeChannels(in.Channels)
 	pr := notice.PriorityRoutine
 	if in.Priority == "emergency" {
 		pr = notice.PriorityEmergency
@@ -110,7 +110,7 @@ func (s *Service) recipients(ctx context.Context, n *ent.Notice) ([]*ent.Party, 
 	if err != nil || len(unitIDs) == 0 {
 		return nil, err
 	}
-	return s.client.Party.Query().Where(party.PhoneNEQ(""), party.StatusEQ(party.StatusActive),
+	return s.client.Party.Query().Where(party.Or(party.PhoneNEQ(""), party.EmailNEQ("")), party.StatusEQ(party.StatusActive),
 		party.HasUnitLinksWith(unitparty.UnitIDIn(unitIDs...), unitparty.RoleIn(roles...), unitparty.StatusEQ(unitparty.StatusActive))).
 		Limit(20000).All(ctx)
 }
@@ -143,11 +143,26 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 
 func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice, people []*ent.Party) {
 	delivered := 0
+	estate := s.estateName(ctx, n, slug)
+	subject := n.Title
+	if n.Priority == notice.PriorityEmergency {
+		subject = "Urgent: " + n.Title
+	}
 	for _, p := range people {
-		for _, ch := range n.Channels {
+		for _, ch := range activeChannels(n.Channels) {
 			dest := p.Phone
+			meta := map[string]any{
+				// Business-initiated WhatsApp needs an approved template; the platform's service
+				// notice template carries the notice as one line (Meta rejects newlines in a
+				// parameter).
+				"template_name":     "broadcast_service_notice_v1",
+				"template_language": "en_US",
+				"template_params":   []string{firstName(p.DisplayName), estate, oneLine(n.Title + ": " + n.Body)},
+				"default_dial_code": "254",
+			}
 			if ch == "email" {
 				dest = p.Email
+				meta = map[string]any{"subject": subject}
 			}
 			if dest == "" {
 				continue
@@ -160,8 +175,9 @@ func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, 
 				continue
 			}
 			res, err := s.notify.Send(ctx, tenantID, slug, fmt.Sprintf("MSK-NOTICE-%s-%s-%s", n.ID, p.ID, ch), notify.Message{
-				Channel: ch, Template: "maskani_notice", To: []string{dest},
-				Data: map[string]any{"title": n.Title, "body": n.Body, "name": p.DisplayName, "priority": string(n.Priority)},
+				Channel: ch, Template: "maskani/notice", To: []string{dest}, Metadata: meta,
+				Data: map[string]any{"title": n.Title, "body": n.Body, "name": firstName(p.DisplayName),
+					"priority": string(n.Priority), "estate": estate},
 			})
 			u := d.Update().SetSentAt(time.Now())
 			if err != nil {
@@ -200,6 +216,56 @@ func (s *Service) Deliveries(ctx context.Context, noticeID uuid.UUID) ([]*ent.No
 // DueScheduled returns scheduled notices whose time has come (system job).
 func (s *Service) DueScheduled(ctx context.Context) ([]*ent.Notice, error) {
 	return s.client.Notice.Query().Where(notice.StatusEQ(notice.StatusScheduled), notice.ScheduledAtLTE(time.Now())).Limit(100).All(ctx)
+}
+
+// activeChannels keeps the channels notifications can deliver (WhatsApp and email), defaulting to
+// both. Notices saved earlier with "sms" fall back to WhatsApp.
+func activeChannels(in []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, 2)
+	for _, ch := range in {
+		ch = strings.ToLower(strings.TrimSpace(ch))
+		if ch == "sms" {
+			ch = "whatsapp"
+		}
+		if (ch == "whatsapp" || ch == "email") && !seen[ch] {
+			seen[ch] = true
+			out = append(out, ch)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"whatsapp", "email"}
+	}
+	return out
+}
+
+// estateName names the sender: the notice's property, else the tenant slug.
+func (s *Service) estateName(ctx context.Context, n *ent.Notice, slug string) string {
+	if n.PropertyID != nil {
+		if p, err := s.client.Property.Get(ctx, *n.PropertyID); err == nil && p.Name != "" {
+			return p.Name
+		}
+	}
+	return slug
+}
+
+func firstName(display string) string {
+	if f := strings.Fields(display); len(f) > 0 {
+		return f[0]
+	}
+	return "there"
+}
+
+// maxNoticeParam keeps the WhatsApp notice parameter inside Meta's 1,024 character body.
+const maxNoticeParam = 900
+
+// oneLine flattens text for a WhatsApp template parameter: no newlines or tabs, no runs of spaces.
+func oneLine(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > maxNoticeParam {
+		s = string(r[:maxNoticeParam-3]) + "..."
+	}
+	return s
 }
 
 func quiet(t time.Time) bool { h := t.Hour(); return h >= 21 || h < 7 }

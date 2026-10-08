@@ -167,12 +167,18 @@ Used directly only for notices to an audience. Everything else is event driven.
 
 - Product `maskani`, plans `MASKANI_STARTER`, `MASKANI_GROWTH`, `MASKANI_PROFESSIONAL`,
   `MASKANI_ENTERPRISE`, service tag `maskani`.
-- Feature codes (service tag `maskani`): `maskani_properties`, `maskani_billing`,
+- Seeded in subscriptions-api 641e99c (`cmd/seed/plans_maskani.go`): 10,000, 20,000, 35,000 and
+  quote. Each tier also includes the ERP and treasury subscription at that tier.
+- Module codes (service tag `maskani`): `maskani_properties`, `maskani_billing`,
   `maskani_utilities`, `maskani_sales`, `maskani_estate`, `maskani_maintenance`,
   `maskani_providers`, `maskani_gate`, `maskani_staff`, `maskani_communication`,
-  `maskani_budgets`, `maskani_multilevel_approvals`, `maskani_bi_reports`, `maskani_api_access`,
-  `maskani_leasing`, `maskani_commercial`, `maskani_portfolios`, `maskani_marketplace`.
-- Limits: `max_units`, `max_staff_users`, `max_erp_staff`.
+  `maskani_leasing`, `maskani_commercial`, `maskani_portfolios` (every tier),
+  `maskani_marketplace` (Growth up).
+- Tier capabilities reuse existing codes: `budgeting`, `approval_workflows`, `asset_management`,
+  `bi_reports` (Growth up); `api_access`, `custom_workflows`, `audit_trail`, `priority_support`
+  (Professional up).
+- Limits: `max_units` (150, 400, 1,000, unlimited), `max_employees` (ERP staff 25, 75, 200),
+  `max_users` (staff users 10, 30, 100). Portal users never count as staff.
 - Runtime: features arrive in the JWT `sub_features` claim; limit checks call
   `GET /api/v1/tenants/{id}/subscription` (cached). A lapsed subscription keeps data readable and
   blocks new records.
