@@ -246,7 +246,8 @@ func (s *Service) previousReadings(ctx context.Context, meterIDs []uuid.UUID, pe
 	return out, nil
 }
 
-// ReadingInput records a reading.
+// ReadingInput records a reading. The meter photo is optional (user decision 2026-10-08): it helps
+// settle disputes but a reading must not be blocked when the camera or upload fails.
 type ReadingInput struct {
 	Period   string     `json:"period"`
 	Reading  float64    `json:"reading"`
@@ -258,9 +259,6 @@ type ReadingInput struct {
 // Record stores a reading (replacing an unaccepted one for the same period), computes consumption
 // against the previous reading and flags anomalies for re-checking.
 func (s *Service) Record(ctx context.Context, meterID, readBy uuid.UUID, in ReadingInput) (*ent.MeterReading, error) {
-	if in.PhotoKey == "" {
-		return nil, httpx.Invalid("a photo of the meter is required")
-	}
 	m, err := s.client.Meter.Get(ctx, meterID)
 	if err != nil {
 		return nil, err

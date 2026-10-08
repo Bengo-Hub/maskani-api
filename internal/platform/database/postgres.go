@@ -21,17 +21,19 @@ func NewPool(ctx context.Context, cfg config.PostgresConfig) (*pgxpool.Pool, err
 	poolConfig.MaxConns = int32(cfg.MaxOpenConns)
 	poolConfig.MinConns = 0
 	poolConfig.MaxConnLifetime = cfg.ConnMaxLifetime
-	if cfg.StatementTimeout > 0 {
-		// Startup parameters are sent with every new server connection, so they survive PgBouncer
-		// transaction pooling, unlike a one-off SET on a pooled connection.
-		poolConfig.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%d", cfg.StatementTimeout.Milliseconds())
-	}
+	// No startup RuntimeParams: the fleet PgBouncer accepts only extra_float_digits, search_path and
+	// options (ignore_startup_parameters) and rejects any other startup parameter with FATAL 08P01,
+	// which failed every connection and kept /readyz at 503 (2026-10-08).
 
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: create pool: %w", err)
+	}
+	// Best-effort session guardrail, the same as treasury-api and the rest of the fleet.
+	if cfg.StatementTimeout > 0 {
+		_, _ = pool.Exec(ctx, fmt.Sprintf("SET statement_timeout = '%dms'", cfg.StatementTimeout.Milliseconds()))
 	}
 	return pool, nil
 }
