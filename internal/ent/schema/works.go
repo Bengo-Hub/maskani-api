@@ -42,7 +42,8 @@ func (Vendor) Edges() []ent.Edge {
 }
 
 func (Vendor) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "status"), index.Fields("tenant_id", "name")}
+	return []ent.Index{index.Fields("tenant_id", "status"), index.Fields("tenant_id", "name"),
+		index.Fields("tenant_id", "created_at", "id")}
 }
 
 // VendorDocument is a licence or compliance document with an expiry date.

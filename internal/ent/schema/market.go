@@ -40,5 +40,7 @@ func (Enquiry) Indexes() []ent.Index {
 		index.Fields("tenant_id", "status", "created_at"),
 		index.Fields("tenant_id", "property_id"),
 		index.Fields("tenant_id", "phone_hash"),
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }

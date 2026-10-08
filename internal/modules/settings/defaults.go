@@ -50,7 +50,7 @@ var Presets = map[string][]string{
 	"owners_association":     {ModProperties, ModBilling, ModUtilities, ModEstate, ModMaintenance, ModProviders, ModGate, ModCommunication},
 	"residential_manager":    {ModProperties, ModBilling, ModUtilities, ModLeasing, ModPortfolios, ModMaintenance, ModProviders, ModCommunication},
 	"commercial_manager":     {ModProperties, ModBilling, ModUtilities, ModLeasing, ModCommercial, ModPortfolios, ModMaintenance, ModProviders, ModCommunication},
-	"self_managing_landlord": {ModProperties, ModBilling, ModUtilities, ModLeasing, ModMaintenance, ModCommunication},
+	"self_managing_landlord": {ModProperties, ModBilling, ModUtilities, ModLeasing, ModMaintenance, ModProviders, ModCommunication},
 	"agent_listings":         {ModProperties, ModMarketplace},
 }
 

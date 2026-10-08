@@ -43,3 +43,37 @@ envelope first and are idempotent on event ID.
 
 Durable consumer names are `maskani-{purpose}` with deliver group `maskani-workers`, `AckExplicit`,
 `MaxDeliver 5`, `DeliverNew` at first start.
+
+## Realtime (live screens)
+
+Separate from the outbox events above. After its database commit a service publishes a small hint
+through `internal/platform/realtime` (an interface, so no domain service imports NATS; a nil
+publisher is a no-op). The hub is the shared-events `FanoutHub` over a `Broadcaster` on core NATS,
+subject `_rt.maskani.events.<tenant>._` (the platform realtime-fanout standard). The `_rt.` prefix is
+outside the `maskani` JetStream stream, so nothing is persisted: every pod hears every message and
+delivers it to its own SSE connections at `GET /api/v1/{tenant}/maskani/stream`.
+
+Payload (the SSE `event:` field is `type`):
+
+```json
+{"type": "payment.applied", "id": "<uuid>", "property_id": "<uuid>", "unit_id": "<uuid>"}
+```
+
+| Type | `id` | Published by |
+|---|---|---|
+| `billing_run.progress` | billing run | billing: run created, after each batch of 500 lines, on finish, on retry |
+| `payment.applied` | unit account | payment consumer, after the balance refresh and the outbox `maskani.payment.applied` |
+| `work_order.updated` | work order | works: create and every action |
+| `gate.event` | gate event | gate: entry, exit or denial stored |
+| `walk_in.requested` | gate event | gate: walk-in request stored |
+| `walk_in.decided` | gate event | gate: host decision |
+| `reading.saved` | meter reading | utilities: record, estimate, verify |
+| `notice.status` | notice | notices: scheduled, sending, sent or failed |
+
+Filtering happens per connection: staff see their properties (all properties for admins, and events
+with no property), portal users only events whose `unit_id` is one of their active unit links.
+Hints carry ids only; clients refetch through the permission-checked endpoints and resync after a
+reconnect, because a pod that is reconnecting to NATS misses messages.
+
+`payment.applied` and `billing_run.progress` also drop each pod's cached dashboard figures for the
+tenant (`reports.Invalidate` subscribed to the same relay).

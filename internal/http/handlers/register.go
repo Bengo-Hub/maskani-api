@@ -177,6 +177,9 @@ func (h *H) LinkParty(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.unitScope(w, r, id) {
+		return
+	}
 	l, err := h.Register.LinkParty(r.Context(), id, actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -217,6 +220,41 @@ func (h *H) ListParties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, res)
+}
+
+// GetParty is GET /parties/{id}: masked identity numbers and unit links with unit codes.
+func (h *H) GetParty(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	a := access(r)
+	p, err := h.Register.GetParty(r.Context(), id, a.PropertyIDs, a.AllProperties)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, p)
+}
+
+// unitScope checks the caller may act on a unit's property.
+func (h *H) unitScope(w http.ResponseWriter, r *http.Request, unitID uuid.UUID) bool {
+	pid, err := h.Register.UnitPropertyID(r.Context(), unitID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	return requireProperty(w, r, pid)
+}
+
+// accountScope checks the caller may act on a unit account's property.
+func (h *H) accountScope(w http.ResponseWriter, r *http.Request, accountID uuid.UUID) bool {
+	pid, err := h.Register.AccountPropertyID(r.Context(), accountID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	return requireProperty(w, r, pid)
 }
 
 // CreateParty is POST /parties.
@@ -269,7 +307,7 @@ func (h *H) InviteParty(w http.ResponseWriter, r *http.Request) {
 // ListStaff is GET /properties/{id}/staff.
 func (h *H) ListStaff(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !requireProperty(w, r, id) {
 		return
 	}
 	rows, err := h.Register.ListStaff(r.Context(), id)
@@ -283,7 +321,7 @@ func (h *H) ListStaff(w http.ResponseWriter, r *http.Request) {
 // AssignStaff is POST /properties/{id}/staff.
 func (h *H) AssignStaff(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !requireProperty(w, r, id) {
 		return
 	}
 	var in struct {
@@ -332,6 +370,9 @@ func (h *H) AddVehicle(w http.ResponseWriter, r *http.Request) {
 		Colour  string     `json:"colour"`
 	}
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.unitScope(w, r, id) {
 		return
 	}
 	v, err := h.Register.AddVehicle(r.Context(), id, in.PartyID, in.Plate, in.Make, in.Model, in.Colour)

@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/fund"
 	"github.com/bengobox/maskani-api/internal/ent/property"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
@@ -20,6 +21,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -56,8 +58,9 @@ func (s *Service) Statement(ctx context.Context, accountID uuid.UUID) (*Statemen
 	return &Statement{Account: acc, Ledger: led}, nil
 }
 
-// ListAccounts returns accounts for a property (or all visible), with cached balances.
-func (s *Service) ListAccounts(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, onlyOwing bool, limit int) ([]*ent.UnitAccount, error) {
+// ListAccounts returns a keyset page of accounts (newest first) for a property or the caller's
+// scope, with cached balances, fund and unit.
+func (s *Service) ListAccounts(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, onlyOwing bool, fundCode string, p page.Params) (page.Result[*ent.UnitAccount], error) {
 	q := s.client.UnitAccount.Query().Where(unitaccount.StatusEQ(unitaccount.StatusActive))
 	if propertyID != nil {
 		q = q.Where(unitaccount.HasUnitWith(unit.PropertyID(*propertyID)))
@@ -67,8 +70,14 @@ func (s *Service) ListAccounts(ctx context.Context, propertyID *uuid.UUID, scope
 	if onlyOwing {
 		q = q.Where(unitaccount.BalanceGT(decimal.Zero))
 	}
-	return q.WithFund().WithUnit().Order(ent.Desc(unitaccount.FieldBalance), ent.Asc(unitaccount.FieldAccountRef)).
-		Limit(min(max(limit, 1), 1000)).All(ctx)
+	if fundCode != "" {
+		q = q.Where(unitaccount.HasFundWith(fund.Code(fundCode)))
+	}
+	rows, err := q.WithFund().WithUnit().Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.UnitAccount]{}, err
+	}
+	return page.Build(rows, p.Limit, func(a *ent.UnitAccount) (uuid.UUID, time.Time) { return a.ID, a.CreatedAt }), nil
 }
 
 // Suspense lists unmatched paybill payments (the treasury C2B inbox) since a date.

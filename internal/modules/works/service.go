@@ -13,13 +13,16 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
+	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // SLA targets per priority (SRDD 14.4): response and resolution.
@@ -35,6 +38,16 @@ type Service struct {
 	client *ent.Client
 	seq    *sequence.Allocator
 	log    *zap.Logger
+	rt     realtime.Publisher
+}
+
+// SetRealtime sets the publisher for work order hints (nil disables them).
+func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
+
+func (s *Service) emit(ctx context.Context, wo *ent.WorkOrder) {
+	tenantID, _ := tenantguard.TenantID(ctx)
+	realtime.Emit(s.rt, tenantID, realtime.Event{Type: realtime.WorkOrderUpdated, ID: wo.ID.String(),
+		PropertyID: wo.PropertyID.String(), UnitID: realtime.IDString(wo.UnitID)})
 }
 
 // NewService creates the works service.
@@ -116,7 +129,11 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 		_ = tx.Rollback()
 		return nil, err
 	}
-	return wo, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	s.emit(ctx, wo)
+	return wo, nil
 }
 
 func (s *Service) event(ctx context.Context, tx *ent.Tx, id uuid.UUID, a Actor, kind, from, to, note string) error {
@@ -277,6 +294,7 @@ func (s *Service) Act(ctx context.Context, id uuid.UUID, a Actor, in ActionInput
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.emit(ctx, wo)
 	return s.client.WorkOrder.Get(ctx, id)
 }
 
@@ -379,30 +397,52 @@ type VendorView struct {
 	ExpiredDocs int                   `json:"expired_documents"`
 }
 
-// ListVendors returns vendors with document status.
-func (s *Service) ListVendors(ctx context.Context) ([]VendorView, error) {
-	vs, err := s.client.Vendor.Query().Where(vendor.StatusNEQ(vendor.StatusInactive)).
-		WithDocuments().Order(ent.Asc(vendor.FieldName)).Limit(500).All(ctx)
-	if err != nil {
-		return nil, err
+func viewVendor(v *ent.Vendor, now time.Time) VendorView {
+	out := VendorView{Vendor: v, Documents: v.Edges.Documents}
+	if out.Documents == nil {
+		out.Documents = []*ent.VendorDocument{}
 	}
-	now := time.Now()
-	out := make([]VendorView, len(vs))
-	for i, v := range vs {
-		out[i] = VendorView{Vendor: v, Documents: v.Edges.Documents}
-		for _, d := range v.Edges.Documents {
-			if d.ExpiresAt == nil {
-				continue
-			}
-			if d.ExpiresAt.Before(now) {
-				out[i].ExpiredDocs++
-			}
-			if out[i].NextExpiry == nil || d.ExpiresAt.Before(*out[i].NextExpiry) {
-				out[i].NextExpiry = d.ExpiresAt
-			}
+	for _, d := range v.Edges.Documents {
+		if d.ExpiresAt == nil {
+			continue
+		}
+		if d.ExpiresAt.Before(now) {
+			out.ExpiredDocs++
+		}
+		if out.NextExpiry == nil || d.ExpiresAt.Before(*out.NextExpiry) {
+			out.NextExpiry = d.ExpiresAt
 		}
 	}
-	return out, nil
+	return out
+}
+
+// VendorListRow is a vendor list row: documents status plus personnel with has_pin.
+type VendorListRow struct {
+	VendorView
+	Personnel []PersonnelView `json:"personnel"`
+}
+
+// ListVendors returns a keyset page of active and suspended vendors, newest first, with document
+// status and personnel. Documents and personnel load in one batched query each for the page.
+func (s *Service) ListVendors(ctx context.Context, status string, p page.Params) (page.Result[VendorListRow], error) {
+	q := s.client.Vendor.Query()
+	if status != "" {
+		q = q.Where(vendor.StatusEQ(vendor.Status(status)))
+	} else {
+		q = q.Where(vendor.StatusNEQ(vendor.StatusInactive))
+	}
+	vs, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).
+		WithDocuments().WithPersonnel().All(ctx)
+	if err != nil {
+		return page.Result[VendorListRow]{}, err
+	}
+	res := page.Build(vs, p.Limit, func(v *ent.Vendor) (uuid.UUID, time.Time) { return v.ID, v.CreatedAt })
+	now := time.Now()
+	rows := make([]VendorListRow, len(res.Data))
+	for i, v := range res.Data {
+		rows[i] = VendorListRow{VendorView: viewVendor(v, now), Personnel: ViewPersonnel(v.Edges.Personnel)}
+	}
+	return page.Result[VendorListRow]{Data: rows, NextCursor: res.NextCursor, HasMore: res.HasMore}, nil
 }
 
 // DocumentInput records a compliance document.
@@ -478,6 +518,95 @@ func (s *Service) AlertExpiring(ctx context.Context) (int, error) {
 		sent++
 	}
 	return sent, nil
+}
+
+// PersonnelView is a personnel row for the console: has_pin instead of the hash, which never leaves
+// the server (pin_hash is a Sensitive column, so it is not serialised either way).
+type PersonnelView struct {
+	*ent.VendorPersonnel
+	HasPIN bool `json:"has_pin"`
+}
+
+// ViewPersonnel wraps rows with has_pin.
+func ViewPersonnel(rows []*ent.VendorPersonnel) []PersonnelView {
+	out := make([]PersonnelView, len(rows))
+	for i, p := range rows {
+		out[i] = PersonnelView{VendorPersonnel: p, HasPIN: p.PinHash != ""}
+	}
+	return out
+}
+
+// ValidGuardPIN reports whether pin is 4 to 6 digits.
+func ValidGuardPIN(pin string) bool {
+	if len(pin) < 4 || len(pin) > 6 {
+		return false
+	}
+	for _, c := range pin {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// SetGuardPIN stores a bcrypt hash of a guard's gate PIN (the fleet's PIN hashing, as pos-api).
+// The hash lives in the existing sensitive pin_hash column, never in metadata, because metadata is
+// returned in API responses.
+func (s *Service) SetGuardPIN(ctx context.Context, vendorID, personnelID uuid.UUID, pin string) (*PersonnelView, error) {
+	if !ValidGuardPIN(pin) {
+		return nil, httpx.Invalid("the PIN must be 4 to 6 digits")
+	}
+	p, err := s.client.VendorPersonnel.Query().
+		Where(vendorpersonnel.ID(personnelID), vendorpersonnel.VendorID(vendorID)).Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	p, err = p.Update().SetPinHash(string(hash)).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &PersonnelView{VendorPersonnel: p, HasPIN: true}, nil
+}
+
+// VendorDetail is one vendor with documents and personnel.
+type VendorDetail struct {
+	VendorView
+	Personnel []PersonnelView `json:"personnel"`
+}
+
+// GetVendor returns a vendor with its documents and personnel. When scope is limited, personnel
+// deployed only to properties outside it are left out.
+func (s *Service) GetVendor(ctx context.Context, id uuid.UUID, scope []uuid.UUID, all bool) (*VendorDetail, error) {
+	v, err := s.client.Vendor.Query().Where(vendor.ID(id)).
+		WithDocuments(func(q *ent.VendorDocumentQuery) { q.Order(ent.Asc(vendordocument.FieldExpiresAt)) }).
+		WithPersonnel(func(q *ent.VendorPersonnelQuery) { q.Order(ent.Asc(vendorpersonnel.FieldBadgeNumber)) }).Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &VendorDetail{VendorView: viewVendor(v, time.Now())}
+	visible := map[string]bool{}
+	for _, p := range scope {
+		visible[p.String()] = true
+	}
+	var people []*ent.VendorPersonnel
+	for _, p := range v.Edges.Personnel {
+		if all || len(p.PropertyIds) == 0 {
+			people = append(people, p)
+			continue
+		}
+		for _, pid := range p.PropertyIds {
+			if visible[pid] {
+				people = append(people, p)
+				break
+			}
+		}
+	}
+	out.Personnel = ViewPersonnel(people)
+	return out, nil
 }
 
 // AddPersonnel registers an agency person with a badge.

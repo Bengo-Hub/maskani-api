@@ -4,9 +4,14 @@ package reports
 
 import (
 	"context"
+	stdsql "database/sql"
+	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -23,8 +28,10 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
+	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/sqlx"
 )
 
@@ -34,53 +41,90 @@ const cacheTTL = 60 * time.Second
 // Service is the reports service.
 type Service struct {
 	client    *ent.Client
+	db        *stdsql.DB // read-only handle for the grouped report SQL; may equal the primary
 	utilities *utilities.Service
 	loc       *time.Location
 	log       *zap.Logger
 
-	mu    sync.Mutex
-	cache map[string]cacheEntry
+	cache *sharedcache.Local[string, any]
+	// gen is a per-tenant generation folded into every cache key: Invalidate bumps it, so a
+	// tenant's old entries become unreachable at once and age out of the bounded LRU.
+	genMu sync.Mutex
+	gen   map[uuid.UUID]uint64
 }
 
-type cacheEntry struct {
-	v  any
-	at time.Time
+// NewService creates the reports service. client and db should be the read replica when present.
+func NewService(client *ent.Client, db *stdsql.DB, util *utilities.Service, loc *time.Location, log *zap.Logger) *Service {
+	return &Service{client: client, db: db, utilities: util, loc: loc, log: log.Named("reports"),
+		cache: sharedcache.NewLocal[string, any](2000, cacheTTL), gen: map[uuid.UUID]uint64{}}
 }
 
-// NewService creates the reports service. client should be the read replica client when present.
-func NewService(client *ent.Client, util *utilities.Service, loc *time.Location, log *zap.Logger) *Service {
-	return &Service{client: client, utilities: util, loc: loc, log: log.Named("reports"), cache: map[string]cacheEntry{}}
+func (s *Service) generation(tenantID uuid.UUID) uint64 {
+	s.genMu.Lock()
+	defer s.genMu.Unlock()
+	return s.gen[tenantID]
 }
 
 func (s *Service) cached(ctx context.Context, key string, fn func() (any, error)) (any, error) {
 	tenantID, _ := tenantguard.TenantID(ctx)
-	k := tenantID.String() + ":" + key
-	s.mu.Lock()
-	if e, ok := s.cache[k]; ok && time.Since(e.at) < cacheTTL {
-		s.mu.Unlock()
-		return e.v, nil
-	}
-	s.mu.Unlock()
-	v, err := fn()
-	if err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	s.cache[k] = cacheEntry{v: v, at: time.Now()}
-	s.mu.Unlock()
-	return v, nil
+	k := fmt.Sprintf("%s:%d:%s", tenantID, s.generation(tenantID), key)
+	return s.cache.GetOrLoad(k, fn)
 }
 
-// Invalidate drops a tenant's cached figures (called after billing runs and payments).
+// Invalidate drops a tenant's cached figures. Wired to payment.applied and billing run progress
+// on every pod through the realtime relay, and called directly after local writes.
 func (s *Service) Invalidate(tenantID uuid.UUID) {
-	prefix := tenantID.String() + ":"
-	s.mu.Lock()
-	for k := range s.cache {
-		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
-			delete(s.cache, k)
-		}
+	s.genMu.Lock()
+	s.gen[tenantID]++
+	s.genMu.Unlock()
+}
+
+// Scope limits a report to one property or to the caller's properties.
+type Scope struct {
+	PropertyID *uuid.UUID
+	IDs        []uuid.UUID
+	All        bool
+}
+
+// ids returns the property filter, or nil when the report covers the whole tenant.
+func (sc Scope) ids() []uuid.UUID {
+	if sc.PropertyID != nil {
+		return []uuid.UUID{*sc.PropertyID}
 	}
-	s.mu.Unlock()
+	if sc.All {
+		return nil
+	}
+	if sc.IDs == nil {
+		return []uuid.UUID{}
+	}
+	return sc.IDs
+}
+
+// key is a stable cache key part for the scope.
+func (sc Scope) key() string {
+	ids := sc.ids()
+	if ids == nil {
+		return "all"
+	}
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = id.String()
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ",")
+}
+
+// sqlIDs is the uuid[] parameter for raw SQL: nil means no property filter.
+func (sc Scope) sqlIDs() any {
+	ids := sc.ids()
+	if ids == nil {
+		return nil
+	}
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return "{" + strings.Join(out, ",") + "}"
 }
 
 // Dashboard is the manager dashboard (SRDD figure 14).
@@ -102,28 +146,51 @@ type Dashboard struct {
 	UnitsSold         int              `json:"units_sold"`
 	SalesValue        decimal.Decimal  `json:"sales_value"`
 	SalesCollected    decimal.Decimal  `json:"sales_collected"`
+	// CollectionsByWeek is billed and collected per week (weeks start Monday) for the period.
+	CollectionsByWeek []WeekFigures `json:"collections_by_week"`
+	// ArrearsAgeing buckets owing accounts by the age of their oldest unpaid due date, allocating
+	// each balance to the newest bills first (treasury settles oldest first).
+	ArrearsAgeing []AgeBucket `json:"arrears_ageing"`
 }
 
-// Dashboard computes the dashboard for a property (or all visible properties) and month.
-func (s *Service) Dashboard(ctx context.Context, propertyID *uuid.UUID, period string) (*Dashboard, error) {
+// WeekFigures is one week of the collections chart.
+type WeekFigures struct {
+	WeekStart string          `json:"week_start"`
+	Billed    decimal.Decimal `json:"billed"`
+	Collected decimal.Decimal `json:"collected"`
+}
+
+// AgeBucket is one arrears ageing band.
+type AgeBucket struct {
+	Bucket   string          `json:"bucket"`
+	Accounts int             `json:"accounts"`
+	Amount   decimal.Decimal `json:"amount"`
+}
+
+// AgeBuckets are the ageing bands in display order.
+var AgeBuckets = []string{"0-30", "31-60", "61-90", "90+"}
+
+// Dashboard computes the dashboard for a property (or the caller's properties) and month. Results
+// are cached for 60 seconds per tenant, scope and period.
+func (s *Service) Dashboard(ctx context.Context, sc Scope, period string) (*Dashboard, error) {
 	if period == "" {
 		period = time.Now().In(s.loc).Format("2006-01")
 	}
-	key := "dashboard:" + period
-	if propertyID != nil {
-		key += ":" + propertyID.String()
+	if _, err := time.ParseInLocation("2006-01", period, s.loc); err != nil {
+		return nil, httpx.Invalid("period must be YYYY-MM")
 	}
-	v, err := s.cached(ctx, key, func() (any, error) { return s.dashboard(ctx, propertyID, period) })
+	v, err := s.cached(ctx, "dashboard:"+period+":"+sc.key(), func() (any, error) { return s.dashboard(ctx, sc, period) })
 	if err != nil {
 		return nil, err
 	}
 	return v.(*Dashboard), nil
 }
 
-func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period string) (*Dashboard, error) {
+func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dashboard, error) {
 	d := &Dashboard{Period: period}
 	start, _ := time.ParseInLocation("2006-01", period, s.loc)
 	end := start.AddDate(0, 1, 0)
+	ids := sc.ids()
 
 	// Billed: issued lines of this period's runs.
 	var billed []struct {
@@ -131,8 +198,8 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 	}
 	lq := s.client.BillingRunLine.Query().Where(billingrunline.StatusEQ(billingrunline.StatusIssued),
 		billingrunline.HasRunWith(billingrun.Period(period)))
-	if propertyID != nil {
-		lq = lq.Where(billingrunline.HasRunWith(billingrun.PropertyID(*propertyID)))
+	if ids != nil {
+		lq = lq.Where(billingrunline.HasRunWith(billingrun.PropertyIDIn(ids...)))
 	}
 	if err := lq.Aggregate(sqlx.SumAs(billingrunline.FieldTotal, "total", "")).Scan(ctx, &billed); err != nil {
 		return nil, err
@@ -145,9 +212,11 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 	var coll []struct {
 		Collected decimal.Decimal `json:"collected"`
 	}
-	sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(start), dailystat.DayLT(end))
-	if propertyID != nil {
-		sq = sq.Where(dailystat.PropertyID(*propertyID))
+	// daily_stats.day holds the local date at UTC midnight (RecordCollection).
+	dayFrom := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, time.UTC)
+	sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(dayFrom), dailystat.DayLT(dayFrom.AddDate(0, 1, 0)))
+	if ids != nil {
+		sq = sq.Where(dailystat.PropertyIDIn(ids...))
 	}
 	if err := sq.Aggregate(sqlx.SumAs(dailystat.FieldCollected, "collected", "")).Scan(ctx, &coll); err != nil {
 		return nil, err
@@ -162,8 +231,8 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 	// Outstanding and arrears from cached treasury balances. "Over 60 days" = owing accounts whose
 	// oldest issued bill fell due more than 60 days ago.
 	aq := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero))
-	if propertyID != nil {
-		aq = aq.Where(unitaccount.HasUnitWith(unit.PropertyID(*propertyID)))
+	if ids != nil {
+		aq = aq.Where(unitaccount.HasUnitWith(unit.PropertyIDIn(ids...)))
 	}
 	var owing []struct {
 		N   int             `json:"n"`
@@ -197,8 +266,8 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 	// Work orders.
 	wq := s.client.WorkOrder.Query().Where(workorder.StatusNotIn(workorder.StatusConfirmed, workorder.StatusClosed,
 		workorder.StatusCancelled, workorder.StatusCompleted))
-	if propertyID != nil {
-		wq = wq.Where(workorder.PropertyID(*propertyID))
+	if ids != nil {
+		wq = wq.Where(workorder.PropertyIDIn(ids...))
 	}
 	var wo []struct {
 		Open int `json:"open"`
@@ -213,8 +282,8 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 
 	// Units and sales.
 	uq := s.client.Unit.Query().Where(unit.StatusEQ(unit.StatusActive))
-	if propertyID != nil {
-		uq = uq.Where(unit.PropertyID(*propertyID))
+	if ids != nil {
+		uq = uq.Where(unit.PropertyIDIn(ids...))
 	}
 	var uc []struct {
 		Units    int `json:"units"`
@@ -229,18 +298,27 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 		d.Units, d.Occupied, d.UnitsSold = uc[0].Units, uc[0].Occupied, uc[0].Sold
 	}
 	cq := s.client.SaleContract.Query().Where(salecontract.StatusNotIn(salecontract.StatusDraft, salecontract.StatusCancelled, salecontract.StatusTerminated))
-	if propertyID != nil {
-		cq = cq.Where(salecontract.PropertyID(*propertyID))
+	if ids != nil {
+		cq = cq.Where(salecontract.PropertyIDIn(ids...))
 	}
-	var sc []struct {
+	var sales []struct {
 		Value decimal.Decimal `json:"value"`
 		Paid  decimal.Decimal `json:"paid"`
 	}
-	if err := cq.Aggregate(sqlx.SumAs(salecontract.FieldNetPrice, "value", ""), sqlx.SumAs(salecontract.FieldPaidTotal, "paid", "")).Scan(ctx, &sc); err != nil {
+	if err := cq.Aggregate(sqlx.SumAs(salecontract.FieldNetPrice, "value", ""), sqlx.SumAs(salecontract.FieldPaidTotal, "paid", "")).Scan(ctx, &sales); err != nil {
 		return nil, err
 	}
-	if len(sc) > 0 {
-		d.SalesValue, d.SalesCollected = sc[0].Value, sc[0].Paid
+	if len(sales) > 0 {
+		d.SalesValue, d.SalesCollected = sales[0].Value, sales[0].Paid
+	}
+
+	tenantID, _ := tenantguard.TenantID(ctx)
+	var err error
+	if d.CollectionsByWeek, err = s.weekly(ctx, tenantID, sc, period, start, end); err != nil {
+		return nil, err
+	}
+	if d.ArrearsAgeing, err = s.ageing(ctx, tenantID, sc); err != nil {
+		return nil, err
 	}
 
 	// Vendors due: contracts ending or documents expiring within 30 days.
@@ -250,8 +328,8 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 	nd, _ := s.client.VendorDocument.Query().Where(vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(soon)).Count(ctx)
 	d.VendorsDue = nc + nd
 
-	if propertyID != nil && s.utilities != nil {
-		if pts, err := s.utilities.WaterBalance(ctx, *propertyID, period); err == nil && len(pts) > 0 {
+	if sc.PropertyID != nil && s.utilities != nil {
+		if pts, err := s.utilities.WaterBalance(ctx, *sc.PropertyID, period); err == nil && len(pts) > 0 {
 			last := pts[len(pts)-1]
 			if last.Supplied.IsPositive() {
 				d.WaterLossPct = &last.LossPct
@@ -259,6 +337,118 @@ func (s *Service) dashboard(ctx context.Context, propertyID *uuid.UUID, period s
 		}
 	}
 	return d, nil
+}
+
+// weeklySQL returns billed and collected per week (Monday start) of a month, in one grouped query.
+// Parameters: $1 tenant, $2 first day (date), $3 first day of next month (date), $4 period (YYYY-MM),
+// $5 property ids as a uuid array literal or NULL, $6 time zone. The guard does not apply to raw
+// SQL, so every table is filtered by tenant_id here.
+const weeklySQL = `
+WITH weeks AS (
+  SELECT gs::date AS week_start
+    FROM generate_series(date_trunc('week', $2::date), ($3::date - 1)::timestamp, interval '1 week') AS gs
+), billed AS (
+  SELECT date_trunc('week', (r.invoice_date AT TIME ZONE $6))::date AS wk, SUM(l.total) AS amt
+    FROM billing_run_lines l JOIN billing_runs r ON r.id = l.run_id AND r.tenant_id = $1
+   WHERE l.tenant_id = $1 AND l.status = 'issued' AND r.period = $4
+     AND ($5::text IS NULL OR r.property_id = ANY($5::text::uuid[]))
+   GROUP BY 1
+), coll AS (
+  SELECT date_trunc('week', (d.day AT TIME ZONE 'UTC'))::date AS wk, SUM(d.collected) AS amt
+    FROM daily_stats d
+   WHERE d.tenant_id = $1 AND (d.day AT TIME ZONE 'UTC')::date >= $2::date AND (d.day AT TIME ZONE 'UTC')::date < $3::date
+     AND ($5::text IS NULL OR d.property_id = ANY($5::text::uuid[]))
+   GROUP BY 1
+)
+SELECT to_char(w.week_start, 'YYYY-MM-DD'), COALESCE(b.amt, 0), COALESCE(c.amt, 0)
+  FROM weeks w LEFT JOIN billed b ON b.wk = w.week_start LEFT JOIN coll c ON c.wk = w.week_start
+ ORDER BY w.week_start`
+
+// ageingSQL buckets owing accounts by the age of their oldest unpaid due date. Each balance is laid
+// against the account's issued bills and instalment invoices from the newest back (treasury settles
+// oldest first, so what is still owed is the newest debt); the oldest bill the balance reaches
+// sets the age. Accounts with a balance but no issued bill (opening balances) count as 0-30.
+// Parameters: $1 tenant, $2 property ids as a uuid array literal or NULL.
+const ageingSQL = `
+WITH acc AS (
+  SELECT ua.id, ua.balance
+    FROM unit_accounts ua JOIN units u ON u.id = ua.unit_id AND u.tenant_id = $1
+   WHERE ua.tenant_id = $1 AND ua.status = 'active' AND ua.balance > 0
+     AND ($2::text IS NULL OR u.property_id = ANY($2::text::uuid[]))
+), dues AS (
+  SELECT l.unit_account_id AS acc_id, r.due_date, l.total AS amount
+    FROM billing_run_lines l JOIN billing_runs r ON r.id = l.run_id AND r.tenant_id = $1
+   WHERE l.tenant_id = $1 AND l.status = 'issued' AND l.unit_account_id IN (SELECT id FROM acc)
+  UNION ALL
+  SELECT sc.unit_account_id, i.due_date, i.amount
+    FROM instalments i JOIN sale_contracts sc ON sc.id = i.contract_id AND sc.tenant_id = $1
+   WHERE i.tenant_id = $1 AND i.treasury_invoice_id IS NOT NULL AND sc.unit_account_id IN (SELECT id FROM acc)
+), running AS (
+  SELECT acc_id, due_date, amount,
+         SUM(amount) OVER (PARTITION BY acc_id ORDER BY due_date DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS upto
+    FROM dues
+), oldest AS (
+  SELECT r.acc_id, MIN(r.due_date) AS oldest_due
+    FROM running r JOIN acc a ON a.id = r.acc_id
+   WHERE r.upto - r.amount < a.balance
+   GROUP BY r.acc_id
+), aged AS (
+  SELECT a.balance, GREATEST(0, CURRENT_DATE - COALESCE(o.oldest_due::date, CURRENT_DATE)) AS age
+    FROM acc a LEFT JOIN oldest o ON o.acc_id = a.id
+)
+SELECT CASE WHEN age <= 30 THEN '0-30' WHEN age <= 60 THEN '31-60' WHEN age <= 90 THEN '61-90' ELSE '90+' END,
+       COUNT(*), COALESCE(SUM(balance), 0)
+  FROM aged GROUP BY 1`
+
+func (s *Service) weekly(ctx context.Context, tenantID uuid.UUID, sc Scope, period string, start, end time.Time) ([]WeekFigures, error) {
+	out := []WeekFigures{}
+	if s.db == nil {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, weeklySQL, tenantID, start.Format("2006-01-02"), end.Format("2006-01-02"),
+		period, sc.sqlIDs(), s.loc.String())
+	if err != nil {
+		return nil, fmt.Errorf("collections by week: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var w WeekFigures
+		if err := rows.Scan(&w.WeekStart, &w.Billed, &w.Collected); err != nil {
+			return nil, err
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) ageing(ctx context.Context, tenantID uuid.UUID, sc Scope) ([]AgeBucket, error) {
+	byName := map[string]AgeBucket{}
+	if s.db != nil {
+		rows, err := s.db.QueryContext(ctx, ageingSQL, tenantID, sc.sqlIDs())
+		if err != nil {
+			return nil, fmt.Errorf("arrears ageing: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var b AgeBucket
+			if err := rows.Scan(&b.Bucket, &b.Accounts, &b.Amount); err != nil {
+				return nil, err
+			}
+			byName[b.Bucket] = b
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	out := make([]AgeBucket, len(AgeBuckets))
+	for i, name := range AgeBuckets {
+		b, ok := byName[name]
+		if !ok {
+			b = AgeBucket{Bucket: name}
+		}
+		out[i] = b
+	}
+	return out, nil
 }
 
 // ArrearsRow is one owing account.
@@ -271,22 +461,26 @@ type ArrearsRow struct {
 	LastPaid   *time.Time      `json:"last_payment_at,omitempty"`
 }
 
-// Arrears lists owing accounts, largest first (bounded).
-func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, limit int) ([]ArrearsRow, error) {
-	q := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero))
+// Arrears returns a keyset page of owing accounts, largest balance first, for one property or the
+// caller's properties.
+func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.DecimalParams) (page.Result[ArrearsRow], error) {
+	q := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero), unitaccount.StatusEQ(unitaccount.StatusActive))
 	if propertyID != nil {
 		q = q.Where(unitaccount.HasUnitWith(unit.PropertyID(*propertyID)))
+	} else if !all {
+		q = q.Where(unitaccount.HasUnitWith(unit.PropertyIDIn(scope...)))
 	}
-	rows, err := q.Order(ent.Desc(unitaccount.FieldBalance)).Limit(min(max(limit, 1), 1000)).All(ctx)
+	rows, err := q.Where(p.Predicate(unitaccount.FieldBalance)).Modify(page.OrderDecimal(unitaccount.FieldBalance)).
+		Limit(p.Limit + 1).All(ctx)
 	if err != nil {
-		return nil, err
+		return page.Result[ArrearsRow]{}, err
 	}
 	out := make([]ArrearsRow, len(rows))
 	for i, a := range rows {
 		out[i] = ArrearsRow{AccountID: a.ID, AccountRef: a.AccountRef, Customer: a.CustomerName, Phone: a.CustomerPhone,
 			Balance: a.Balance, LastPaid: a.LastPaymentAt}
 	}
-	return out, nil
+	return page.BuildDecimal(out, p.Limit, func(r ArrearsRow) (uuid.UUID, decimal.Decimal) { return r.AccountID, r.Balance }), nil
 }
 
 // SalesPosition counts units by sale status and sums contract values.

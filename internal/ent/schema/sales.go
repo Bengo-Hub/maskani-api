@@ -92,6 +92,7 @@ func (Reservation) Indexes() []ent.Index {
 		index.Fields("tenant_id", "status", "expires_at"),
 		index.Fields("tenant_id", "unit_id").Unique().
 			Annotations(entsql.IndexWhere("status IN ('pending_payment','active')")),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }
 
@@ -153,6 +154,8 @@ func (SaleContract) Indexes() []ent.Index {
 		index.Fields("tenant_id", "status"),
 		index.Fields("tenant_id", "unit_id"),
 		index.Fields("tenant_id", "primary_buyer_id"),
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }
 

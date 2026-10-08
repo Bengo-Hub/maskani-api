@@ -38,7 +38,8 @@ func (Notice) Edges() []ent.Edge {
 }
 
 func (Notice) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "status", "scheduled_at"), index.Fields("tenant_id", "created_at")}
+	return []ent.Index{index.Fields("tenant_id", "status", "scheduled_at"), index.Fields("tenant_id", "created_at", "id"),
+		index.Fields("tenant_id", "property_id", "created_at", "id")}
 }
 
 // NoticeDelivery tracks one recipient and channel.

@@ -8,6 +8,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -212,14 +213,53 @@ func (h *H) ActWorkOrder(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, wo)
 }
 
-// ListVendors is GET /vendors.
+// ListVendors is GET /vendors?status= (keyset page).
 func (h *H) ListVendors(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Works.ListVendors(r.Context())
+	res, err := h.Works.ListVendors(r.Context(), r.URL.Query().Get("status"), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
+}
+
+// GetVendor is GET /vendors/{id}: vendor with documents and personnel (has_pin, never the hash).
+func (h *H) GetVendor(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	a := access(r)
+	v, err := h.Works.GetVendor(r.Context(), id, a.PropertyIDs, a.AllProperties)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
+}
+
+// SetPersonnelPIN is PUT /vendors/{id}/personnel/{pid}/pin {pin}: sets a guard's gate PIN.
+func (h *H) SetPersonnelPIN(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	pid, ok := httpx.UUIDParam(w, r, "pid")
+	if !ok {
+		return
+	}
+	var in struct {
+		PIN string `json:"pin"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	p, err := h.Works.SetGuardPIN(r.Context(), id, pid, in.PIN)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, p)
 }
 
 // CreateVendor is POST /vendors.
@@ -275,7 +315,7 @@ func (h *H) AddPersonnel(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusCreated, p)
+	httpx.JSON(w, http.StatusCreated, works.PersonnelView{VendorPersonnel: p, HasPIN: p.PinHash != ""})
 }
 
 // --- Gate (staff side) ---
@@ -318,14 +358,28 @@ func (h *H) StaffCreatePass(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, p)
 }
 
-// ListPasses is GET /visitor-passes?property_id=&active=.
+// scopeFilter reads ?property_id and checks it against the caller's properties.
+func scopeFilter(w http.ResponseWriter, r *http.Request) (gate.ScopeFilter, bool) {
+	a := access(r)
+	f := gate.ScopeFilter{PropertyID: httpx.QueryUUID(r, "property_id"), Scope: a.PropertyIDs, AllProperties: a.AllProperties}
+	if f.PropertyID != nil && !requireProperty(w, r, *f.PropertyID) {
+		return f, false
+	}
+	return f, true
+}
+
+// ListPasses is GET /visitor-passes?property_id=&active= (keyset page).
 func (h *H) ListPasses(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Gate.ListPasses(r.Context(), httpx.QueryUUID(r, "property_id"), nil, r.URL.Query().Get("active") == "true", intQuery(r, "limit", 200))
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.Gate.PagePasses(r.Context(), f, r.URL.Query().Get("active") == "true", page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // ListGateEvents is GET /gate/events?property_id=.
@@ -359,14 +413,18 @@ func (h *H) ReportIncident(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, inc)
 }
 
-// ListIncidents is GET /incidents.
+// ListIncidents is GET /incidents?property_id=&open= (keyset page).
 func (h *H) ListIncidents(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Gate.ListIncidents(r.Context(), httpx.QueryUUID(r, "property_id"), r.URL.Query().Get("open") == "true", intQuery(r, "limit", 200))
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.Gate.PageIncidents(r.Context(), f, r.URL.Query().Get("open") == "true", page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // --- Notices ---
@@ -399,14 +457,18 @@ func (h *H) SendNotice(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, n)
 }
 
-// ListNotices is GET /notices.
+// ListNotices is GET /notices?property_id=&status= (keyset page).
 func (h *H) ListNotices(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Notices.List(r.Context(), httpx.QueryUUID(r, "property_id"), intQuery(r, "limit", 50))
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.Notices.List(r.Context(), f.PropertyID, f.Scope, f.AllProperties, r.URL.Query().Get("status"), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // NoticeDeliveries is GET /notices/{id}/deliveries.
@@ -427,11 +489,12 @@ func (h *H) NoticeDeliveries(w http.ResponseWriter, r *http.Request) {
 
 // Dashboard is GET /reports/dashboard?property_id=&period=.
 func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
-	pid := httpx.QueryUUID(r, "property_id")
-	if pid != nil && !requireProperty(w, r, *pid) {
+	f, ok := scopeFilter(w, r)
+	if !ok {
 		return
 	}
-	d, err := h.Reports.Dashboard(r.Context(), pid, r.URL.Query().Get("period"))
+	d, err := h.Reports.Dashboard(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
+		r.URL.Query().Get("period"))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -439,14 +502,18 @@ func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, d)
 }
 
-// Arrears is GET /reports/arrears.
+// Arrears is GET /reports/arrears?property_id= (keyset page, largest balance first).
 func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Reports.Arrears(r.Context(), httpx.QueryUUID(r, "property_id"), intQuery(r, "limit", 200))
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.Reports.Arrears(r.Context(), f.PropertyID, f.Scope, f.AllProperties, page.ParseDecimal(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // SalesPosition is GET /reports/sales-position?property_id=.
@@ -454,6 +521,9 @@ func (h *H) SalesPosition(w http.ResponseWriter, r *http.Request) {
 	pid := httpx.QueryUUID(r, "property_id")
 	if pid == nil {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
+		return
+	}
+	if !requireProperty(w, r, *pid) {
 		return
 	}
 	v, err := h.Reports.Sales(r.Context(), *pid)
@@ -464,14 +534,18 @@ func (h *H) SalesPosition(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
-// ListEnquiries is GET /enquiries.
+// ListEnquiries is GET /enquiries?property_id=&status= (keyset page).
 func (h *H) ListEnquiries(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Market.ListEnquiries(r.Context(), r.URL.Query().Get("status"), intQuery(r, "limit", 200))
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.Market.ListEnquiries(r.Context(), f.PropertyID, f.Scope, f.AllProperties, r.URL.Query().Get("status"), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // UpdateEnquiry is PATCH /enquiries/{id}.

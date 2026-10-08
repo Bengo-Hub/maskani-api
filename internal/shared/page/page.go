@@ -1,15 +1,23 @@
 // Package page implements keyset pagination on (created_at, id) descending, so list cost stays flat
-// however deep the caller pages (SRDD 17.2).
+// however deep the caller pages (SRDD 17.2). Lists sorted by another column (arrears by balance)
+// use the keyed cursor below with the same response envelope.
 package page
 
 import (
+	"encoding/base64"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/Bengo-Hub/pagination"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
+
+// MaxLimit is the largest page; asking for more returns MaxLimit rows (not the default).
+const MaxLimit = 100
 
 // Params are the parsed cursor parameters.
 type Params struct {
@@ -19,12 +27,23 @@ type Params struct {
 	HasAfter bool
 }
 
+// Limit reads ?limit: missing or invalid gives the shared default (20), above MaxLimit gives MaxLimit.
+func Limit(r *http.Request) int {
+	n, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	switch {
+	case err != nil || n <= 0:
+		return pagination.DefaultLimit
+	case n > MaxLimit:
+		return MaxLimit
+	}
+	return n
+}
+
 // Parse reads ?limit and ?cursor.
 func Parse(r *http.Request) Params {
-	cp := pagination.ParseCursorParams(r)
-	p := Params{Limit: cp.Limit}
-	if cp.Cursor != "" {
-		if id, at, err := pagination.DecodeCursor(cp.Cursor); err == nil {
+	p := Params{Limit: Limit(r)}
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		if id, at, err := pagination.DecodeCursor(c); err == nil {
 			p.AfterID, p.AfterAt, p.HasAfter = id, at, true
 		}
 	}
@@ -71,4 +90,75 @@ func Build[T any](rows []T, limit int, key func(T) (uuid.UUID, time.Time)) Resul
 		res.Data = []T{}
 	}
 	return res
+}
+
+// DecimalParams page a list sorted by a decimal column descending, then id descending.
+type DecimalParams struct {
+	Limit    int
+	AfterID  uuid.UUID
+	AfterVal decimal.Decimal
+	HasAfter bool
+}
+
+// ParseDecimal reads ?limit and a cursor made by BuildDecimal.
+func ParseDecimal(r *http.Request) DecimalParams {
+	p := DecimalParams{Limit: Limit(r)}
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		if id, v, err := decodeDecimal(c); err == nil {
+			p.AfterID, p.AfterVal, p.HasAfter = id, v, true
+		}
+	}
+	return p
+}
+
+// Predicate restricts to rows after the cursor on (column DESC, id DESC).
+func (p DecimalParams) Predicate(column string) func(*sql.Selector) {
+	return func(s *sql.Selector) {
+		if !p.HasAfter {
+			return
+		}
+		s.Where(sql.Or(
+			sql.LT(s.C(column), p.AfterVal),
+			sql.And(sql.EQ(s.C(column), p.AfterVal), sql.LT(s.C("id"), p.AfterID)),
+		))
+	}
+}
+
+// OrderDecimal sorts by column DESC, id DESC.
+func OrderDecimal(column string) func(*sql.Selector) {
+	return func(s *sql.Selector) {
+		s.OrderBy(sql.Desc(s.C(column)), sql.Desc(s.C("id")))
+	}
+}
+
+// BuildDecimal trims the probe row and encodes the next cursor from the last row's value and id.
+func BuildDecimal[T any](rows []T, limit int, key func(T) (uuid.UUID, decimal.Decimal)) Result[T] {
+	res := Result[T]{Data: rows}
+	if len(rows) > limit {
+		res.Data = rows[:limit]
+		res.HasMore = true
+		id, v := key(res.Data[len(res.Data)-1])
+		res.NextCursor = base64.URLEncoding.EncodeToString([]byte(id.String() + "|" + v.String()))
+	}
+	if res.Data == nil {
+		res.Data = []T{}
+	}
+	return res
+}
+
+func decodeDecimal(c string) (uuid.UUID, decimal.Decimal, error) {
+	raw, err := base64.URLEncoding.DecodeString(c)
+	if err != nil {
+		return uuid.Nil, decimal.Zero, err
+	}
+	parts := strings.SplitN(string(raw), "|", 2)
+	if len(parts) != 2 {
+		return uuid.Nil, decimal.Zero, strconv.ErrSyntax
+	}
+	id, err := uuid.Parse(parts[0])
+	if err != nil {
+		return uuid.Nil, decimal.Zero, err
+	}
+	v, err := decimal.NewFromString(parts[1])
+	return id, v, err
 }

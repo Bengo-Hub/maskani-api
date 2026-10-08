@@ -39,6 +39,7 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
 - [ ] Overpayment applied to the next instalment (treasury backlog: held credit)
 - [ ] Reminders and default
 - [x] Purchase position: `/me/purchase`, `/reports/sales-position`
+- [x] Reservations list `GET /reservations`; keyset sale contracts; property scope on price lists, contracts and sales position (2026-10-08)
 - [ ] Purchase and completion statement PDF
 - [ ] Restructure, handover, title tracking (after demo)
 - [ ] maskani-ui sales screens

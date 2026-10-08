@@ -69,6 +69,24 @@ func (s *Service) Units(ctx context.Context, partyIDs []uuid.UUID) ([]MyUnit, er
 	return out, nil
 }
 
+// UnitIDs returns the units the caller is actively linked to (bounded by the caller's own links).
+func (s *Service) UnitIDs(ctx context.Context, partyIDs []uuid.UUID) ([]uuid.UUID, error) {
+	if len(partyIDs) == 0 {
+		return nil, nil
+	}
+	links, err := s.client.UnitParty.Query().
+		Where(unitparty.PartyIDIn(partyIDs...), unitparty.StatusEQ(unitparty.StatusActive)).
+		Select(unitparty.FieldUnitID).Limit(500).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]uuid.UUID, 0, len(links))
+	for _, l := range links {
+		out = append(out, l.UnitID)
+	}
+	return out, nil
+}
+
 // OwnsAccount checks that the caller may see and pay an account.
 func (s *Service) OwnsAccount(ctx context.Context, partyIDs []uuid.UUID, accountID uuid.UUID) error {
 	acc, err := s.client.UnitAccount.Get(ctx, accountID)

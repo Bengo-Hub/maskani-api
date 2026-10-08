@@ -32,7 +32,7 @@ func (h *H) MyStatement(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	h.Statement(w, r)
+	h.statement(w, r, id)
 }
 
 // MyPay is POST /me/accounts/{id}/pay.

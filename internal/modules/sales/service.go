@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -12,6 +13,8 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
+	"github.com/bengobox/maskani-api/internal/ent/party"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/pricelist"
 	"github.com/bengobox/maskani-api/internal/ent/pricelistitem"
 	"github.com/bengobox/maskani-api/internal/ent/reservation"
@@ -24,6 +27,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
 // Service is the sales service.
@@ -615,14 +619,92 @@ func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView,
 	return v, nil
 }
 
-// ListContracts returns contracts, newest first.
-func (s *Service) ListContracts(ctx context.Context, propertyID *uuid.UUID, status string, limit int) ([]*ent.SaleContract, error) {
+// ListContracts returns a keyset page of contracts, newest first, for one property or the scope.
+func (s *Service) ListContracts(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, status string, p page.Params) (page.Result[*ent.SaleContract], error) {
 	q := s.client.SaleContract.Query()
 	if propertyID != nil {
 		q = q.Where(salecontract.PropertyID(*propertyID))
+	} else if !all {
+		q = q.Where(salecontract.PropertyIDIn(scope...))
 	}
 	if status != "" {
 		q = q.Where(salecontract.StatusEQ(salecontract.Status(status)))
 	}
-	return q.Order(ent.Desc(salecontract.FieldCreatedAt)).Limit(min(max(limit, 1), 500)).All(ctx)
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.SaleContract]{}, err
+	}
+	return page.Build(rows, p.Limit, func(c *ent.SaleContract) (uuid.UUID, time.Time) { return c.ID, c.CreatedAt }), nil
+}
+
+// ReservationView is a reservation with its unit and buyer for list screens.
+type ReservationView struct {
+	*ent.Reservation
+	UnitCode   string    `json:"unit_code"`
+	PropertyID uuid.UUID `json:"property_id"`
+	BuyerName  string    `json:"buyer_name"`
+}
+
+// ListReservations returns a keyset page of reservations, newest first. Units and buyers for the
+// page load in one query each.
+func (s *Service) ListReservations(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, status string, p page.Params) (page.Result[ReservationView], error) {
+	q := s.client.Reservation.Query()
+	if propertyID != nil {
+		q = q.Where(unitsOfProperties([]uuid.UUID{*propertyID}))
+	} else if !all {
+		q = q.Where(unitsOfProperties(scope))
+	}
+	if status != "" {
+		q = q.Where(reservation.StatusEQ(reservation.Status(status)))
+	}
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[ReservationView]{}, err
+	}
+	res := page.Build(rows, p.Limit, func(r *ent.Reservation) (uuid.UUID, time.Time) { return r.ID, r.CreatedAt })
+	unitIDs := make([]uuid.UUID, 0, len(res.Data))
+	partyIDs := make([]uuid.UUID, 0, len(res.Data))
+	for _, r := range res.Data {
+		unitIDs, partyIDs = append(unitIDs, r.UnitID), append(partyIDs, r.PartyID)
+	}
+	units := map[uuid.UUID]*ent.Unit{}
+	buyers := map[uuid.UUID]string{}
+	if len(unitIDs) > 0 {
+		us, err := s.client.Unit.Query().Where(unit.IDIn(unitIDs...)).All(ctx)
+		if err != nil {
+			return page.Result[ReservationView]{}, err
+		}
+		for _, u := range us {
+			units[u.ID] = u
+		}
+		ps, err := s.client.Party.Query().Where(party.IDIn(partyIDs...)).All(ctx)
+		if err != nil {
+			return page.Result[ReservationView]{}, err
+		}
+		for _, x := range ps {
+			buyers[x.ID] = x.DisplayName
+		}
+	}
+	out := make([]ReservationView, len(res.Data))
+	for i, r := range res.Data {
+		out[i] = ReservationView{Reservation: r, BuyerName: buyers[r.PartyID]}
+		if u := units[r.UnitID]; u != nil {
+			out[i].UnitCode, out[i].PropertyID = u.Code, u.PropertyID
+		}
+	}
+	return page.Result[ReservationView]{Data: out, NextCursor: res.NextCursor, HasMore: res.HasMore}, nil
+}
+
+// unitsOfProperties keeps reservations whose unit belongs to one of the properties (reservations
+// carry unit_id only). The outer query is already tenant scoped by the guard.
+func unitsOfProperties(propertyIDs []uuid.UUID) predicate.Reservation {
+	return func(s *sql.Selector) {
+		t := sql.Table(unit.Table)
+		vals := make([]any, len(propertyIDs))
+		for i, id := range propertyIDs {
+			vals[i] = id
+		}
+		s.Where(sql.In(s.C(reservation.FieldUnitID),
+			sql.Select(t.C(unit.FieldID)).From(t).Where(sql.In(t.C(unit.FieldPropertyID), vals...))))
+	}
 }

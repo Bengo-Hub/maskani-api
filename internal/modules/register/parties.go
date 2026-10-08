@@ -216,6 +216,80 @@ func (s *Service) ListParties(ctx context.Context, q string, p page.Params) (pag
 	return page.Result[PartyView]{Data: out, NextCursor: res.NextCursor, HasMore: res.HasMore}, nil
 }
 
+// PartyUnitLink is one of a party's unit relationships with the unit code.
+type PartyUnitLink struct {
+	ID         uuid.UUID  `json:"id"`
+	UnitID     uuid.UUID  `json:"unit_id"`
+	UnitCode   string     `json:"unit_code"`
+	PropertyID uuid.UUID  `json:"property_id"`
+	Role       string     `json:"role"`
+	IsPrimary  bool       `json:"is_primary"`
+	StartDate  time.Time  `json:"start_date"`
+	EndDate    *time.Time `json:"end_date,omitempty"`
+	BillTo     []string   `json:"bill_to"`
+	Status     string     `json:"status"`
+}
+
+// PartyDetail is a party (identity numbers masked) with its unit links.
+type PartyDetail struct {
+	PartyView
+	Units []PartyUnitLink `json:"units"`
+}
+
+// GetParty returns a party with the unit links the caller may see. A limited staff user gets a
+// forbidden error when every link of the party is outside their properties.
+func (s *Service) GetParty(ctx context.Context, id uuid.UUID, scope []uuid.UUID, all bool) (*PartyDetail, error) {
+	p, err := s.client.Party.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	links, err := s.client.UnitParty.Query().Where(unitparty.PartyID(id)).WithUnit().
+		Order(ent.Desc(unitparty.FieldStartDate)).Limit(200).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	visible := map[uuid.UUID]bool{}
+	for _, pid := range scope {
+		visible[pid] = true
+	}
+	out := &PartyDetail{PartyView: s.View(p), Units: []PartyUnitLink{}}
+	for _, l := range links {
+		u := l.Edges.Unit
+		if u == nil || (!all && !visible[u.PropertyID]) {
+			continue
+		}
+		bill := l.BillTo
+		if bill == nil {
+			bill = []string{}
+		}
+		out.Units = append(out.Units, PartyUnitLink{ID: l.ID, UnitID: u.ID, UnitCode: u.Code, PropertyID: u.PropertyID,
+			Role: string(l.Role), IsPrimary: l.IsPrimary, StartDate: l.StartDate, EndDate: l.EndDate, BillTo: bill,
+			Status: string(l.Status)})
+	}
+	if !all && len(links) > 0 && len(out.Units) == 0 {
+		return nil, httpx.Forbidden("this party is linked only to properties you are not assigned to")
+	}
+	return out, nil
+}
+
+// UnitPropertyID returns the property of a unit (scope checks).
+func (s *Service) UnitPropertyID(ctx context.Context, unitID uuid.UUID) (uuid.UUID, error) {
+	u, err := s.client.Unit.Query().Where(unit.ID(unitID)).Select(unit.FieldPropertyID).Only(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return u.PropertyID, nil
+}
+
+// AccountPropertyID returns the property of a unit account (scope checks).
+func (s *Service) AccountPropertyID(ctx context.Context, accountID uuid.UUID) (uuid.UUID, error) {
+	a, err := s.client.UnitAccount.Get(ctx, accountID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return s.UnitPropertyID(ctx, a.UnitID)
+}
+
 // LinkInput attaches a party to a unit.
 type LinkInput struct {
 	PartyID        uuid.UUID  `json:"party_id"`

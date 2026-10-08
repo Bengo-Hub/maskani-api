@@ -18,6 +18,8 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/readinground"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
+	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/sqlx"
 )
 
@@ -32,6 +34,26 @@ const (
 type Service struct {
 	client *ent.Client
 	log    *zap.Logger
+	rt     realtime.Publisher
+}
+
+// SetRealtime sets the publisher for reading hints (nil disables them).
+func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
+
+// saved publishes reading.saved for a stored reading and passes the result through.
+func (s *Service) saved(ctx context.Context, propertyID uuid.UUID, r *ent.MeterReading, err error) (*ent.MeterReading, error) {
+	if err != nil || r == nil {
+		return r, err
+	}
+	if propertyID == uuid.Nil {
+		if m, merr := s.client.Meter.Get(ctx, r.MeterID); merr == nil {
+			propertyID = m.PropertyID
+		}
+	}
+	tenantID, _ := tenantguard.TenantID(ctx)
+	realtime.Emit(s.rt, tenantID, realtime.Event{Type: realtime.ReadingSaved, ID: r.ID.String(),
+		PropertyID: propertyID.String(), UnitID: realtime.IDString(r.UnitID)})
+	return r, nil
 }
 
 // NewService creates the utilities service.
@@ -285,8 +307,9 @@ func (s *Service) Record(ctx context.Context, meterID, readBy uuid.UUID, in Read
 		if existing.Status == meterreading.StatusAccepted && len(flags) == 0 && existing.Reading.Equal(reading) {
 			return existing, nil
 		}
-		return existing.Update().SetReading(reading).SetPreviousReading(prev).SetConsumption(consumption).
+		r, err := existing.Update().SetReading(reading).SetPreviousReading(prev).SetConsumption(consumption).
 			SetFlags(flags).SetStatus(status).SetPhotoKey(in.PhotoKey).SetReadAt(at).SetReadBy(readBy).SetNotes(in.Notes).Save(ctx)
+		return s.saved(ctx, m.PropertyID, r, err)
 	}
 	c := s.client.MeterReading.Create().SetMeterID(meterID).SetPeriod(in.Period).SetReading(reading).
 		SetPreviousReading(prev).SetConsumption(consumption).SetFlags(flags).SetStatus(status).
@@ -297,7 +320,8 @@ func (s *Service) Record(ctx context.Context, meterID, readBy uuid.UUID, in Read
 	if rr != nil {
 		c.SetRoundID(rr.ID)
 	}
-	return c.Save(ctx)
+	r, err := c.Save(ctx)
+	return s.saved(ctx, m.PropertyID, r, err)
 }
 
 // average is the mean consumption over the meter's last three periods.
@@ -321,7 +345,8 @@ func (s *Service) Verify(ctx context.Context, readingID, by uuid.UUID, action st
 	if st == "" {
 		return nil, httpx.Invalid("action must be accept, reject or recheck")
 	}
-	return s.client.MeterReading.UpdateOneID(readingID).SetStatus(st).SetVerifiedBy(by).Save(ctx)
+	r, err := s.client.MeterReading.UpdateOneID(readingID).SetStatus(st).SetVerifiedBy(by).Save(ctx)
+	return s.saved(ctx, uuid.Nil, r, err)
 }
 
 // Estimate records an estimated reading at the three-period average when a meter cannot be read.
@@ -347,7 +372,8 @@ func (s *Service) Estimate(ctx context.Context, meterID, by uuid.UUID, period st
 	if m.UnitID != nil {
 		c.SetUnitID(*m.UnitID)
 	}
-	return c.Save(ctx)
+	r, err := c.Save(ctx)
+	return s.saved(ctx, m.PropertyID, r, err)
 }
 
 // BalancePoint is one period of the water balance.

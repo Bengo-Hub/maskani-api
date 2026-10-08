@@ -174,6 +174,9 @@ func (UnitAccount) Indexes() []ent.Index {
 		index.Fields("tenant_id", "account_ref").Unique(),
 		index.Fields("tenant_id", "unit_id", "fund_id").Unique(),
 		index.Fields("tenant_id", "primary_party_id"),
+		// Keyset lists: accounts newest first, arrears largest balance first.
+		index.Fields("tenant_id", "created_at", "id"),
+		index.Fields("tenant_id", "balance", "id"),
 	}
 }
 
@@ -212,6 +215,8 @@ func (BillingRun) Indexes() []ent.Index {
 		index.Fields("tenant_id", "property_id", "fund_id", "period", "run_kind").Unique().
 			Annotations(entsql.IndexWhere("status <> 'cancelled'")),
 		index.Fields("tenant_id", "status"),
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }
 

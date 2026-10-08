@@ -21,7 +21,9 @@ import (
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/notify"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
 // Service is the notices service.
@@ -30,6 +32,18 @@ type Service struct {
 	notify *notify.Client
 	loc    *time.Location
 	log    *zap.Logger
+	rt     realtime.Publisher
+}
+
+// SetRealtime sets the publisher for notice status hints (nil disables them).
+func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
+
+func (s *Service) emit(tenantID uuid.UUID, n *ent.Notice) {
+	if n == nil {
+		return
+	}
+	realtime.Emit(s.rt, tenantID, realtime.Event{Type: realtime.NoticeStatus, ID: n.ID.String(),
+		PropertyID: realtime.IDString(n.PropertyID)})
 }
 
 // NewService creates the notices service.
@@ -124,9 +138,14 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 	if n.Status == notice.StatusSent || n.Status == notice.StatusSending {
 		return n, nil
 	}
+	tenantID, _ := tenantguard.TenantID(ctx)
 	if n.Priority == notice.PriorityRoutine && quiet(time.Now().In(s.loc)) {
 		next := nextMorning(time.Now().In(s.loc))
-		return n.Update().SetStatus(notice.StatusScheduled).SetScheduledAt(next).Save(ctx)
+		n, err = n.Update().SetStatus(notice.StatusScheduled).SetScheduledAt(next).Save(ctx)
+		if err == nil {
+			s.emit(tenantID, n)
+		}
+		return n, err
 	}
 	people, err := s.recipients(ctx, n)
 	if err != nil {
@@ -136,7 +155,7 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 	if err != nil {
 		return nil, err
 	}
-	tenantID, _ := tenantguard.TenantID(ctx)
+	s.emit(tenantID, n)
 	go s.deliver(tenantguard.With(context.Background(), tenantID), tenantID, tenantSlug, n, people)
 	return n, nil
 }
@@ -193,19 +212,31 @@ func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, 
 	if delivered == 0 && len(people) > 0 {
 		status = notice.StatusFailed
 	}
-	_ = s.client.Notice.UpdateOneID(n.ID).SetStatus(status).SetSentAt(time.Now()).SetDeliveredCount(delivered).Exec(ctx)
+	if err := s.client.Notice.UpdateOneID(n.ID).SetStatus(status).SetSentAt(time.Now()).SetDeliveredCount(delivered).Exec(ctx); err == nil {
+		s.emit(tenantID, n)
+	}
 	_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, n.ID.String(), events.NoticePublished, map[string]any{
 		"notice_id": n.ID, "title": n.Title, "audience_size": len(people), "priority": n.Priority, "delivered": delivered,
 	})
 }
 
-// List returns recent notices.
-func (s *Service) List(ctx context.Context, propertyID *uuid.UUID, limit int) ([]*ent.Notice, error) {
+// List returns a keyset page of notices, newest first. With a property, tenant-wide notices are
+// included; without one, a property-limited caller sees tenant-wide notices and their properties.
+func (s *Service) List(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, status string, p page.Params) (page.Result[*ent.Notice], error) {
 	q := s.client.Notice.Query()
 	if propertyID != nil {
 		q = q.Where(notice.Or(notice.PropertyID(*propertyID), notice.PropertyIDIsNil()))
+	} else if !all {
+		q = q.Where(notice.Or(notice.PropertyIDIn(scope...), notice.PropertyIDIsNil()))
 	}
-	return q.Order(ent.Desc(notice.FieldCreatedAt)).Limit(min(max(limit, 1), 200)).All(ctx)
+	if status != "" {
+		q = q.Where(notice.StatusEQ(notice.Status(status)))
+	}
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.Notice]{}, err
+	}
+	return page.Build(rows, p.Limit, func(n *ent.Notice) (uuid.UUID, time.Time) { return n.ID, n.CreatedAt }), nil
 }
 
 // Deliveries returns a notice's delivery records.

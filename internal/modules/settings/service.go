@@ -90,6 +90,8 @@ func (s *Service) EnsureTenantDefaults(ctx context.Context, tenantID uuid.UUID) 
 		if err := s.applyPreset(ctx, tenantID, preset); err != nil {
 			return err
 		}
+	} else if err := s.carryProvidersWithMaintenance(ctx, tenantID); err != nil {
+		return err
 	}
 
 	for _, f := range FundDefaults {
@@ -113,6 +115,36 @@ func (s *Service) EnsureTenantDefaults(ctx context.Context, tenantID uuid.UUID) 
 		}
 	}
 	s.invalidate(tenantID)
+	return nil
+}
+
+// carryProvidersWithMaintenance keeps vendor access for tenants set up before vendors moved from the
+// maintenance module to providers: when maintenance is on and providers was never switched by a
+// person (no changed_by), providers is switched on. A deliberate "providers off" is respected.
+func (s *Service) carryProvidersWithMaintenance(ctx context.Context, tenantID uuid.UUID) error {
+	mods, err := s.client.TenantModule.Query().
+		Where(tenantmodule.TenantID(tenantID), tenantmodule.ModuleIn(ModMaintenance, ModProviders)).All(ctx)
+	if err != nil {
+		return err
+	}
+	var maint, prov *ent.TenantModule
+	for _, m := range mods {
+		switch m.Module {
+		case ModMaintenance:
+			maint = m
+		case ModProviders:
+			prov = m
+		}
+	}
+	if maint == nil || !maint.Enabled || (prov != nil && (prov.Enabled || prov.ChangedBy != nil)) {
+		return nil
+	}
+	err = s.client.TenantModule.Create().SetTenantID(tenantID).SetModule(ModProviders).SetEnabled(true).
+		SetEnabledAt(time.Now()).OnConflictColumns(tenantmodule.FieldTenantID, tenantmodule.FieldModule).
+		UpdateEnabled().UpdateEnabledAt().Exec(ctx)
+	if err != nil && !isNoRows(err) {
+		return fmt.Errorf("settings: providers backfill: %w", err)
+	}
 	return nil
 }
 

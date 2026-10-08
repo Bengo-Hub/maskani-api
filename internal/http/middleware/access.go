@@ -49,6 +49,12 @@ func FromContext(ctx context.Context) *Access {
 	return a
 }
 
+// WithAccess returns ctx carrying a. ResolveAccess is the only production caller; tests use it to
+// exercise handlers with a chosen scope.
+func WithAccess(ctx context.Context, a *Access) context.Context {
+	return context.WithValue(ctx, accessKey{}, a)
+}
+
 // IsStaff reports whether the caller holds any staff permission.
 func (a *Access) IsStaff() bool { return a.Bypass || len(a.Perms) > 0 }
 

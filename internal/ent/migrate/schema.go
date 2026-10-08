@@ -173,6 +173,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{BillingRunsColumns[1], BillingRunsColumns[9]},
 			},
+			{
+				Name:    "billingrun_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingRunsColumns[1], BillingRunsColumns[5], BillingRunsColumns[2], BillingRunsColumns[0]},
+			},
+			{
+				Name:    "billingrun_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingRunsColumns[1], BillingRunsColumns[2], BillingRunsColumns[0]},
+			},
 		},
 	}
 	// BillingRunLinesColumns holds the columns for the "billing_run_lines" table.
@@ -701,6 +711,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{EnquiriesColumns[1], EnquiriesColumns[10]},
 			},
+			{
+				Name:    "enquiry_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{EnquiriesColumns[1], EnquiriesColumns[5], EnquiriesColumns[2], EnquiriesColumns[0]},
+			},
+			{
+				Name:    "enquiry_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{EnquiriesColumns[1], EnquiriesColumns[2], EnquiriesColumns[0]},
+			},
 		},
 	}
 	// FundsColumns holds the columns for the "funds" table.
@@ -946,6 +966,16 @@ var (
 				Name:    "incident_tenant_id_property_id_status",
 				Unique:  false,
 				Columns: []*schema.Column{IncidentsColumns[1], IncidentsColumns[6], IncidentsColumns[16]},
+			},
+			{
+				Name:    "incident_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{IncidentsColumns[1], IncidentsColumns[6], IncidentsColumns[2], IncidentsColumns[0]},
+			},
+			{
+				Name:    "incident_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{IncidentsColumns[1], IncidentsColumns[2], IncidentsColumns[0]},
 			},
 		},
 	}
@@ -1340,9 +1370,14 @@ var (
 				Columns: []*schema.Column{NoticesColumns[1], NoticesColumns[14], NoticesColumns[12]},
 			},
 			{
-				Name:    "notice_tenant_id_created_at",
+				Name:    "notice_tenant_id_created_at_id",
 				Unique:  false,
-				Columns: []*schema.Column{NoticesColumns[1], NoticesColumns[2]},
+				Columns: []*schema.Column{NoticesColumns[1], NoticesColumns[2], NoticesColumns[0]},
+			},
+			{
+				Name:    "notice_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{NoticesColumns[1], NoticesColumns[5], NoticesColumns[2], NoticesColumns[0]},
 			},
 		},
 	}
@@ -1901,6 +1936,11 @@ var (
 					Where: "status IN ('pending_payment','active')",
 				},
 			},
+			{
+				Name:    "reservation_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{ReservationsColumns[1], ReservationsColumns[2], ReservationsColumns[0]},
+			},
 		},
 	}
 	// RolePermissionsColumns holds the columns for the "role_permissions" table.
@@ -2037,6 +2077,16 @@ var (
 				Name:    "salecontract_tenant_id_primary_buyer_id",
 				Unique:  false,
 				Columns: []*schema.Column{SaleContractsColumns[1], SaleContractsColumns[8]},
+			},
+			{
+				Name:    "salecontract_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{SaleContractsColumns[1], SaleContractsColumns[6], SaleContractsColumns[2], SaleContractsColumns[0]},
+			},
+			{
+				Name:    "salecontract_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{SaleContractsColumns[1], SaleContractsColumns[2], SaleContractsColumns[0]},
 			},
 		},
 	}
@@ -2365,6 +2415,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{UnitAccountsColumns[1], UnitAccountsColumns[6]},
 			},
+			{
+				Name:    "unitaccount_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{UnitAccountsColumns[1], UnitAccountsColumns[2], UnitAccountsColumns[0]},
+			},
+			{
+				Name:    "unitaccount_tenant_id_balance_id",
+				Unique:  false,
+				Columns: []*schema.Column{UnitAccountsColumns[1], UnitAccountsColumns[10], UnitAccountsColumns[0]},
+			},
 		},
 	}
 	// UnitChargesColumns holds the columns for the "unit_charges" table.
@@ -2563,6 +2623,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{VendorsColumns[1], VendorsColumns[6]},
 			},
+			{
+				Name:    "vendor_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{VendorsColumns[1], VendorsColumns[2], VendorsColumns[0]},
+			},
 		},
 	}
 	// VendorContractsColumns holds the columns for the "vendor_contracts" table.
@@ -2755,6 +2820,16 @@ var (
 				Name:    "visitorpass_tenant_id_host_party_id",
 				Unique:  false,
 				Columns: []*schema.Column{VisitorPassesColumns[1], VisitorPassesColumns[7]},
+			},
+			{
+				Name:    "visitorpass_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorPassesColumns[1], VisitorPassesColumns[5], VisitorPassesColumns[2], VisitorPassesColumns[0]},
+			},
+			{
+				Name:    "visitorpass_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorPassesColumns[1], VisitorPassesColumns[2], VisitorPassesColumns[0]},
 			},
 		},
 	}

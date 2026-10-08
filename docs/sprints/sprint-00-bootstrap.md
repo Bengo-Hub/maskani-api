@@ -39,7 +39,10 @@ As of 2026-10-08.
 - [ ] Sync the `maskani_*` WhatsApp templates to Meta after the notifications deploy (dry run first)
 - [ ] devops-k8s apps for maskani-ui and maskani-commerce committed
 - [ ] HA values (min 2 replicas, PDB) after the first image; fleet-health-watcher URLs
-- [ ] `seed-tenant` command and Swagger annotations
+- [x] `seed-tenant` command: idempotent Shaba Village dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
+- [x] Live updates: `GET /stream` (SSE, `?token=`), realtime hub on the shared FanoutHub over NATS `_rt.maskani.*` (2026-10-08)
+- [x] Keyset pagination on growing lists, limit capped at 100, migration `keyset_list_indexes` (2026-10-08)
+- [ ] Swagger annotations
 - [ ] maskani-ui and maskani-commerce scaffolds and repos
 - [x] subscriptions-api: `plans_maskani.go` (four tiers from SRDD 25.3), `maskani_*` module codes, `max_units`, plan matrix doc, test (641e99c)
 - [ ] shared-ui-lib: app switcher entry

@@ -40,6 +40,8 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
 - [x] Payment consumer: account resolved from `metadata.unit_account_id`
 - [x] Statements API from the treasury account ledger
 - [x] Bill and receipt messages by email and WhatsApp, bills itemised with optional VAT, rate and paybill lines (notifications 5830c60)
+- [x] Run detail `GET /billing-runs/{id}` with line counts; keyset runs and unit accounts; property scope on statements, staff pay, runs (2026-10-08)
+- [x] Live hints: `billing_run.progress`, `payment.applied`, `reading.saved` (2026-10-08)
 - [ ] Statement PDF and CSV
 - [ ] Reminder job (1, 7, 14 days)
 - [ ] Adjustments and bill queries (after demo)

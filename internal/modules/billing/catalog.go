@@ -18,6 +18,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 )
 
 // Service is the billing domain service.
@@ -27,7 +28,11 @@ type Service struct {
 	accounts *accounts.Service
 	loc      *time.Location
 	log      *zap.Logger
+	rt       realtime.Publisher
 }
+
+// SetRealtime sets the publisher for run progress hints (nil disables them).
+func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
 
 // NewService creates the billing service.
 func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, loc *time.Location, log *zap.Logger) *Service {

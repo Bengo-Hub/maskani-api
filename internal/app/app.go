@@ -50,6 +50,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/platform/database"
 	"github.com/bengobox/maskani-api/internal/platform/events"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/shared/logger"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
@@ -114,10 +115,10 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 	orm := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, sqlDB)))
-	roOrm := orm
+	roOrm, roSQL := orm, sqlDB
 	if cfg.Postgres.ReadOnlyURL != "" && cfg.Postgres.ReadOnlyURL != cfg.Postgres.URL {
 		if roDB, err := database.OpenSQL(cfg.Postgres.ReadOnlyURL, cfg.Postgres); err == nil {
-			roOrm = ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, roDB)))
+			roOrm, roSQL = ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, roDB))), roDB
 		}
 	}
 
@@ -162,12 +163,27 @@ func New(ctx context.Context) (*App, error) {
 	worksSvc := works.NewService(orm, seq, log)
 	gateSvc := gate.NewService(orm, box, seq, log)
 	noticeSvc := notices.NewService(orm, nt, loc, log)
-	reportSvc := reports.NewService(roOrm, utilities.NewService(roOrm, log), loc, log)
+	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
 	portalSvc := portal.NewService(orm, log)
 	marketSvc := market.NewService(orm, box, log)
 
 	consumer := collections.NewConsumer(orm, collSvc, salesSvc.SyncProgress, loc, log)
 	consumer.OnApplied = reportSvc.Invalidate
+
+	// Live change hints for SSE clients, relayed to every replica over core NATS.
+	rt := realtime.NewHub(log, nc)
+	billSvc.SetRealtime(rt)
+	worksSvc.SetRealtime(rt)
+	gateSvc.SetRealtime(rt)
+	utilSvc.SetRealtime(rt)
+	noticeSvc.SetRealtime(rt)
+	consumer.RT = rt
+	// A payment or billing run on any pod drops this pod's cached dashboard figures for the tenant.
+	rt.OnEvent(func(tenantID uuid.UUID, ev realtime.Event) {
+		if ev.Type == realtime.PaymentApplied || ev.Type == realtime.BillingRunProgress {
+			reportSvc.Invalidate(tenantID)
+		}
+	})
 
 	// Auth.
 	authCfg := authclient.DefaultConfig(cfg.Auth.JWKSUrl, cfg.Auth.Issuer, cfg.Auth.Audience)
@@ -185,7 +201,8 @@ func New(ctx context.Context) (*App, error) {
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
-		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log}}
+		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
+		RT:    rt}
 
 	var limiter *ratelimit.Limiter
 	if rdb != nil {

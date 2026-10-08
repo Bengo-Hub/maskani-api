@@ -5,6 +5,7 @@ package market
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -18,6 +19,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -198,24 +200,31 @@ type EnquiryView struct {
 	Phone string `json:"phone,omitempty"`
 }
 
-// ListEnquiries returns enquiries for staff (tenant scoped).
-func (s *Service) ListEnquiries(ctx context.Context, status string, limit int) ([]EnquiryView, error) {
+// ListEnquiries returns a keyset page of enquiries for staff (tenant scoped, newest first), for one
+// property or the caller's properties.
+func (s *Service) ListEnquiries(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, status string, p page.Params) (page.Result[EnquiryView], error) {
 	q := s.client.Enquiry.Query()
+	if propertyID != nil {
+		q = q.Where(enquiry.PropertyID(*propertyID))
+	} else if !all {
+		q = q.Where(enquiry.PropertyIDIn(scope...))
+	}
 	if status != "" {
 		q = q.Where(enquiry.StatusEQ(enquiry.Status(status)))
 	}
-	rows, err := q.Order(ent.Desc(enquiry.FieldCreatedAt)).Limit(min(max(limit, 1), 500)).All(ctx)
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
 	if err != nil {
-		return nil, err
+		return page.Result[EnquiryView]{}, err
 	}
-	out := make([]EnquiryView, len(rows))
-	for i, r := range rows {
+	res := page.Build(rows, p.Limit, func(e *ent.Enquiry) (uuid.UUID, time.Time) { return e.ID, e.CreatedAt })
+	out := make([]EnquiryView, len(res.Data))
+	for i, r := range res.Data {
 		out[i] = EnquiryView{Enquiry: r}
 		if r.ConsentToShare {
 			out[i].Phone, _ = s.box.Decrypt(r.PhoneEnc)
 		}
 	}
-	return out, nil
+	return page.Result[EnquiryView]{Data: out, NextCursor: res.NextCursor, HasMore: res.HasMore}, nil
 }
 
 // UpdateEnquiry changes an enquiry's status.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/gatedevice"
@@ -23,6 +24,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
@@ -37,6 +39,16 @@ type Service struct {
 	box    *secure.Box
 	seq    *sequence.Allocator
 	log    *zap.Logger
+	rt     realtime.Publisher
+}
+
+// SetRealtime sets the publisher for gate hints (nil disables them).
+func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
+
+func (s *Service) emit(ctx context.Context, typ string, ev *ent.GateEvent) {
+	tenantID, _ := tenantguard.TenantID(ctx)
+	realtime.Emit(s.rt, tenantID, realtime.Event{Type: typ, ID: ev.ID.String(), PropertyID: ev.PropertyID.String(),
+		UnitID: realtime.IDString(ev.HostUnitID)})
 }
 
 // NewService creates the gate service.
@@ -332,6 +344,9 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		}
 		if ev.Kind == gateevent.KindWalkInRequest {
 			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.WalkInRequested, s.arrival(ctx, ev))
+			s.emit(ctx, realtime.WalkInRequested, ev)
+		} else {
+			s.emit(ctx, realtime.GateEvent, ev)
 		}
 	}
 	return stored, nil
@@ -390,14 +405,82 @@ func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (
 	if time.Since(ev.OccurredAt) > 5*time.Minute {
 		d = gateevent.DecisionTimeout
 	}
-	return ev.Update().SetDecision(d).SetDecidedAt(time.Now()).Save(ctx)
+	ev, err = ev.Update().SetDecision(d).SetDecidedAt(time.Now()).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.emit(ctx, realtime.WalkInDecided, ev)
+	return ev, nil
 }
 
 // SyncPayload is what a tablet caches for offline operation.
 type SyncPayload struct {
-	ServerTime time.Time    `json:"server_time"`
-	Passes     []CachedPass `json:"passes"`
-	Badges     []string     `json:"badges"`
+	ServerTime time.Time     `json:"server_time"`
+	Passes     []CachedPass  `json:"passes"`
+	Badges     []CachedBadge `json:"badges"`
+}
+
+// CachedBadge is an active badge deployed to the device's property, with the holder's name. The
+// PIN hash never leaves the server; has_pin tells the tablet whether sign-on is possible.
+type CachedBadge struct {
+	ID          uuid.UUID `json:"id"`
+	BadgeNumber string    `json:"badge_number"`
+	Name        string    `json:"name"`
+	Role        string    `json:"role,omitempty"`
+	VendorID    uuid.UUID `json:"vendor_id"`
+	HasPIN      bool      `json:"has_pin"`
+}
+
+// SignOnResult is returned to the tablet when a guard signs on.
+type SignOnResult struct {
+	Guard      SignOnGuard `json:"guard"`
+	SignedOnAt time.Time   `json:"signed_on_at"`
+}
+
+// SignOnGuard identifies the guard on duty.
+type SignOnGuard struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Badge string    `json:"badge"`
+}
+
+// ErrSignOn is the single answer for every failed sign-on, so a guesser learns nothing.
+var ErrSignOn = httpx.Forbidden("badge or PIN is not correct")
+
+// SignOn checks a guard's badge and PIN at the device's property. The tenant comes from the device
+// context; personnel not deployed to the device's property are rejected.
+func (s *Service) SignOn(ctx context.Context, d *ent.GateDevice, badge, pin string) (*SignOnResult, error) {
+	badge = strings.TrimSpace(badge)
+	if badge == "" || pin == "" {
+		return nil, httpx.Invalid("badge and pin are required")
+	}
+	p, err := s.client.VendorPersonnel.Query().
+		Where(vendorpersonnel.BadgeNumber(badge), vendorpersonnel.StatusEQ(vendorpersonnel.StatusActive)).Only(ctx)
+	if err != nil || p.PinHash == "" || !deployedTo(p.PropertyIds, d.PropertyID) {
+		return nil, ErrSignOn
+	}
+	if bcrypt.CompareHashAndPassword([]byte(p.PinHash), []byte(pin)) != nil {
+		return nil, ErrSignOn
+	}
+	now := time.Now()
+	meta := map[string]any{}
+	for k, v := range p.Metadata {
+		meta[k] = v
+	}
+	meta["last_sign_on"] = map[string]any{"at": now, "device_id": d.ID.String(), "property_id": d.PropertyID.String()}
+	if err := p.Update().SetMetadata(meta).Exec(ctx); err != nil {
+		s.log.Warn("sign-on record failed", zap.Error(err))
+	}
+	return &SignOnResult{Guard: SignOnGuard{ID: p.ID, Name: p.FullName, Badge: p.BadgeNumber}, SignedOnAt: now}, nil
+}
+
+func deployedTo(propertyIDs []string, property uuid.UUID) bool {
+	for _, id := range propertyIDs {
+		if id == property.String() {
+			return true
+		}
+	}
+	return false
 }
 
 // CachedPass carries only device-salted hashes: the tablet computes sha256(device_id + ":" + code)
@@ -441,10 +524,21 @@ func (s *Service) Sync(ctx context.Context, d *ent.GateDevice) (*SyncPayload, er
 			UnitID: p.UnitID, ValidFrom: p.ValidFrom, ValidTo: p.ValidTo, Recurrence: p.Recurrence,
 			MaxEntries: p.MaxEntries, EntriesUsed: p.EntriesUsed})
 	}
-	badges, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.StatusEQ(vendorpersonnel.StatusActive)).
-		Select(vendorpersonnel.FieldBadgeNumber).Strings(ctx)
-	if err == nil {
-		out.Badges = badges
+	people, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.StatusEQ(vendorpersonnel.StatusActive)).
+		Order(ent.Asc(vendorpersonnel.FieldBadgeNumber)).Limit(2000).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out.Badges = []CachedBadge{}
+	for _, p := range people {
+		if !deployedTo(p.PropertyIds, d.PropertyID) {
+			continue
+		}
+		out.Badges = append(out.Badges, CachedBadge{ID: p.ID, BadgeNumber: p.BadgeNumber, Name: p.FullName, Role: p.Role,
+			VendorID: p.VendorID, HasPIN: p.PinHash != ""})
+	}
+	if out.Passes == nil {
+		out.Passes = []CachedPass{}
 	}
 	return out, nil
 }
@@ -459,7 +553,51 @@ func (s *Service) ListEvents(ctx context.Context, propertyID uuid.UUID, p page.P
 	return page.Build(rows, p.Limit, func(e *ent.GateEvent) (uuid.UUID, time.Time) { return e.ID, e.CreatedAt }), nil
 }
 
-// ListPasses returns passes for a property (or a host party), newest first.
+// ScopeFilter narrows a staff list to one property or the caller's properties.
+type ScopeFilter struct {
+	PropertyID    *uuid.UUID
+	Scope         []uuid.UUID
+	AllProperties bool
+}
+
+// PagePasses returns a keyset page of passes for staff, newest first.
+func (s *Service) PagePasses(ctx context.Context, f ScopeFilter, activeOnly bool, p page.Params) (page.Result[*ent.VisitorPass], error) {
+	q := s.client.VisitorPass.Query()
+	if f.PropertyID != nil {
+		q = q.Where(visitorpass.PropertyID(*f.PropertyID))
+	} else if !f.AllProperties {
+		q = q.Where(visitorpass.PropertyIDIn(f.Scope...))
+	}
+	if activeOnly {
+		q = q.Where(visitorpass.StatusEQ(visitorpass.StatusActive), visitorpass.ValidToGT(time.Now()))
+	}
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.VisitorPass]{}, err
+	}
+	return page.Build(rows, p.Limit, func(v *ent.VisitorPass) (uuid.UUID, time.Time) { return v.ID, v.CreatedAt }), nil
+}
+
+// PageIncidents returns a keyset page of incidents for staff, newest first.
+func (s *Service) PageIncidents(ctx context.Context, f ScopeFilter, open bool, p page.Params) (page.Result[*ent.Incident], error) {
+	q := s.client.Incident.Query()
+	if f.PropertyID != nil {
+		q = q.Where(incident.PropertyID(*f.PropertyID))
+	} else if !f.AllProperties {
+		q = q.Where(incident.PropertyIDIn(f.Scope...))
+	}
+	if open {
+		q = q.Where(incident.StatusIn(incident.StatusOpen, incident.StatusInvestigating))
+	}
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.Incident]{}, err
+	}
+	return page.Build(rows, p.Limit, func(v *ent.Incident) (uuid.UUID, time.Time) { return v.ID, v.CreatedAt }), nil
+}
+
+// ListPasses returns passes for a property (or a host party), newest first. The portal uses it
+// with the caller's own parties; staff lists use PagePasses.
 func (s *Service) ListPasses(ctx context.Context, propertyID *uuid.UUID, hostParties []uuid.UUID, activeOnly bool, limit int) ([]*ent.VisitorPass, error) {
 	q := s.client.VisitorPass.Query()
 	if propertyID != nil {
@@ -519,18 +657,6 @@ func (s *Service) ReportIncident(ctx context.Context, kind string, by uuid.UUID,
 		"title": inc.Title, "property_id": inc.PropertyID, "urgent": sev == incident.SeverityHigh || sev == incident.SeverityCritical,
 	})
 	return inc, nil
-}
-
-// ListIncidents returns incidents, newest first.
-func (s *Service) ListIncidents(ctx context.Context, propertyID *uuid.UUID, open bool, limit int) ([]*ent.Incident, error) {
-	q := s.client.Incident.Query()
-	if propertyID != nil {
-		q = q.Where(incident.PropertyID(*propertyID))
-	}
-	if open {
-		q = q.Where(incident.StatusIn(incident.StatusOpen, incident.StatusInvestigating))
-	}
-	return q.Order(ent.Desc(incident.FieldOccurredAt)).Limit(min(max(limit, 1), 500)).All(ctx)
 }
 
 // PurgeOld deletes gate events past retention in batches (system job).

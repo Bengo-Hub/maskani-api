@@ -154,6 +154,8 @@ func (VisitorPass) Indexes() []ent.Index {
 		index.Fields("tenant_id", "code_hash"),
 		index.Fields("tenant_id", "qr_token_hash"),
 		index.Fields("tenant_id", "host_party_id"),
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }
 
@@ -216,7 +218,8 @@ func (Incident) Fields() []ent.Field {
 }
 
 func (Incident) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "number").Unique(), index.Fields("tenant_id", "property_id", "status")}
+	return []ent.Index{index.Fields("tenant_id", "number").Unique(), index.Fields("tenant_id", "property_id", "status"),
+		index.Fields("tenant_id", "property_id", "created_at", "id"), index.Fields("tenant_id", "created_at", "id")}
 }
 
 // OccurrenceEntry is a digital occurrence book line (shift handover, notes).

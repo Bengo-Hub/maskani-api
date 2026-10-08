@@ -33,6 +33,9 @@ API state as of 2026-10-08. Screens and the gate tablet app are in maskani-ui sp
 - [x] Gate tablet API: verify, events, offline sync cache, walk-in decide, offline device job
 - [ ] Patrols and posts endpoints (schema exists)
 - [x] Incidents: staff and device reporting
+- [x] Vendor detail `GET /vendors/{id}`, `has_pin` on personnel, vendor routes gated on the `providers` module (2026-10-08)
+- [x] Guard PIN: `PUT /vendors/{id}/personnel/{pid}/pin`, tablet `POST /gate/sign-on` (rate limited), named badges in `/gate/sync` (2026-10-08)
+- [x] Keyset passes and incidents with property scope; live hints `work_order.updated`, `gate.event`, `walk_in.requested`, `walk_in.decided` (2026-10-08)
 - [ ] Schedules and visits, preventive maintenance, vendor invoices (after demo)
 - [ ] maskani-ui works screens and gate tablet app
 

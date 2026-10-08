@@ -24,7 +24,9 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
 // batchSize bounds memory and treasury load per step (SRDD 17.2).
@@ -287,8 +289,18 @@ func (s *Service) Issue(ctx context.Context, actor uuid.UUID, in IssueInput) (*e
 		return nil, err
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
+	s.progress(tenantID, run)
 	go s.issueLines(tenantguard.With(context.Background(), tenantID), run.ID)
 	return run, nil
+}
+
+// progress publishes a run progress hint. Called once per batch, never per line.
+func (s *Service) progress(tenantID uuid.UUID, run *ent.BillingRun) {
+	if run == nil {
+		return
+	}
+	realtime.Emit(s.rt, tenantID, realtime.Event{Type: realtime.BillingRunProgress, ID: run.ID.String(),
+		PropertyID: run.PropertyID.String()})
 }
 
 func (s *Service) dates(ctx context.Context, in IssueInput) (time.Time, time.Time, error) {
@@ -335,6 +347,7 @@ func (s *Service) issueLines(ctx context.Context, runID uuid.UUID) {
 		for _, l := range lines {
 			s.issueOne(ctx, tenantID, run, f, prop, l)
 		}
+		s.progress(tenantID, run)
 	}
 	s.finishRun(ctx, tenantID, runID)
 }
@@ -453,7 +466,9 @@ func (s *Service) finishRun(ctx context.Context, tenantID, runID uuid.UUID) {
 		"run_id": runID, "property_id": run.PropertyID, "period": run.Period, "issued": issued, "failed": failed,
 		"total": run.TotalAmount.StringFixed(2),
 	})
-	_ = tx.Commit()
+	if tx.Commit() == nil {
+		s.progress(tenantID, run)
+	}
 }
 
 // Retry re-issues failed lines of a run.
@@ -472,17 +487,79 @@ func (s *Service) Retry(ctx context.Context, runID uuid.UUID) (*ent.BillingRun, 
 		return nil, err
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
+	s.progress(tenantID, run)
 	go s.issueLines(tenantguard.With(context.Background(), tenantID), runID)
 	return run, nil
 }
 
-// ListRuns returns the most recent runs, optionally for one property.
-func (s *Service) ListRuns(ctx context.Context, propertyID *uuid.UUID, limit int) ([]*ent.BillingRun, error) {
+// ListRuns returns a keyset page of runs, newest first, for one property or the caller's scope.
+func (s *Service) ListRuns(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.Params) (page.Result[*ent.BillingRun], error) {
 	q := s.client.BillingRun.Query()
 	if propertyID != nil {
 		q = q.Where(billingrun.PropertyID(*propertyID))
+	} else if !all {
+		q = q.Where(billingrun.PropertyIDIn(scope...))
 	}
-	return q.Order(ent.Desc(billingrun.FieldCreatedAt)).Limit(min(max(limit, 1), 100)).All(ctx)
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.BillingRun]{}, err
+	}
+	return page.Build(rows, p.Limit, func(r *ent.BillingRun) (uuid.UUID, time.Time) { return r.ID, r.CreatedAt }), nil
+}
+
+// RunPropertyID returns a run's property (scope checks).
+func (s *Service) RunPropertyID(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	r, err := s.client.BillingRun.Query().Where(billingrun.ID(id)).Select(billingrun.FieldPropertyID).Only(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return r.PropertyID, nil
+}
+
+// RunCounts are a run's lines by status.
+type RunCounts struct {
+	Pending int `json:"pending"`
+	Issued  int `json:"issued"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
+	Total   int `json:"total"`
+}
+
+// RunView is a run with its live line counts.
+type RunView struct {
+	*ent.BillingRun
+	Counts RunCounts `json:"counts"`
+}
+
+// GetRun returns one run with its line counts by status (one grouped query).
+func (s *Service) GetRun(ctx context.Context, id uuid.UUID) (*RunView, error) {
+	run, err := s.client.BillingRun.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Status string `json:"status"`
+		Count  int    `json:"count"`
+	}
+	if err := s.client.BillingRunLine.Query().Where(billingrunline.RunID(id)).
+		GroupBy(billingrunline.FieldStatus).Aggregate(ent.Count()).Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	v := &RunView{BillingRun: run}
+	for _, r := range rows {
+		switch r.Status {
+		case "pending":
+			v.Counts.Pending = r.Count
+		case "issued":
+			v.Counts.Issued = r.Count
+		case "failed":
+			v.Counts.Failed = r.Count
+		case "skipped":
+			v.Counts.Skipped = r.Count
+		}
+		v.Counts.Total += r.Count
+	}
+	return v, nil
 }
 
 // RunLines returns a run's lines.

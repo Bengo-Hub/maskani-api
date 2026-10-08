@@ -25,6 +25,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 )
 
 // H bundles the services handlers call.
@@ -45,6 +46,8 @@ type H struct {
 	Market      *market.Service
 	PortalURL   string
 	Media       *Media
+	// RT is the realtime hub behind GET /stream (nil disables live updates).
+	RT *realtime.Hub
 }
 
 func access(r *http.Request) *mw.Access { return mw.FromContext(r.Context()) }
@@ -110,7 +113,7 @@ func (h *H) Me(w http.ResponseWriter, r *http.Request) {
 		"id": a.AuthUserID, "email": a.Email, "tenant_id": a.TenantID, "tenant_slug": a.TenantSlug,
 		"roles": roles, "permissions": perms, "is_platform_owner": a.Claims != nil && a.Claims.IsPlatformOwner,
 		"all_properties": a.AllProperties, "property_ids": a.PropertyIDs, "party_ids": a.PartyIDs,
-		"is_staff": a.IsStaff(), "is_portal_user": len(a.PartyIDs) > 0,
+		"is_staff": a.IsStaff(), "is_portal_user": len(a.PartyIDs) > 0, "bypass": a.Bypass,
 		"modules": h.Settings.ModuleList(r.Context(), a.TenantID),
 	}
 	if a.LocalUser != nil {

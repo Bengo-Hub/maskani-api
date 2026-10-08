@@ -10,6 +10,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
 // ListFunds is GET /funds.
@@ -153,20 +154,52 @@ func (h *H) IssueRun(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusAccepted, run)
 }
 
-// ListRuns is GET /billing-runs.
+// ListRuns is GET /billing-runs?property_id= (keyset page).
 func (h *H) ListRuns(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Billing.ListRuns(r.Context(), httpx.QueryUUID(r, "property_id"), intQuery(r, "limit", 24))
+	a := access(r)
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid != nil && !requireProperty(w, r, *pid) {
+		return
+	}
+	res, err := h.Billing.ListRuns(r.Context(), pid, a.PropertyIDs, a.AllProperties, page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
+}
+
+// runScope checks the caller may see a run's property.
+func (h *H) runScope(w http.ResponseWriter, r *http.Request, id uuid.UUID) bool {
+	pid, err := h.Billing.RunPropertyID(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	return requireProperty(w, r, pid)
+}
+
+// GetRun is GET /billing-runs/{id}: the run with line counts by status.
+func (h *H) GetRun(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	v, err := h.Billing.GetRun(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !requireProperty(w, r, v.PropertyID) {
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
 }
 
 // RunLines is GET /billing-runs/{id}/lines.
 func (h *H) RunLines(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.runScope(w, r, id) {
 		return
 	}
 	rows, err := h.Billing.RunLines(r.Context(), id)
@@ -180,7 +213,7 @@ func (h *H) RunLines(w http.ResponseWriter, r *http.Request) {
 // RetryRun is POST /billing-runs/{id}/retry.
 func (h *H) RetryRun(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.runScope(w, r, id) {
 		return
 	}
 	run, err := h.Billing.Retry(r.Context(), id)
@@ -191,24 +224,34 @@ func (h *H) RetryRun(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusAccepted, run)
 }
 
-// ListAccounts is GET /unit-accounts.
+// ListAccounts is GET /unit-accounts?property_id=&owing=&fund= (keyset page). Without property_id a
+// property-limited user sees only accounts in their properties.
 func (h *H) ListAccounts(w http.ResponseWriter, r *http.Request) {
 	a := access(r)
-	rows, err := h.Collections.ListAccounts(r.Context(), httpx.QueryUUID(r, "property_id"), a.PropertyIDs, a.AllProperties,
-		r.URL.Query().Get("owing") == "true", intQuery(r, "limit", 500))
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid != nil && !requireProperty(w, r, *pid) {
+		return
+	}
+	res, err := h.Collections.ListAccounts(r.Context(), pid, a.PropertyIDs, a.AllProperties,
+		r.URL.Query().Get("owing") == "true", r.URL.Query().Get("fund"), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
-// Statement is GET /unit-accounts/{id}/statement.
+// Statement is GET /unit-accounts/{id}/statement (staff, property scoped).
 func (h *H) Statement(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.accountScope(w, r, id) {
 		return
 	}
+	h.statement(w, r, id)
+}
+
+// statement writes the account statement; callers have already authorised the account.
+func (h *H) statement(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	st, err := h.Collections.Statement(r.Context(), id)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -225,6 +268,9 @@ func (h *H) StaffPay(w http.ResponseWriter, r *http.Request) {
 	}
 	var in collections.PayInput
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.accountScope(w, r, id) {
 		return
 	}
 	res, err := h.Collections.Pay(r.Context(), id, in)
@@ -286,6 +332,9 @@ func (h *H) ListPriceLists(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
 		return
 	}
+	if !requireProperty(w, r, *pid) {
+		return
+	}
 	rows, err := h.Sales.ListPriceLists(r.Context(), *pid)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -339,14 +388,34 @@ func (h *H) CreateContract(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, sc)
 }
 
-// ListContracts is GET /sale-contracts.
+// ListContracts is GET /sale-contracts?property_id=&status= (keyset page).
 func (h *H) ListContracts(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Sales.ListContracts(r.Context(), httpx.QueryUUID(r, "property_id"), r.URL.Query().Get("status"), intQuery(r, "limit", 200))
+	a := access(r)
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid != nil && !requireProperty(w, r, *pid) {
+		return
+	}
+	res, err := h.Sales.ListContracts(r.Context(), pid, a.PropertyIDs, a.AllProperties, r.URL.Query().Get("status"), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
+}
+
+// ListReservations is GET /reservations?property_id=&status= (keyset page).
+func (h *H) ListReservations(w http.ResponseWriter, r *http.Request) {
+	a := access(r)
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid != nil && !requireProperty(w, r, *pid) {
+		return
+	}
+	res, err := h.Sales.ListReservations(r.Context(), pid, a.PropertyIDs, a.AllProperties, r.URL.Query().Get("status"), page.Parse(r))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // GetContract is GET /sale-contracts/{id}.

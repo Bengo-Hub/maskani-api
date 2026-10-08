@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/bengobox/maskani-api/internal/ent"
@@ -109,6 +110,27 @@ func (h *H) DeviceIncident(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, inc)
+}
+
+// DeviceSignOn is POST /gate/sign-on {badge, pin}: a guard starts a shift on this tablet.
+func (h *H) DeviceSignOn(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Badge string `json:"badge"`
+		PIN   string `json:"pin"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	res, err := h.Gate.SignOn(r.Context(), device(r), in.Badge, in.PIN)
+	if errors.Is(err, gate.ErrSignOn) {
+		httpx.Error(w, http.StatusUnauthorized, "invalid_credentials", err.Error())
+		return
+	}
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // DeviceUnits is GET /gate/units: unit codes for the walk-in host picker.

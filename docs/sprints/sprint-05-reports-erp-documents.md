@@ -22,6 +22,8 @@ API state as of 2026-10-08.
 
 - [x] Dashboard: `/reports/dashboard`
 - [x] Arrears, sales position and water balance reports
+- [x] Dashboard `collections_by_week` and `arrears_ageing` in grouped SQL on the read-only database, bounded 60 second cache dropped on every pod by payments and runs, property scope (2026-10-08)
+- [x] Keyset arrears (largest first), notices and enquiries; `notice.status` live hint (2026-10-08)
 - [ ] Remaining reports, CSV and PDF exports
 - [x] Daily collections aggregate updated by the payment consumer
 - [ ] Nightly `daily_stats` rebuild

@@ -19,6 +19,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/events"
+	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
 
@@ -41,6 +42,8 @@ type Consumer struct {
 	log    *zap.Logger
 	// OnApplied runs after a payment is reflected (cache invalidation).
 	OnApplied func(tenantID uuid.UUID)
+	// RT receives a payment.applied hint for live screens (nil disables it).
+	RT realtime.Publisher
 }
 
 // NewConsumer creates the payment consumer.
@@ -95,7 +98,8 @@ func (c *Consumer) handle(msg *nats.Msg) {
 		_ = msg.Ack()
 		return
 	}
-	if err := c.apply(tctx, tenantID, accountID, p); err != nil {
+	acc, err := c.apply(tctx, tenantID, accountID, p)
+	if err != nil {
 		c.log.Warn("payment apply failed; will redeliver", zap.Error(err))
 		_ = msg.Nak()
 		return
@@ -105,6 +109,11 @@ func (c *Consumer) handle(msg *nats.Msg) {
 	if c.OnApplied != nil {
 		c.OnApplied(tenantID)
 	}
+	ev := realtime.Event{Type: realtime.PaymentApplied, ID: acc.ID.String(), UnitID: acc.UnitID.String()}
+	if acc.Edges.Unit != nil {
+		ev.PropertyID = acc.Edges.Unit.PropertyID.String()
+	}
+	realtime.Emit(c.RT, tenantID, ev)
 	_ = msg.Ack()
 }
 
@@ -137,14 +146,14 @@ func (c *Consumer) resolveAccount(ctx context.Context, refType string, p map[str
 	return uuid.Nil
 }
 
-func (c *Consumer) apply(ctx context.Context, tenantID, accountID uuid.UUID, p map[string]any) error {
+func (c *Consumer) apply(ctx context.Context, tenantID, accountID uuid.UUID, p map[string]any) (*ent.UnitAccount, error) {
 	acc, err := c.client.UnitAccount.Query().Where(unitaccount.ID(accountID)).WithFund().WithUnit().Only(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	led, err := c.svc.accounts.Refresh(ctx, acc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if amt, err := decimal.NewFromString(str(p["amount"])); err == nil && amt.IsPositive() && acc.Edges.Unit != nil {
 		if err := reports.RecordCollection(ctx, c.client, tenantID, acc.Edges.Unit.PropertyID, time.Now(), amt, c.loc); err != nil {
@@ -156,7 +165,7 @@ func (c *Consumer) apply(ctx context.Context, tenantID, accountID uuid.UUID, p m
 			c.log.Warn("sales progress update failed", zap.Error(err))
 		}
 	}
-	return events.Publish(ctx, c.client.OutboxEvent, tenantID, acc.ID.String(), events.PaymentApplied, map[string]any{
+	return acc, events.Publish(ctx, c.client.OutboxEvent, tenantID, acc.ID.String(), events.PaymentApplied, map[string]any{
 		"account_id": acc.ID, "account_ref": acc.AccountRef, "amount": str(p["amount"]),
 		"receipt": str(p["provider_reference"]), "balance": led.Balance.StringFixed(2),
 		"phone": acc.CustomerPhone, "name": acc.CustomerName, "intent_id": str(p["intent_id"]),

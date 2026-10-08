@@ -4,6 +4,8 @@ package router
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -98,9 +100,19 @@ func New(d Deps) http.Handler {
 		gr.Get("/units", h.DeviceUnits)
 		gr.Get("/walk-ins/{id}", h.DeviceWalkIn)
 		gr.Post("/incidents", h.DeviceIncident)
+		// PIN guessing is throttled per device and per client IP (shared Redis limiter, all pods).
+		if d.Limiter != nil {
+			gr.With(
+				d.Limiter.MiddlewareWith(ratelimit.ValueKey("device", deviceKeyHash), ratelimit.Options{Name: "gate-signon-device", Limit: 10, Window: time.Minute}),
+				d.Limiter.MiddlewareWith(ratelimit.IPKey, ratelimit.Options{Name: "gate-signon-ip", Limit: 30, Window: time.Minute}),
+			).Post("/sign-on", h.DeviceSignOn)
+		} else {
+			gr.Post("/sign-on", h.DeviceSignOn)
+		}
 	})
 
 	r.Route("/api/v1/{tenant}/maskani", func(tr chi.Router) {
+		tr.Use(mw.StreamQueryToken) // acts on GET .../stream only
 		tr.Use(d.Auth.RequireAuth)
 		tr.Use(authclient.RequireActiveSubscriptionForMutationsWithGrace(7))
 		tr.Use(httpware.TenantV2(httpware.TenantConfig{
@@ -119,6 +131,16 @@ func New(d Deps) http.Handler {
 	})
 	routes = r
 	return r
+}
+
+// deviceKeyHash keys the sign-on limiter by device without putting the raw key in Redis.
+func deviceKeyHash(r *http.Request) string {
+	k := r.Header.Get("X-Device-Key")
+	if k == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(k))
+	return hex.EncodeToString(sum[:8])
 }
 
 // tenantSync resolves slug to the auth-api UUID when TenantV2 left the id empty (platform owners
@@ -151,6 +173,8 @@ func mount(r chi.Router, d Deps) {
 	mod := func(m string) func(http.Handler) http.Handler { return mw.RequireModule(d.Settings, m) }
 
 	r.Get("/auth/me", h.Me)
+	// Live change hints (SSE). The router's timeout already bypasses event streams.
+	r.Get("/stream", h.Stream)
 	r.Post("/media/upload", h.Media.Upload)
 	r.Post("/media/sign", h.Media.Sign)
 
@@ -185,6 +209,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermPartiesManage)).Post("/unit-parties/{id}/end", h.EndLink)
 		g.With(perm(rbac.PermPartiesView)).Get("/parties", h.ListParties)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties", h.CreateParty)
+		g.With(perm(rbac.PermPartiesView)).Get("/parties/{id}", h.GetParty)
 		g.With(perm(rbac.PermPartiesManage)).Patch("/parties/{id}", h.UpdateParty)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties/{id}/invite", h.InviteParty)
 	})
@@ -202,6 +227,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs/preview", h.PreviewRun)
 		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs", h.IssueRun)
 		g.With(perm(rbac.PermBillingView)).Get("/billing-runs", h.ListRuns)
+		g.With(perm(rbac.PermBillingView)).Get("/billing-runs/{id}", h.GetRun)
 		g.With(perm(rbac.PermBillingView)).Get("/billing-runs/{id}/lines", h.RunLines)
 		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs/{id}/retry", h.RetryRun)
 		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts", h.ListAccounts)
@@ -230,6 +256,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermSalesView)).Get("/price-lists", h.ListPriceLists)
 		g.With(perm(rbac.PermSalesManage)).Post("/price-lists", h.CreatePriceList)
 		g.With(perm(rbac.PermSalesView)).Get("/availability", h.Availability)
+		g.With(perm(rbac.PermSalesView)).Get("/reservations", h.ListReservations)
 		g.With(perm(rbac.PermSalesManage)).Post("/reservations", h.Reserve)
 		g.With(perm(rbac.PermSalesView)).Get("/sale-contracts", h.ListContracts)
 		g.With(perm(rbac.PermSalesManage)).Post("/sale-contracts", h.CreateContract)
@@ -248,10 +275,17 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermWorksManage)).Post("/work-orders", h.CreateWorkOrder)
 		g.With(perm(rbac.PermWorksView)).Get("/work-orders/{id}", h.GetWorkOrder)
 		g.With(perm(rbac.PermWorksManage)).Post("/work-orders/{id}/actions", h.ActWorkOrder)
+	})
+
+	// Vendors (service providers module).
+	r.Group(func(g chi.Router) {
+		g.Use(mod(settings.ModProviders))
 		g.With(perm(rbac.PermVendorsView)).Get("/vendors", h.ListVendors)
 		g.With(perm(rbac.PermVendorsManage)).Post("/vendors", h.CreateVendor)
+		g.With(perm(rbac.PermVendorsView)).Get("/vendors/{id}", h.GetVendor)
 		g.With(perm(rbac.PermVendorsManage)).Post("/vendors/{id}/documents", h.AddVendorDocument)
 		g.With(perm(rbac.PermVendorsManage)).Post("/vendors/{id}/personnel", h.AddPersonnel)
+		g.With(perm(rbac.PermVendorsManage)).Put("/vendors/{id}/personnel/{pid}/pin", h.SetPersonnelPIN)
 	})
 
 	// Gate (staff side).
