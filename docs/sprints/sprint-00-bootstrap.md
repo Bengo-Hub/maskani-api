@@ -44,6 +44,9 @@ As of 2026-10-08.
 - [x] `seed-tenant` command: idempotent Shaba Village dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
 - [x] `seed-tenant` syncs the tenant and its property outlets from auth-api itself, and takes a real demo resident from `SEED_DEMO_RESIDENT_*` as the B07 owner and invites them (2026-10-08); see `docs/demo-guide.md`
 - [x] Only property outlets and property people are synced into Maskani (outlet filter, `EnsureUser` relevance, generic role names only for property tenants) (2026-10-08)
+- [x] The same rule across the fleet through shared-events v0.7.4 `UserRelevance`, so a Maskani tenant's people no longer land in other services: inventory `ae3ce93`, ordering `1986a68`, logistics `978c1c2`, library `5bc1866`; logistics also skips tenants that have not activated it (`019fdad`) (2026-10-08)
+- [ ] Plan gate for inventory, ordering and library (port `ConsumerHasActiveProduct` from logistics first)
+- [ ] Remove rows those services took in before the gate: a dry-run-first command per service, each production run confirmed by the user
 - [x] Live updates: `GET /stream` (SSE, `?token=`), realtime hub on the shared FanoutHub over NATS `_rt.maskani.*` (2026-10-08)
 - [x] Keyset pagination on growing lists, limit capped at 100, migration `keyset_list_indexes` (2026-10-08)
 - [ ] Swagger annotations
