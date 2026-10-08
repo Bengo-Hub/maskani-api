@@ -17,6 +17,7 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	enttenant "github.com/bengobox/maskani-api/internal/ent/tenant"
+	"github.com/bengobox/maskani-api/internal/modules/rbac"
 )
 
 var s2sHTTPClient = &http.Client{Timeout: 15 * time.Second}
@@ -26,15 +27,6 @@ var driftProbeClient = &http.Client{Timeout: 5 * time.Second}
 
 // driftCheckInterval throttles the auth-api drift probe per slug.
 const driftCheckInterval = 10 * time.Minute
-
-// PropertyUseCases are the outlet use cases that represent Maskani properties. Outlets of other
-// products in the same tenant (a shop, a restaurant) are not projected here.
-var PropertyUseCases = map[string]bool{
-	"property":    true,
-	"estate":      true,
-	"real_estate": true,
-	"maskani":     true,
-}
 
 // FirstSeenFunc runs once per pod when a tenant is first resolved, to ensure its defaults exist
 // (settings, modules, funds, charge catalogue). It must be idempotent.
@@ -266,10 +258,25 @@ type authOutlet struct {
 	Code     string         `json:"code"`
 	Name     string         `json:"name"`
 	UseCase  string         `json:"use_case"`
-	IsHQ     bool           `json:"is_hq"`
+	// ApplicableServices is auth-api's own list of services an outlet serves.
+	ApplicableServices []string `json:"applicable_services,omitempty"`
+	IsHQ               bool     `json:"is_hq"`
 	Status   string         `json:"status"`
 	Address  string         `json:"address,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+// isMaskaniOutlet is a property outlet by use case, or one auth-api lists as served by maskani-api.
+func isMaskaniOutlet(o authOutlet) bool {
+	if rbac.IsPropertyUseCase(o.UseCase) {
+		return true
+	}
+	for _, svc := range o.ApplicableServices {
+		if svc == "maskani-api" {
+			return true
+		}
+	}
+	return false
 }
 
 // SyncOutlets pulls the tenant's outlets from auth-api and upserts the property ones (and the HQ,
@@ -293,7 +300,9 @@ func (s *Syncer) SyncOutlets(ctx context.Context, tenantID uuid.UUID, tenantSlug
 		return fmt.Errorf("tenant: decode outlets: %w", err)
 	}
 	for _, it := range items {
-		if it.Status == "archived" || (!it.IsHQ && it.UseCase != "" && !PropertyUseCases[it.UseCase]) {
+		// Only property outlets and the HQ, which grants a tenant-wide view. A shop or restaurant
+		// outlet in the same tenant is never projected here.
+		if it.Status == "archived" || (!it.IsHQ && !isMaskaniOutlet(it)) {
 			continue
 		}
 		id, err := uuid.Parse(it.ID)

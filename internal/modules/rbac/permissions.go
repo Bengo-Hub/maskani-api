@@ -151,26 +151,31 @@ var Roles = []RoleDef{
 	{RoleGuard, "Guard", "Gate tablet only", true, nil},
 }
 
-// MapSSORole maps a global auth-api role onto a Maskani role. Unknown staff roles map to viewer so a
-// new staff member sees something read-only until an admin assigns a role.
-func MapSSORole(role string) string {
-	// In auth-api "owner" is the business owner (an admin-level role) and "member" is the default
-	// staff membership. Portal users are created with explicit maskani_* roles so they can never
-	// be confused with staff.
+// MapSSORole maps a global auth-api role onto a Maskani role, or "" when the role says nothing about
+// property work.
+//
+// One auth-api tenant can run several products (codevertex-demo hosts every vertical), and role
+// names such as manager, cashier, supervisor and member are reused by all of them. So only two kinds
+// of role grant Maskani access on their own: the tenant's admin-level roles and property-specific
+// names. The generic names map only when propertyTenant is true, meaning the tenant's own use case
+// is property, so a POS cashier or a hotel manager in a mixed tenant never lands in Maskani.
+// Portal users are invited with explicit maskani_* roles and are also recognised by their party link.
+func MapSSORole(role string, propertyTenant bool) string {
 	switch role {
+	// In auth-api "owner" is the business owner, an admin-level role.
 	case "superuser", "super_admin", "admin", "owner", "tenant_admin", "administrator", "director":
 		return RoleTenantAdmin
-	case "manager", "property_manager", "estate_manager", "supervisor":
+	case "property_manager", "estate_manager", "maskani_manager":
 		return RolePropertyManager
-	case "accountant", "finance", "finance_officer", "cashier":
+	case "estate_accountant", "property_accountant", "maskani_finance":
 		return RoleFinanceOfficer
-	case "sales", "sales_officer", "letting_officer":
+	case "property_sales", "letting_officer", "maskani_sales":
 		return RoleSalesOfficer
 	case "caretaker", "maskani_caretaker":
 		return RoleCaretaker
-	case "security", "security_manager":
+	case "estate_security", "maskani_security":
 		return RoleSecurityManager
-	case "maskani_owner", "customer":
+	case "maskani_owner":
 		return RoleOwner
 	case "maskani_occupant":
 		return RoleOccupant
@@ -178,6 +183,19 @@ func MapSSORole(role string) string {
 		return RoleVendorSupervisor
 	case "maskani_guard":
 		return RoleGuard
+	}
+	if !propertyTenant {
+		return ""
+	}
+	switch role {
+	case "manager", "supervisor":
+		return RolePropertyManager
+	case "accountant", "finance", "finance_officer", "cashier":
+		return RoleFinanceOfficer
+	case "sales", "sales_officer":
+		return RoleSalesOfficer
+	case "security", "security_manager":
+		return RoleSecurityManager
 	case "member", "staff":
 		return RoleViewer
 	}

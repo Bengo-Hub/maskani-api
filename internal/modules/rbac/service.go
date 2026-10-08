@@ -88,7 +88,7 @@ func (s *Service) Seed(ctx context.Context) error {
 	return nil
 }
 
-// Identity is what the token tells us about a caller.
+// Identity is what the token and the request tell us about a caller.
 type Identity struct {
 	TenantID   uuid.UUID
 	AuthUserID uuid.UUID
@@ -96,26 +96,71 @@ type Identity struct {
 	Name       string
 	Phone      string
 	SSORoles   []string
+	// Bypass is a platform owner, superuser or service caller.
+	Bypass bool
+	// OutletUseCase is the token's outlet use case, when it was minted for an outlet.
+	OutletUseCase string
+	// HasParty is true when the user is linked to an estate party (an owner or resident).
+	HasParty bool
+}
+
+// IsPropertyUseCase reports whether a tenant or outlet use case is a Maskani property one. It is the
+// single list: the outlet projection (tenant.SyncOutlets) and user admission both use it.
+func IsPropertyUseCase(v string) bool {
+	switch v {
+	case "property", "estate", "real_estate", "maskani":
+		return true
+	}
+	return false
 }
 
 // EnsureUser creates or refreshes the local user and, when the user has no role yet, assigns the
 // role mapped from their SSO roles. Throttled per pod so it does not write on every request.
+//
+// Only people who belong to property work get a local user: platform owners, tenant admins,
+// property-specific roles, tokens minted for a property outlet, linked estate parties, and staff a
+// Maskani admin has already given a role. Everyone else in a multi-product tenant (a POS cashier,
+// a clinic nurse) gets nil and no permissions, so they are never listed or granted anything here.
 func (s *Service) EnsureUser(ctx context.Context, id Identity) (*ent.MaskaniUser, error) {
 	key := id.TenantID.String() + ":" + id.AuthUserID.String()
 	s.mu.RLock()
 	last, ok := s.seen[key]
 	s.mu.RUnlock()
 	if ok && time.Since(last) < 5*time.Minute {
-		return s.client.MaskaniUser.Query().
+		u, err := s.client.MaskaniUser.Query().
 			Where(maskaniuser.TenantID(id.TenantID), maskaniuser.AuthServiceUserID(id.AuthUserID)).Only(ctx)
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		return u, err
 	}
 
+	propertyTenant := false
+	if t, err := s.client.Tenant.Get(ctx, id.TenantID); err == nil && t.UseCase != nil {
+		propertyTenant = IsPropertyUseCase(*t.UseCase)
+	}
 	roleCode := ""
 	for _, r := range id.SSORoles {
-		if m := MapSSORole(r); m != "" {
+		if m := MapSSORole(r, propertyTenant); m != "" {
 			if roleCode == "" || m == RoleTenantAdmin {
 				roleCode = m
 			}
+		}
+	}
+
+	relevant := id.Bypass || roleCode != "" || id.HasParty || IsPropertyUseCase(id.OutletUseCase)
+	if !relevant {
+		// Someone a Maskani admin granted a role stays; anyone else is left out, and roles the old
+		// unconditional mapping granted them automatically (assigned by themselves) are removed.
+		granted, err := s.adminGranted(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if !granted {
+			s.mu.Lock()
+			s.seen[key] = time.Now()
+			s.mu.Unlock()
+			return nil, nil
 		}
 	}
 	kind := maskaniuser.KindStaff
@@ -167,6 +212,32 @@ func (s *Service) EnsureUser(ctx context.Context, id Identity) (*ent.MaskaniUser
 	s.seen[key] = time.Now()
 	s.mu.Unlock()
 	return s.client.MaskaniUser.Get(ctx, userID)
+}
+
+// adminGranted reports whether an existing local user holds a role someone else assigned. Roles the
+// user was granted automatically at sign-in (assigned_by is the user) are removed on the way, which
+// cleans up grants made before sign-in was limited to property staff.
+func (s *Service) adminGranted(ctx context.Context, id Identity) (bool, error) {
+	u, err := s.client.MaskaniUser.Query().
+		Where(maskaniuser.TenantID(id.TenantID), maskaniuser.AuthServiceUserID(id.AuthUserID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	n, err := s.client.UserRoleAssignment.Delete().Where(userroleassignment.TenantID(id.TenantID),
+		userroleassignment.UserID(u.ID), userroleassignment.AssignedBy(id.AuthUserID)).Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	if n > 0 {
+		s.log.Info("removed automatic maskani roles from a user outside property work",
+			zap.String("auth_user_id", id.AuthUserID.String()), zap.Int("roles", n))
+		s.invalidate(id.TenantID, id.AuthUserID)
+	}
+	return s.client.UserRoleAssignment.Query().
+		Where(userroleassignment.TenantID(id.TenantID), userroleassignment.UserID(u.ID)).Exist(ctx)
 }
 
 // Resolve returns the caller's Maskani roles and permissions within the tenant.
@@ -289,7 +360,10 @@ func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind string
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
-	q := s.client.MaskaniUser.Query().Where(maskaniuser.TenantID(tenantID))
+	// Staff appear once they hold a role; a roleless staff row is a sign-in from outside property work
+	// (or a platform owner) and is not part of the estate's team.
+	q := s.client.MaskaniUser.Query().Where(maskaniuser.TenantID(tenantID),
+		maskaniuser.Or(maskaniuser.HasRoleAssignments(), maskaniuser.KindNEQ(maskaniuser.KindStaff)))
 	if kind != "" {
 		q = q.Where(maskaniuser.KindEQ(maskaniuser.Kind(kind)))
 	}

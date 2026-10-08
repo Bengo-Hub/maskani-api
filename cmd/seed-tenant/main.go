@@ -62,6 +62,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
+	"github.com/bengobox/maskani-api/internal/modules/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
@@ -83,6 +84,10 @@ type seeder struct {
 	tenantID uuid.UUID
 	slug     string
 	bearer   string
+	// resident is a real person who takes over the B07 owner so they can sign in to the owner portal
+	// (set from SEED_DEMO_RESIDENT_* at run time, never committed). Empty phone means none.
+	resident  demoResident
+	portalURL string
 
 	settings *settings.Service
 	register *register.Service
@@ -127,9 +132,21 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
+	// The tenant and its property outlets are mirrored from auth-api first (the same sync the API runs
+	// on first sight of a tenant), so a tenant nobody has opened in Maskani yet can still be seeded and
+	// the demo property links to its auth-api outlet. This projection is the only write a dry run makes.
+	syncer := tenant.NewSyncer(client, cfg.Auth.APIURL, db, zl)
+	if _, err := uuid.Parse(strings.TrimSpace(*tenantArg)); err != nil {
+		if _, serr := syncer.SyncTenant(ctx, strings.ToLower(strings.TrimSpace(*tenantArg))); serr != nil {
+			zl.Warn("tenant sync from auth-api failed; using the local projection", zap.Error(serr))
+		}
+	}
 	t, err := findTenant(ctx, client, strings.TrimSpace(*tenantArg))
 	if err != nil {
-		log.Fatalf("tenant %q is not in the local tenants projection (%v). Open the Maskani console once as that tenant, or let the tenant syncer run, then retry.", *tenantArg, err)
+		log.Fatalf("tenant %q is not in auth-api or the local tenants projection (%v)", *tenantArg, err)
+	}
+	if err := syncer.SyncOutlets(ctx, t.ID, t.Slug); err != nil {
+		zl.Warn("outlet sync from auth-api failed; the property may stay unlinked", zap.Error(err))
 	}
 	box, err := secure.NewBox(cfg.Security.FieldEncryptionKey)
 	if err != nil {
@@ -155,6 +172,11 @@ func main() {
 		gate: gate.NewService(client, box, seq, zl), notices: notices.NewService(client, nt, loc, zl)}
 	if s.bearer != "" && !strings.HasPrefix(strings.ToLower(s.bearer), "bearer ") {
 		s.bearer = "Bearer " + s.bearer
+	}
+	s.resident = residentFromEnv()
+	s.portalURL = strings.TrimRight(cfg.HTTP.AppURL, "/")
+	if s.resident.Phone != "" {
+		fmt.Printf("demo resident: %s takes over the owner of %s and is invited to the owner portal\n", s.resident.Name, residentUnit)
 	}
 
 	start := time.Now()
@@ -238,6 +260,9 @@ func (s *seeder) run(code string) error {
 		return err
 	}
 	if err := s.ownership(units, parties); err != nil {
+		return err
+	}
+	if err := s.inviteResident(parties); err != nil {
 		return err
 	}
 	if err := s.charges(prop); err != nil {
@@ -414,26 +439,65 @@ func (s *seeder) units(p *ent.Property, blocks map[string]uuid.UUID) (map[string
 func (s *seeder) parties() ([]*ent.Party, error) {
 	fmt.Println("owners and buyers")
 	out := make([]*ent.Party, len(ownerNames))
+	residentIdx := residentOwnerIdx()
 	for i, name := range ownerNames {
-		phone := secure.NormalizePhone(demoPhone(i))
+		rawPhone, email := demoPhone(i), ""
+		isResident := i == residentIdx && s.resident.Phone != ""
+		if isResident {
+			name, rawPhone, email = s.resident.Name, s.resident.Phone, s.resident.Email
+		}
+		phone := secure.NormalizePhone(rawPhone)
 		p, err := s.client.Party.Query().Where(party.PhoneHash(s.box.Hash(phone))).First(s.ctx)
 		if err == nil {
 			s.step(true, "")
 			out[i] = p
 			continue
 		}
-		if !s.step(false, "party %s %s", name, demoPhone(i)) {
+		label := rawPhone
+		if isResident {
+			label = "(demo resident, phone from SEED_DEMO_RESIDENT_PHONE)"
+		}
+		if !s.step(false, "party %s %s", name, label) {
 			continue
 		}
 		parts := strings.Fields(name)
-		p, err = s.register.CreateParty(s.ctx, uuid.Nil, register.PartyInput{DisplayName: ptr(name), FirstName: ptr(parts[0]),
-			LastName: ptr(parts[len(parts)-1]), Phone: ptr(demoPhone(i)), PreferredChannel: ptr("whatsapp"), Kind: ptr("person")})
+		in := register.PartyInput{DisplayName: ptr(name), FirstName: ptr(parts[0]), LastName: ptr(parts[len(parts)-1]),
+			Phone: ptr(rawPhone), PreferredChannel: ptr("whatsapp"), Kind: ptr("person")}
+		if email != "" {
+			in.Email, in.PreferredChannel = ptr(email), ptr("email")
+		}
+		p, err = s.register.CreateParty(s.ctx, uuid.Nil, in)
 		if err != nil {
 			return nil, err
 		}
 		out[i] = p
 	}
 	return out, nil
+}
+
+// inviteResident gives the demo resident an auth-api member with the maskani_owner role (added to,
+// never replacing, any roles they already hold), so they can sign in to the owner portal with a
+// phone code sent to their email or WhatsApp. The other demo owners have fake phones and are not
+// invited. Skipped in a dry run and when the resident is already invited.
+func (s *seeder) inviteResident(parties []*ent.Party) error {
+	if s.resident.Phone == "" {
+		return nil
+	}
+	fmt.Println("demo resident portal access")
+	idx := residentOwnerIdx()
+	if idx < 0 || idx >= len(parties) || parties[idx] == nil {
+		s.step(false, "owner portal invite for the %s owner", residentUnit)
+		return nil
+	}
+	p := parties[idx]
+	if !s.step(p.AuthUserID != nil, "owner portal invite for %s (%s)", p.DisplayName, residentUnit) {
+		return nil
+	}
+	if _, err := s.register.Invite(s.ctx, p.ID, s.slug, s.portalURL); err != nil {
+		// Without auth-api the resident cannot sign in, so this one is not optional.
+		return fmt.Errorf("invite the demo resident: %w", err)
+	}
+	return nil
 }
 
 // ownership links each sold unit to its owner with bill-to (opens the estate account; the paybill

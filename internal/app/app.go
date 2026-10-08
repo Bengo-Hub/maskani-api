@@ -150,6 +150,11 @@ func New(ctx context.Context) (*App, error) {
 		if err := settingsSvc.EnsureTenantDefaults(ctx, id); err != nil {
 			log.Warn("tenant defaults failed", zap.String("slug", slug), zap.Error(err))
 		}
+		// Mirror the tenant's property outlets (and HQ) so properties link to auth-api branches and
+		// staff outlet scoping resolves; other products' outlets are filtered out.
+		if err := syncer.SyncOutlets(ctx, id, slug); err != nil {
+			log.Warn("outlet sync failed", zap.String("slug", slug), zap.Error(err))
+		}
 	})
 	tc := treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, log)
 	ac := authapi.NewClient(cfg.Auth.APIURL, cfg.Auth.APIKey, log)

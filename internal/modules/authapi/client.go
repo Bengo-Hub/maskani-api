@@ -43,6 +43,9 @@ type MemberRequest struct {
 	Roles    []string `json:"roles"`
 	OutletID string   `json:"outlet_id,omitempty"`
 	Service  string   `json:"service,omitempty"`
+	// MergeRoles adds Roles to an existing membership instead of replacing it, so inviting someone
+	// who is already staff as an owner keeps their staff roles.
+	MergeRoles bool `json:"merge_roles,omitempty"`
 }
 
 // MemberResult mirrors auth-api's tenantMemberResponse subset.

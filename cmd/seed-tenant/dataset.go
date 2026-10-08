@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -79,6 +81,39 @@ const (
 
 // demoPhone returns the n-th demo phone (n from 0) in an obviously fake range: +254700000001 up.
 func demoPhone(n int) string { return fmt.Sprintf("+2547%08d", n+1) }
+
+// residentUnit is the unit whose owner a real demo resident replaces: B07 is the SRDD 8.2 worked
+// example (a 6,450 bill), so the resident sees a meaningful statement in the portal.
+const residentUnit = "B07"
+
+// demoResident is a real person who signs in to the owner portal during a demo.
+type demoResident struct {
+	Name, Phone, Email string
+}
+
+// residentFromEnv reads SEED_DEMO_RESIDENT_PHONE, _NAME and _EMAIL. The values are personal, so
+// they come from the environment of one run and are never written to the repository.
+func residentFromEnv() demoResident {
+	r := demoResident{
+		Name:  strings.TrimSpace(os.Getenv("SEED_DEMO_RESIDENT_NAME")),
+		Phone: strings.TrimSpace(os.Getenv("SEED_DEMO_RESIDENT_PHONE")),
+		Email: strings.ToLower(strings.TrimSpace(os.Getenv("SEED_DEMO_RESIDENT_EMAIL"))),
+	}
+	if r.Phone != "" && r.Name == "" {
+		r.Name = "Demo Resident"
+	}
+	return r
+}
+
+// residentOwnerIdx is the position in ownerNames of the owner of residentUnit.
+func residentOwnerIdx() int {
+	for _, u := range demoUnits() {
+		if u.Code == residentUnit {
+			return u.OwnerIdx
+		}
+	}
+	return -1
+}
 
 // demoReading is last month's meter reading for a unit: B07 reads 1,284 against an opening 1,275
 // (9 m3, the SRDD 8.2 worked example); other occupied units use 5 to 12 m3; unsold units read zero.

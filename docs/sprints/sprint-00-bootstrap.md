@@ -42,6 +42,8 @@ As of 2026-10-08.
 - [x] PgBouncer fix: no `statement_timeout` startup parameter (it failed every pool connection, `fb46c61`)
 - [ ] fleet-health-watcher URLs
 - [x] `seed-tenant` command: idempotent Shaba Village dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
+- [x] `seed-tenant` syncs the tenant and its property outlets from auth-api itself, and takes a real demo resident from `SEED_DEMO_RESIDENT_*` as the B07 owner and invites them (2026-10-08); see `docs/demo-guide.md`
+- [x] Only property outlets and property people are synced into Maskani (outlet filter, `EnsureUser` relevance, generic role names only for property tenants) (2026-10-08)
 - [x] Live updates: `GET /stream` (SSE, `?token=`), realtime hub on the shared FanoutHub over NATS `_rt.maskani.*` (2026-10-08)
 - [x] Keyset pagination on growing lists, limit capped at 100, migration `keyset_list_indexes` (2026-10-08)
 - [ ] Swagger annotations

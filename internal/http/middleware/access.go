@@ -128,19 +128,26 @@ func ResolveAccess(client *ent.Client, rbacSvc *rbac.Service, log *zap.Logger) f
 					return
 				}
 				a.AuthUserID = authUserID
+				a.PartyIDs = linkedParties(gctx, client, authUserID)
+				// Only property staff, admins and linked parties get a local user (see EnsureUser);
+				// anyone else in a multi-product tenant resolves to no roles and no permissions.
 				user, eerr := rbacSvc.EnsureUser(gctx, rbac.Identity{
 					TenantID: tenantID, AuthUserID: authUserID, Email: claims.Email, SSORoles: claims.Roles,
+					Bypass: a.Bypass, OutletUseCase: claims.OutletUseCase, HasParty: len(a.PartyIDs) > 0,
 				})
 				if eerr != nil {
 					log.Warn("ensure user failed", zap.Error(eerr))
 				}
 				a.LocalUser = user
-				a.Roles, a.Perms, _ = rbacSvc.Resolve(gctx, tenantID, authUserID)
-				a.AllProperties = a.Bypass || claims.CanAccessAllOutlets() || containsStr(a.Roles, rbac.RoleTenantAdmin)
+				if user != nil || a.Bypass {
+					a.Roles, a.Perms, _ = rbacSvc.Resolve(gctx, tenantID, authUserID)
+				}
+				// The all-outlets claim counts only for someone Maskani admitted; a POS-wide manager
+				// does not see every estate.
+				a.AllProperties = a.Bypass || containsStr(a.Roles, rbac.RoleTenantAdmin) || (user != nil && claims.CanAccessAllOutlets())
 				if !a.AllProperties && user != nil {
 					a.PropertyIDs, a.AllProperties = assignedProperties(gctx, client, tenantID, user.ID)
 				}
-				a.PartyIDs = linkedParties(gctx, client, authUserID)
 			} else {
 				a.AllProperties = true
 			}

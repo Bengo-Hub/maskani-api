@@ -54,16 +54,36 @@ Tenant (auth-api organisation)
           Unit accounts (one per fund: estate "B07", sales "S-B07")
 ```
 
-A property is registered as an auth-api outlet. maskani keeps a local `outlets` projection fed by
-`auth.outlet.*` events, and `properties.outlet_id` points at it. Staff assignment to a property is
-an outlet assignment, so the existing branch scoping in tokens and in `/auth/me` covers it.
+A property is registered as an auth-api outlet. maskani keeps a local `outlets` projection and
+`properties.outlet_id` points at it. The projection is pulled from auth-api's public outlet list
+(`tenant.SyncOutlets`) when a pod first sees a tenant and at the start of `seed-tenant`. Staff
+assignment to a property is an outlet assignment, so the existing branch scoping in tokens and in
+`/auth/me` covers it.
+
+### Only property outlets and property people are synced
+
+One auth-api tenant can run several products: codevertex-demo hosts a hotel, shops, a clinic, a
+weighbridge and the Shaba Village estate under one tenant, and role names such as manager,
+cashier and member are shared by all of them. Two rules keep other products out of Maskani:
+
+- **Outlets.** `SyncOutlets` keeps an outlet only when its use case is a property one
+  (`rbac.IsPropertyUseCase`: property, estate, real_estate, maskani), when auth-api lists
+  `maskani-api` in its `applicable_services`, or when it is the tenant HQ. Archived outlets are skipped.
+- **Users.** `rbac.EnsureUser` creates a local user only for platform owners and superusers, the
+  tenant's admin-level roles, property-specific roles (`property_manager`, `estate_accountant`,
+  `property_sales`, `caretaker`, `estate_security`, `maskani_*`), tokens minted for a property
+  outlet, people linked to an estate party, and staff a Maskani admin has already given a role.
+  Generic names (manager, supervisor, accountant, cashier, sales, security, member, staff) map
+  only when the tenant's own use case is property. Everyone else resolves to no roles and no
+  permissions, and roles the earlier unconditional mapping granted them automatically are
+  removed at their next request. The Users screen lists staff only once they hold a role.
 
 ## Request pipeline
 
 1. `ratelimit.TrustedRealIP`, request ID, logging, recover, timeout (streaming bypass), CORS,
    per-IP limiter.
 2. `RequireAuth` (JWKS, or `X-API-Key` for S2S), subscription mutation gate.
-3. JIT user provisioning (`identity.EnsureUserFromToken`).
+3. JIT user provisioning (`rbac.EnsureUser`, limited to property people as described above).
 4. `httpware.TenantV2`: tenant from the signed token, URL slug only for platform owners.
 5. Tenant sync: slug to UUID, local `tenants` projection (Redis cached).
 6. Tenant guard context: `tenantguard.With(ctx, tenantID)`.

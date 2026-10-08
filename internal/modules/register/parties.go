@@ -372,7 +372,8 @@ func (s *Service) Invite(ctx context.Context, partyID uuid.UUID, tenantSlug, por
 		role = "maskani_occupant"
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
-	res, err := s.auth.AddMember(ctx, tenantID, authapi.MemberRequest{Phone: "+" + p.Phone, Email: p.Email, Name: p.DisplayName, Roles: []string{role}})
+	res, err := s.auth.AddMember(ctx, tenantID, authapi.MemberRequest{Phone: "+" + p.Phone, Email: p.Email, Name: p.DisplayName,
+		Roles: []string{role}, MergeRoles: true})
 	if err != nil {
 		return nil, err
 	}
