@@ -75,3 +75,65 @@ func (c *Client) Send(ctx context.Context, tenantID uuid.UUID, tenantSlug, idem 
 	_ = resp.DecodeJSON(&out)
 	return &out, nil
 }
+
+// Broadcast is a notifications-api broadcast another service hands over (POST /api/v1/s2s/broadcasts).
+// Notifications resolves the audience page by page from the owning service, applies templates,
+// quiet-hour windows, rate limits and suppression, and tracks every recipient.
+type Broadcast struct {
+	Title    string           `json:"title"`
+	Kind     string           `json:"kind"` // service_notice for estate notices (transactional, no consent gate)
+	Channels []string         `json:"channels"`
+	Content  BroadcastContent `json:"content"`
+	Audience map[string]any   `json:"audience"`
+}
+
+// BroadcastContent carries the per-channel text. Email is a subject and a plain-text body;
+// WhatsApp names an approved template and the tokens filling it ("message" is Message).
+type BroadcastContent struct {
+	Email    *BroadcastEmail    `json:"email,omitempty"`
+	WhatsApp *BroadcastWhatsApp `json:"whatsapp,omitempty"`
+}
+
+// BroadcastEmail is an email subject and body.
+type BroadcastEmail struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
+// BroadcastWhatsApp is an approved template with its parameter tokens.
+type BroadcastWhatsApp struct {
+	Template string   `json:"template"`
+	Params   []string `json:"params"`
+	Message  string   `json:"message,omitempty"`
+}
+
+// BroadcastResult is the created broadcast's id and status.
+type BroadcastResult struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+// CreateBroadcast hands a broadcast to notifications-api. sourceRef is this service's record (the
+// notice id), echoed back on notifications.broadcast.completed. approve schedules it at once; only
+// service notices may be approved this way (the sender already holds notices.manage here).
+func (c *Client) CreateBroadcast(ctx context.Context, tenantID uuid.UUID, requestedBy, sourceRef string, approve bool, b Broadcast) (*BroadcastResult, error) {
+	if !c.enabled {
+		return nil, fmt.Errorf("notifications client not configured")
+	}
+	body := map[string]any{
+		"tenant_id": tenantID.String(), "requested_by": requestedBy, "source": "maskani", "source_ref": sourceRef,
+		"approve": approve, "broadcast": b,
+	}
+	resp, err := c.sc.Post(ctx, "/api/v1/s2s/broadcasts", body, map[string]string{"X-API-Key": c.apiKey, "Idempotency-Key": "MSK-NOTICE-" + sourceRef})
+	if err != nil {
+		return nil, fmt.Errorf("notify: broadcast: %w", err)
+	}
+	if !resp.IsSuccess() {
+		return nil, fmt.Errorf("notify: broadcast: status %d: %s", resp.StatusCode, string(resp.Body))
+	}
+	var out BroadcastResult
+	if err := resp.DecodeJSON(&out); err != nil {
+		return nil, fmt.Errorf("notify: broadcast: decode: %w", err)
+	}
+	return &out, nil
+}

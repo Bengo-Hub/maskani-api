@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/richtext"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -102,7 +103,8 @@ func (s *Service) Estate(ctx context.Context, slug string) (*PublicEstate, error
 }
 
 func (s *Service) estate(ctx context.Context, p *ent.Property, withUnits bool) (*PublicEstate, error) {
-	e := &PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name, Description: p.Description,
+	// The description may be editor HTML; the public site gets readable plain text.
+	e := &PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name, Description: richtext.PlainText(p.Description),
 		Area: p.Area, Town: p.Town, County: p.County, Latitude: p.Latitude, Longitude: p.Longitude,
 		Amenities: p.Amenities, Photos: p.Photos, Verified: true}
 	units, err := s.client.Unit.Query().Where(unit.TenantID(p.TenantID), unit.PropertyID(p.ID), unit.StatusEQ(unit.StatusActive),

@@ -16,6 +16,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/authapi"
+	"github.com/bengobox/maskani-api/internal/shared/richtext"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 	"github.com/bengobox/maskani-api/internal/shared/sqlx"
 )
@@ -99,7 +100,7 @@ func applyPropertyCreate(c *ent.PropertyCreate, in PropertyInput) {
 		c.SetUseCase(*in.UseCase)
 	}
 	if in.Description != nil {
-		c.SetDescription(*in.Description)
+		c.SetDescription(richtext.Sanitize(*in.Description))
 	}
 	if in.AddressLine != nil {
 		c.SetAddressLine(*in.AddressLine)
@@ -161,7 +162,7 @@ func (s *Service) UpdateProperty(ctx context.Context, id uuid.UUID, in PropertyI
 		u.SetUseCase(*in.UseCase)
 	}
 	if in.Description != nil {
-		u.SetDescription(*in.Description)
+		u.SetDescription(richtext.Sanitize(*in.Description))
 	}
 	if in.AddressLine != nil {
 		u.SetAddressLine(*in.AddressLine)
@@ -308,7 +309,7 @@ func (s *Service) CreateBlock(ctx context.Context, propertyID uuid.UUID, in Bloc
 		c.SetSort(*in.Sort)
 	}
 	if in.Description != nil {
-		c.SetDescription(*in.Description)
+		c.SetDescription(richtext.Sanitize(*in.Description))
 	}
 	return c.Save(ctx)
 }

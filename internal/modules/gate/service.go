@@ -27,6 +27,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/richtext"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -647,6 +648,7 @@ func (s *Service) ReportIncident(ctx context.Context, kind string, by uuid.UUID,
 	if in.Title == "" || in.Category == "" {
 		return nil, httpx.Invalid("title and category are required")
 	}
+	in.Description = richtext.Sanitize(in.Description)
 	number, err := s.seq.Next(ctx, "incident", "INC")
 	if err != nil {
 		return nil, err

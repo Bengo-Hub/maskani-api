@@ -68,6 +68,7 @@ type App struct {
 	roOrm    *ent.Client
 	outbox   *eventslib.OutboxPoller
 	consumer *collections.Consumer
+	notices  *notices.Service
 	jobs     *jobs.Runner
 }
 
@@ -216,12 +217,13 @@ func New(ctx context.Context) (*App, error) {
 	}
 	mux := router.New(router.Deps{Log: log, Limiter: limiter, Auth: authMW, AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		Ent: orm, RBAC: rbacSvc, Settings: settingsSvc, TenantSyncer: syncer, H: h,
-		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer})
+		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer,
+		InternalKey: cfg.Auth.APIKey})
 
 	runner := jobs.New(jobs.Deps{Client: orm, Accounts: accSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
 
 	return &App{cfg: cfg, log: log, pool: pool, cache: rdb, nc: nc, orm: orm, roOrm: roOrm, outbox: outbox,
-		consumer: consumer, jobs: runner,
+		consumer: consumer, notices: noticeSvc, jobs: runner,
 		server: &http.Server{Addr: fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port), Handler: mux,
 			ReadTimeout: cfg.HTTP.ReadTimeout, ReadHeaderTimeout: 5 * time.Second, WriteTimeout: cfg.HTTP.WriteTimeout,
 			IdleTimeout: cfg.HTTP.IdleTimeout}}, nil
@@ -232,6 +234,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.nc != nil {
 		if js, err := a.nc.JetStream(); err == nil {
 			a.consumer.Start(js)
+			a.notices.StartCompletedConsumer(js)
 		}
 	}
 	a.jobs.Start(ctx)

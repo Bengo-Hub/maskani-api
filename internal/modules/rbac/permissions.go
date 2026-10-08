@@ -151,6 +151,18 @@ var Roles = []RoleDef{
 	{RoleGuard, "Guard", "Gate tablet only", true, nil},
 }
 
+// CatalogueManagePerms lists, per catalogue kind, the permissions besides settings.manage that may add
+// to or rename entries in it, so the person creating a unit can add a new unit type from the
+// dropdown without a settings role. A kind not listed needs settings.manage.
+var CatalogueManagePerms = map[string][]string{
+	"unit_type":       {PermUnitsManage, PermPropertiesManage},
+	"property_type":   {PermPropertiesManage},
+	"wo_category":     {PermWorksManage},
+	"vendor_category": {PermVendorsManage},
+	"incident_type":   {PermGateManage},
+	"notice_category": {PermNoticesManage},
+}
+
 // MapSSORole maps a global auth-api role onto a Maskani role, or "" when the role says nothing about
 // property work.
 //

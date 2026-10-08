@@ -6,6 +6,7 @@ package notices
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/notice"
 	"github.com/bengobox/maskani-api/internal/ent/noticedelivery"
 	"github.com/bengobox/maskani-api/internal/ent/party"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/events"
@@ -24,6 +26,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/richtext"
 )
 
 // Service is the notices service.
@@ -67,6 +70,7 @@ type Input struct {
 // Create stores a notice; with send_now it is sent immediately (emergency) or at the end of quiet
 // hours (routine).
 func (s *Service) Create(ctx context.Context, actor uuid.UUID, tenantSlug string, in Input) (*ent.Notice, error) {
+	in.Body = richtext.Sanitize(in.Body)
 	if in.Title == "" || in.Body == "" {
 		return nil, httpx.Invalid("title and body are required")
 	}
@@ -99,34 +103,104 @@ func (s *Service) Create(ctx context.Context, actor uuid.UUID, tenantSlug string
 	return n, nil
 }
 
-// recipients resolves the audience to parties with phones, deduplicated.
-func (s *Service) recipients(ctx context.Context, n *ent.Notice) ([]*ent.Party, error) {
-	roles := []unitparty.Role{unitparty.RoleOwner, unitparty.RoleOccupant}
-	if rs, ok := n.Audience["roles"].([]any); ok && len(rs) > 0 {
-		roles = nil
+// Audience is who a notice reaches: the people holding one of Roles on active units, narrowed to a
+// property, blocks or units. It is the one filter for direct sending, the count and the reach list
+// notifications-api pages through.
+type Audience struct {
+	PropertyID *uuid.UUID
+	BlockIDs   []uuid.UUID
+	UnitIDs    []uuid.UUID
+	Roles      []string
+}
+
+// AudienceOf reads a notice's stored audience.
+func AudienceOf(n *ent.Notice) Audience {
+	a := Audience{PropertyID: n.PropertyID, BlockIDs: uuids(n.Audience["block_ids"]), UnitIDs: uuids(n.Audience["unit_ids"])}
+	if rs, ok := n.Audience["roles"].([]any); ok {
 		for _, r := range rs {
-			if v, ok := r.(string); ok {
-				roles = append(roles, unitparty.Role(v))
+			if v, ok := r.(string); ok && v != "" {
+				a.Roles = append(a.Roles, v)
 			}
 		}
 	}
-	uq := s.client.Unit.Query().Where(unit.StatusEQ(unit.StatusActive))
-	if n.PropertyID != nil {
-		uq = uq.Where(unit.PropertyID(*n.PropertyID))
+	return a
+}
+
+// partyQuery is the active, reachable parties holding the audience's roles on its active units. The
+// unit filter is a subquery, so it stays one statement however large the estate is.
+func (s *Service) partyQuery(a Audience) *ent.PartyQuery {
+	roles := []unitparty.Role{unitparty.RoleOwner, unitparty.RoleOccupant}
+	if len(a.Roles) > 0 {
+		roles = roles[:0]
+		for _, r := range a.Roles {
+			roles = append(roles, unitparty.Role(r))
+		}
 	}
-	if ids := uuids(n.Audience["block_ids"]); len(ids) > 0 {
-		uq = uq.Where(unit.BlockIDIn(ids...))
+	unitPreds := []predicate.Unit{unit.StatusEQ(unit.StatusActive)}
+	if a.PropertyID != nil {
+		unitPreds = append(unitPreds, unit.PropertyID(*a.PropertyID))
 	}
-	if ids := uuids(n.Audience["unit_ids"]); len(ids) > 0 {
-		uq = uq.Where(unit.IDIn(ids...))
+	if len(a.BlockIDs) > 0 {
+		unitPreds = append(unitPreds, unit.BlockIDIn(a.BlockIDs...))
 	}
-	unitIDs, err := uq.IDs(ctx)
-	if err != nil || len(unitIDs) == 0 {
-		return nil, err
+	if len(a.UnitIDs) > 0 {
+		unitPreds = append(unitPreds, unit.IDIn(a.UnitIDs...))
 	}
 	return s.client.Party.Query().Where(party.Or(party.PhoneNEQ(""), party.EmailNEQ("")), party.StatusEQ(party.StatusActive),
-		party.HasUnitLinksWith(unitparty.UnitIDIn(unitIDs...), unitparty.RoleIn(roles...), unitparty.StatusEQ(unitparty.StatusActive))).
-		Limit(20000).All(ctx)
+		party.HasUnitLinksWith(unitparty.RoleIn(roles...), unitparty.StatusEQ(unitparty.StatusActive), unitparty.HasUnitWith(unitPreds...)))
+}
+
+// recipients resolves the audience to parties for the direct-send fallback (bounded).
+func (s *Service) recipients(ctx context.Context, n *ent.Notice) ([]*ent.Party, error) {
+	return s.partyQuery(AudienceOf(n)).Limit(20000).All(ctx)
+}
+
+// Resident is one reachable person, as the internal reach list returns them.
+type Resident struct {
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	FirstName string `json:"first_name"`
+	Email     string `json:"email,omitempty"`
+	Phone     string `json:"phone,omitempty"`
+}
+
+// Reach returns one page of the audience ordered by party id, for notifications-api's
+// maskani_residents resolver (keyset paging: after is the last key of the previous page).
+func (s *Service) Reach(ctx context.Context, a Audience, after string, limit int) ([]Resident, string, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	q := s.partyQuery(a)
+	if after != "" {
+		id, err := uuid.Parse(after)
+		if err != nil {
+			return nil, "", httpx.Invalid("after must be a resident key")
+		}
+		q = q.Where(party.IDGT(id))
+	}
+	rows, err := q.Order(ent.Asc(party.FieldID)).Limit(limit + 1).
+		Select(party.FieldID, party.FieldDisplayName, party.FieldFirstName, party.FieldEmail, party.FieldPhone).All(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	next := ""
+	if len(rows) > limit {
+		rows = rows[:limit]
+		next = rows[len(rows)-1].ID.String()
+	}
+	out := make([]Resident, 0, len(rows))
+	for _, p := range rows {
+		first := p.FirstName
+		if first == "" {
+			first = firstName(p.DisplayName)
+		}
+		r := Resident{Key: p.ID.String(), Name: p.DisplayName, FirstName: first, Email: p.Email}
+		if p.Phone != "" {
+			r.Phone = "+" + strings.TrimPrefix(p.Phone, "+")
+		}
+		out = append(out, r)
+	}
+	return out, next, nil
 }
 
 // Send delivers the notice to every recipient and channel, recording each delivery.
@@ -147,6 +221,14 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 		}
 		return n, err
 	}
+	// Preferred path: notifications-api owns delivery (templates, rate limits, suppression,
+	// per-recipient tracking) and pages the residents from this service as it sends. The direct
+	// path below stays as the fallback when notifications-api cannot take the broadcast.
+	if sent, err := s.sendAsBroadcast(ctx, tenantID, tenantSlug, n); err == nil {
+		return sent, nil
+	} else {
+		s.log.Warn("notice broadcast hand-over failed; sending directly", zap.String("notice", n.ID.String()), zap.Error(err))
+	}
 	people, err := s.recipients(ctx, n)
 	if err != nil {
 		return nil, err
@@ -158,6 +240,103 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 	s.emit(tenantID, n)
 	go s.deliver(tenantguard.With(context.Background(), tenantID), tenantID, tenantSlug, n, people)
 	return n, nil
+}
+
+var linkPattern = regexp.MustCompile(`\s*\(?\bhttps?://\S+\)?`)
+
+// sendAsBroadcast hands the notice to notifications-api as an approved service notice whose
+// audience is resolved from this service (maskani_residents). Delivery counts arrive later on
+// notifications.broadcast.completed (Completed).
+func (s *Service) sendAsBroadcast(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice) (*ent.Notice, error) {
+	a := AudienceOf(n)
+	count, err := s.partyQuery(a).Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+	estate := s.estateName(ctx, n, slug)
+	subject := n.Title
+	if n.Priority == notice.PriorityEmergency {
+		subject = "Urgent: " + n.Title
+	}
+	text := richtext.PlainText(n.Body)
+	audience := map[string]any{"type": "maskani_residents"}
+	if a.PropertyID != nil {
+		audience["property_id"] = a.PropertyID.String()
+	}
+	if len(a.BlockIDs) > 0 {
+		audience["block_ids"] = uuidStrings(a.BlockIDs)
+	}
+	if len(a.UnitIDs) > 0 {
+		audience["unit_ids"] = uuidStrings(a.UnitIDs)
+	}
+	if len(a.Roles) > 0 {
+		audience["roles"] = a.Roles
+	}
+	b := notify.Broadcast{Title: subject, Kind: "service_notice", Channels: activeChannels(n.Channels), Audience: audience}
+	for _, ch := range b.Channels {
+		switch ch {
+		case "email":
+			b.Content.Email = &notify.BroadcastEmail{Subject: subject + " (" + estate + ")", Body: text}
+		case "whatsapp":
+			// The platform service notice template: {{1}} first name, {{2}} estate, {{3}} the notice
+			// on one line. Meta rejects links in a parameter, so they are dropped from this copy.
+			b.Content.WhatsApp = &notify.BroadcastWhatsApp{Template: "broadcast_service_notice_v1",
+				Params: []string{"first_name", "sender_name", "message"}, Message: oneLine(n.Title + ": " + linkPattern.ReplaceAllString(text, ""))}
+		}
+	}
+	res, err := s.notify.CreateBroadcast(ctx, tenantID, "maskani", n.ID.String(), true, b)
+	if err != nil {
+		return nil, err
+	}
+	meta := n.Metadata
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	meta["broadcast_id"], meta["delivery"] = res.ID, "notifications_broadcast"
+	n, err = n.Update().SetStatus(notice.StatusSending).SetRecipientsCount(count).SetMetadata(meta).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.emit(tenantID, n)
+	return n, nil
+}
+
+// Completed records a finished notifications-api broadcast on its notice (consumer of
+// notifications.broadcast.completed with source "maskani"). Idempotent.
+func (s *Service) Completed(ctx context.Context, tenantID, noticeID uuid.UUID, sent, target int) error {
+	n, err := s.client.Notice.Get(ctx, noticeID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	status := notice.StatusSent
+	if sent == 0 && target > 0 {
+		status = notice.StatusFailed
+	}
+	u := n.Update().SetStatus(status).SetDeliveredCount(sent)
+	if n.SentAt == nil {
+		u.SetSentAt(time.Now())
+	}
+	if target > 0 {
+		u.SetRecipientsCount(target)
+	}
+	if n, err = u.Save(ctx); err != nil {
+		return err
+	}
+	s.emit(tenantID, n)
+	return events.Publish(ctx, s.client.OutboxEvent, tenantID, n.ID.String(), events.NoticePublished, map[string]any{
+		"notice_id": n.ID, "title": n.Title, "audience_size": target, "priority": n.Priority, "delivered": sent,
+	})
+}
+
+func uuidStrings(ids []uuid.UUID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out
 }
 
 func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice, people []*ent.Party) {

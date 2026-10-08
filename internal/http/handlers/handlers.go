@@ -192,8 +192,14 @@ func (h *H) Catalogue(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
-// UpsertCatalogue is PUT /catalogues/{kind}/{code}.
+// UpsertCatalogue is PUT /catalogues/{kind}/{code}: settings managers, or whoever manages what the
+// list describes (rbac.CatalogueManagePerms).
 func (h *H) UpsertCatalogue(w http.ResponseWriter, r *http.Request) {
+	a := access(r)
+	if !a.Has(append([]string{rbac.PermSettingsManage}, rbac.CatalogueManagePerms[chiParam(r, "kind")]...)...) {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "you cannot change this list")
+		return
+	}
 	var in struct {
 		Name   string         `json:"name"`
 		Active *bool          `json:"active"`

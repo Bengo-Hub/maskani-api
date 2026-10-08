@@ -22,6 +22,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/richtext"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -86,6 +87,7 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 	if err := workorder.PriorityValidator(pr); err != nil {
 		return nil, httpx.Invalid("invalid priority")
 	}
+	in.Description = richtext.Sanitize(in.Description)
 	number, err := s.seq.Next(ctx, "work_order", "WO")
 	if err != nil {
 		return nil, err
@@ -179,6 +181,7 @@ var transitions = map[string][]workorder.Status{
 
 // Act applies a lifecycle action and records it on the timeline.
 func (s *Service) Act(ctx context.Context, id uuid.UUID, a Actor, in ActionInput) (*ent.WorkOrder, error) {
+	in.Note = richtext.Sanitize(in.Note)
 	wo, err := s.client.WorkOrder.Get(ctx, id)
 	if err != nil {
 		return nil, err

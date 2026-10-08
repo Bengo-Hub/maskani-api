@@ -40,6 +40,8 @@ type Deps struct {
 	Health         *handlers.Health
 	MediaRoot      string
 	MediaSigner    *httpware.MediaSigner
+	// InternalKey is the fleet INTERNAL_SERVICE_KEY sibling services present on /api/v1/internal.
+	InternalKey string
 }
 
 // New returns the HTTP handler.
@@ -89,6 +91,13 @@ func New(d Deps) http.Handler {
 		} else {
 			pr.Post("/enquiries", h.PublicEnquiry)
 		}
+	})
+
+	// Internal reads for sibling services (internal service key, no user token): the estate
+	// residents notifications-api pages through when it sends a notice broadcast.
+	r.Route("/api/v1/internal", func(ir chi.Router) {
+		ir.Use(mw.RequireInternalKey(d.InternalKey))
+		ir.Get("/residents/reach", h.InternalResidentsReach)
 	})
 
 	// Gate tablets authenticate with their device key.
@@ -184,7 +193,8 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
 	r.Get("/catalogues/{kind}", h.Catalogue)
-	r.With(perm(rbac.PermSettingsManage)).Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
+	// Settings managers edit any list; the people who use a list may add to it (CatalogueManagePerms).
+	r.Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
 	r.With(perm(rbac.PermUsersView)).Get("/users", h.ListUsers)
 	r.With(perm(rbac.PermUsersView)).Get("/roles", h.ListRoles)
 	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/roles", h.SetUserRoles)
@@ -213,11 +223,11 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermPartiesManage)).Patch("/parties/{id}", h.UpdateParty)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties/{id}/invite", h.InviteParty)
 		// CSV import of units and owners: validate first, then commit in the background.
-		g.With(perm(rbac.PermUnitsManage)).Get("/imports/template", h.ImportTemplate)
-		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Get("/imports", h.ListImports)
-		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Post("/imports", h.CreateImport)
-		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Get("/imports/{id}", h.GetImport)
-		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Post("/imports/{id}/commit", h.CommitImport)
+		g.With(perm(rbac.PermImportsRun)).Get("/imports/template", h.ImportTemplate)
+		g.With(perm(rbac.PermImportsRun)).Get("/imports", h.ListImports)
+		g.With(perm(rbac.PermImportsRun)).Post("/imports", h.CreateImport)
+		g.With(perm(rbac.PermImportsRun)).Get("/imports/{id}", h.GetImport)
+		g.With(perm(rbac.PermImportsRun)).Post("/imports/{id}/commit", h.CommitImport)
 	})
 
 	// Billing and collections.
