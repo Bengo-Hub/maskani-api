@@ -389,6 +389,19 @@ func (s *Service) Event(ctx context.Context, id uuid.UUID) (*ent.GateEvent, erro
 	return s.client.GateEvent.Get(ctx, id)
 }
 
+// DeviceEvent returns an event a tablet recorded, found by the server id or by the tablet's own
+// client_event_id. Tablets only know the id they generated, so polling a walk-in uses that one.
+func (s *Service) DeviceEvent(ctx context.Context, deviceID uuid.UUID, id string) (*ent.GateEvent, error) {
+	if uid, err := uuid.Parse(id); err == nil {
+		if ev, err := s.client.GateEvent.Query().
+			Where(gateevent.ID(uid), gateevent.DeviceID(deviceID)).Only(ctx); err == nil {
+			return ev, nil
+		}
+	}
+	return s.client.GateEvent.Query().
+		Where(gateevent.DeviceID(deviceID), gateevent.ClientEventID(id)).Only(ctx)
+}
+
 // Decide records the host's walk-in decision.
 func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (*ent.GateEvent, error) {
 	ev, err := s.client.GateEvent.Get(ctx, eventID)

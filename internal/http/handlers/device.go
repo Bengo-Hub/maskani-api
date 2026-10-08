@@ -82,13 +82,15 @@ func (h *H) DeviceSync(w http.ResponseWriter, r *http.Request) {
 		"gate_name": d.GateName, "property_id": d.PropertyID}, "cache": payload})
 }
 
-// DeviceWalkIn is GET /gate/walk-ins/{id}: the host's decision so far.
+// DeviceWalkIn is GET /gate/walk-ins/{id}: the host's decision so far. {id} is the event id or the
+// client_event_id the tablet generated (the only id it knows), always scoped to this device.
 func (h *H) DeviceWalkIn(w http.ResponseWriter, r *http.Request) {
-	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	id := chiParam(r, "id")
+	if id == "" || len(id) > 64 {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
-	ev, err := h.Gate.Event(r.Context(), id)
+	ev, err := h.Gate.DeviceEvent(r.Context(), device(r).ID, id)
 	if err != nil || ev.PropertyID != device(r).PropertyID {
 		httpx.Error(w, http.StatusNotFound, "not_found", "not found")
 		return
