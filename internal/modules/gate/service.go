@@ -389,6 +389,11 @@ func (s *Service) Event(ctx context.Context, id uuid.UUID) (*ent.GateEvent, erro
 	return s.client.GateEvent.Get(ctx, id)
 }
 
+// Incident returns one incident (the deep link in incident alerts opens it).
+func (s *Service) Incident(ctx context.Context, id uuid.UUID) (*ent.Incident, error) {
+	return s.client.Incident.Get(ctx, id)
+}
+
 // DeviceEvent returns an event a tablet recorded, found by the server id or by the tablet's own
 // client_event_id. Tablets only know the id they generated, so polling a walk-in uses that one.
 func (s *Service) DeviceEvent(ctx context.Context, deviceID uuid.UUID, id string) (*ent.GateEvent, error) {

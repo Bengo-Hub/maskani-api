@@ -413,6 +413,23 @@ func (h *H) ReportIncident(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, inc)
 }
 
+// GetIncident is GET /incidents/{id}, limited to properties the caller can see.
+func (h *H) GetIncident(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	inc, err := h.Gate.Incident(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !requireProperty(w, r, inc.PropertyID) {
+		return
+	}
+	httpx.JSON(w, http.StatusOK, inc)
+}
+
 // ListIncidents is GET /incidents?property_id=&open= (keyset page).
 func (h *H) ListIncidents(w http.ResponseWriter, r *http.Request) {
 	f, ok := scopeFilter(w, r)

@@ -296,6 +296,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermGateView)).Get("/visitor-passes", h.ListPasses)
 		g.With(perm(rbac.PermGateManage)).Post("/visitor-passes", h.StaffCreatePass)
 		g.With(perm(rbac.PermGateView)).Get("/incidents", h.ListIncidents)
+		g.With(perm(rbac.PermGateView)).Get("/incidents/{id}", h.GetIncident)
 		g.With(perm(rbac.PermGateView)).Post("/incidents", h.ReportIncident)
 	})
 
