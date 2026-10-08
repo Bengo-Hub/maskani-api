@@ -75,7 +75,25 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 | POST `/units/{id}/vehicles` `{party_id, plate, make, model, colour}` | Vehicles | `parties.manage` |
 | GET `/parties` (keyset; `q`); POST `/parties`; GET, PATCH `/parties/{id}`; POST `/parties/{id}/invite` | Parties (identity numbers masked) | `parties.view` / `parties.manage` |
 | GET `/units/{id}/timeline`; PATCH `/blocks/{id}`; PATCH `/unit-parties/{id}`; DELETE `/vehicles/{id}` | | planned (sprint 1) |
-| POST `/imports`; GET `/imports/{id}` | CSV import with dry run | planned (sprint 1) |
+| GET `/imports/template` | CSV template (header plus one example row) | `units.manage` |
+| POST `/imports` (multipart `property_id`, `file`) | Checks a units and owners CSV and records the job; writes nothing else. 201 with the job | `units.manage` and `parties.manage` |
+| GET `/imports` (`limit` up to 50); GET `/imports/{id}` | Recent jobs; one job with `summary.counts`, `summary.plans` and `errors` | `units.manage` and `parties.manage` |
+| POST `/imports/{id}/commit` | Saves a validated job in the background (202); poll GET `/imports/{id}` for `rows_committed` | `units.manage` and `parties.manage` |
+
+CSV import rules (`internal/modules/imports`):
+
+- Columns in any order, unknown ones ignored, Excel's byte order mark tolerated. Only `unit_code`
+  is required. Template columns: `unit_code, block, unit_type, bedrooms, bathrooms, size_sqm,
+  floor, sale_status, occupancy_status, owner_name, owner_phone, owner_email, owner_since`.
+- At most 5,000 rows and 4 MB per file. Errors carry the file's own line number.
+- Every row matches existing records by natural key through `register/lookup.go` (block code, unit
+  code, owner phone hash, active owner link), so a re-run updates and never duplicates. The same
+  lookups serve `cmd/seed-tenant`.
+- Commit re-checks each row, then applies it through the register service (so validation and
+  phone encryption are the same as the screens), updating `rows_committed` every 500 rows.
+  A job can be committed once (the status moves from `validated` to `committing` atomically).
+- Owner phones and emails sit in the job only between the check and the commit; responses never
+  include them, and the raw rows are dropped when the commit finishes.
 
 GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin_masked` and
 `units: [{id, unit_id, unit_code, property_id, role, is_primary, start_date, end_date, bill_to, status}]`

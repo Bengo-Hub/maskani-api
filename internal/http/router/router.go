@@ -212,6 +212,12 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermPartiesView)).Get("/parties/{id}", h.GetParty)
 		g.With(perm(rbac.PermPartiesManage)).Patch("/parties/{id}", h.UpdateParty)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties/{id}/invite", h.InviteParty)
+		// CSV import of units and owners: validate first, then commit in the background.
+		g.With(perm(rbac.PermUnitsManage)).Get("/imports/template", h.ImportTemplate)
+		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Get("/imports", h.ListImports)
+		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Post("/imports", h.CreateImport)
+		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Get("/imports/{id}", h.GetImport)
+		g.With(perm(rbac.PermUnitsManage), perm(rbac.PermPartiesManage)).Post("/imports/{id}/commit", h.CommitImport)
 	})
 
 	// Billing and collections.

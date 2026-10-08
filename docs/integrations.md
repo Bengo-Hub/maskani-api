@@ -21,7 +21,7 @@ service listens on 80, the others on 4000). Re-check there before changing them.
 | Use | Call |
 |---|---|
 | Staff sign-in | SSO (OIDC + PKCE), client `maskani-ui`; JWT validated through JWKS |
-| Owner, occupant, vendor supervisor sign-in | `POST /api/v1/auth/phone/otp/request` then `/verify` with `{tenant_slug, phone, client_id}`; returns the standard token pair (new in this release) |
+| Owner, occupant, vendor supervisor sign-in | `POST /api/v1/auth/phone/otp/request` then `/verify` with `{tenant_slug, phone, client_id}`; returns the standard token pair. The code goes by email when the member has one, else WhatsApp; `channel: "whatsapp"` forces WhatsApp. Works only for parties already invited (`POST /parties/{id}/invite`) |
 | Create or link a customer user | `POST /api/v1/s2s/tenants/{tenant_id}/members` with phone, name, role; returns the real user ID stored on `parties.auth_user_id` |
 | Property as branch | Properties are auth-api outlets: `POST /api/v1/tenants/{slug}/outlets` on create; local projection kept by `auth.outlet.created/updated/archived` |
 | Roles | Push the maskani role catalogue to `POST /api/v1/s2s/roles/sync` (idempotent) |

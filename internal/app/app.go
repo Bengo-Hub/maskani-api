@@ -34,6 +34,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
+	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/market"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/notify"
@@ -200,7 +201,7 @@ func New(ctx context.Context) (*App, error) {
 	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: imports.NewService(orm, regSvc, log), PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 
