@@ -46,7 +46,8 @@ As of 2026-10-08.
 - [x] Only property outlets and property people are synced into Maskani (outlet filter, `EnsureUser` relevance, generic role names only for property tenants) (2026-10-08)
 - [x] The same rule across the fleet through shared-events v0.7.4 `UserRelevance`, so a Maskani tenant's people no longer land in other services: inventory `ae3ce93`, ordering `1986a68`, logistics `978c1c2`, library `5bc1866`; logistics also skips tenants that have not activated it (`019fdad`) (2026-10-08)
 - [x] Plan gate for new users in ordering `034f1a7` and library `3762a96` (`ConsumerHasActiveProduct` ported from logistics). Inventory stays ungated because POS tenants rely on it without a listed product line
-- [ ] Remove rows those services took in before the gate: a dry-run-first command per service, each production run confirmed by the user
+- [x] `prune-users` command in logistics `535b7ae`, library `b2b9cd3`, ordering `8ef6b6a` and inventory `4e1179e`: dry run by default, `--apply` deletes only rows with no footprint in that service
+- [ ] Run the four dry runs in production, then apply per service after the user approves the numbers
 - [x] Live updates: `GET /stream` (SSE, `?token=`), realtime hub on the shared FanoutHub over NATS `_rt.maskani.*` (2026-10-08)
 - [x] Keyset pagination on growing lists, limit capped at 100, migration `keyset_list_indexes` (2026-10-08)
 - [ ] Swagger annotations
