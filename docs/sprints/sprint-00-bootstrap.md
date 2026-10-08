@@ -14,7 +14,7 @@ SRDD week 1 (discovery, data audit, architecture approval, environments).
 | devops-k8s | `apps/maskani-{api,ui,commerce}`, namespace `maskani`, pgbouncer `maskani` and `maskani_ro`, `create-service-secrets.sh` case for `INTERNAL_SERVICE_KEY`, network policies, Cloudflare origin hosts, fleet-health-watcher URLs | Yes |
 | auth-api | OAuth client `maskani-ui` (prod host `maskaniapp.codevertexafrica.com`) | Yes |
 | subscriptions-api | `plans_maskani.go`, feature catalog codes, plan feature matrix doc | Yes |
-| notifications-api | Subscribe to `maskani.>`; SMS templates | Yes |
+| notifications-api | Subscribe to `maskani.>`; email and WhatsApp templates (the active channels) | Yes |
 | shared-ui-lib | App switcher entry `maskani` (new tag; local copy in maskani-ui until it ships) | Yes |
 
 ## Progress
@@ -31,14 +31,17 @@ As of 2026-10-08.
 - [x] devops-k8s: maskani-api app (replicas 0 until the first image), network policies, secrets script, Cloudflare hosts (cabcaf09)
 - [x] treasury C2B account routes, `account_payment` allocator, account ledger (treasury e8b5dbc, 059f27a)
 - [x] Per-attempt payment references, consumer reads the account from metadata, invoices sent after create (`IssueInvoice`) (2026-10-08)
-- [ ] First green CI run: run 37624525811 failed at secret sync because the repo has no `GH_PAT` yet
+- [x] Secrets synced through devops-k8s `sync-secrets.yml` (GH_PAT and registry, database, kube secrets)
+- [x] First green CI run 37694790362: test, sync-secrets, deploy (image built; app still at replicas 0)
+- [x] auth-api: `property` use case, phone code sign-in on WhatsApp, phone-only members, `maskani-ui` OAuth client (dd2080c, b06e8a0)
+- [x] notifications-api: `maskani.>` consumer, email and WhatsApp templates, itemised bills (dde0a44, 05efd7f, 5830c60)
+- [x] Bill-to email kept in `unit_accounts.metadata.customer_email`; events carry email; bill events carry items, subtotal and VAT
+- [ ] Sync the `maskani_*` WhatsApp templates to Meta after the notifications deploy (dry run first)
 - [ ] devops-k8s apps for maskani-ui and maskani-commerce committed
 - [ ] HA values (min 2 replicas, PDB) after the first image; fleet-health-watcher URLs
 - [ ] `seed-tenant` command and Swagger annotations
 - [ ] maskani-ui and maskani-commerce scaffolds and repos
-- [ ] auth-api: `property` use case, phone OTP, phone-only members, `maskani-ui` OAuth client
 - [ ] subscriptions-api: `plans_maskani.go`, feature codes, plan matrix doc
-- [ ] notifications-api: `maskani.>` subscription and templates
 - [ ] shared-ui-lib: app switcher entry
 
 ## Acceptance

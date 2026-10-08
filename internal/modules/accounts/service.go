@@ -5,6 +5,7 @@ package accounts
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +38,25 @@ type Party struct {
 	ID    uuid.UUID
 	Name  string
 	Phone string
+	Email string // kept in metadata.customer_email for message delivery
+}
+
+// withEmail returns metadata carrying the bill-to email (merged, so other keys survive).
+func (p *Party) withEmail(meta map[string]any) map[string]any {
+	out := make(map[string]any, len(meta)+1)
+	for k, v := range meta {
+		out[k] = v
+	}
+	if e := strings.TrimSpace(p.Email); e != "" {
+		out["customer_email"] = strings.ToLower(e)
+	}
+	return out
+}
+
+// CustomerEmail returns the bill-to email stored on the account, if any.
+func CustomerEmail(acc *ent.UnitAccount) string {
+	e, _ := acc.Metadata["customer_email"].(string)
+	return e
 }
 
 // Ensure returns the unit's account in the fund, creating it (and its outbox event) if missing.
@@ -50,7 +70,8 @@ func (s *Service) Ensure(ctx context.Context, unit *ent.Unit, fundCode string, p
 		Where(unitaccount.UnitID(unit.ID), unitaccount.FundID(f.ID)).Only(ctx)
 	if err == nil {
 		if p != nil && acc.PrimaryPartyID == nil {
-			acc, err = acc.Update().SetPrimaryPartyID(p.ID).SetCustomerName(p.Name).SetCustomerPhone(p.Phone).Save(ctx)
+			acc, err = acc.Update().SetPrimaryPartyID(p.ID).SetCustomerName(p.Name).SetCustomerPhone(p.Phone).
+				SetMetadata(p.withEmail(acc.Metadata)).Save(ctx)
 		}
 		return acc, err
 	}
@@ -65,7 +86,7 @@ func (s *Service) Ensure(ctx context.Context, unit *ent.Unit, fundCode string, p
 	}
 	c := tx.UnitAccount.Create().SetUnitID(unit.ID).SetFundID(f.ID).SetAccountRef(ref)
 	if p != nil {
-		c.SetPrimaryPartyID(p.ID).SetCustomerName(p.Name).SetCustomerPhone(p.Phone)
+		c.SetPrimaryPartyID(p.ID).SetCustomerName(p.Name).SetCustomerPhone(p.Phone).SetMetadata(p.withEmail(nil))
 	}
 	acc, err = c.Save(ctx)
 	if err != nil {

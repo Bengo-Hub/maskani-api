@@ -41,4 +41,4 @@ Standing backend rules in [README.md](README.md), plus:
 | PDF documents | Reuse the platform document engine pattern; check the shared render bugs before copying | `feedback_document_generation_architecture.md`, global `reference_docs_engine_shared_across_services.md` |
 | Exports | Branded export through the established report module pattern, not ad hoc CSV | `treasury-customer-statement-datatable-pagination-export-2026-09-12.md` |
 | Backups and tenant export | Tenant-scoped export pattern | `feedback_tenant_scoped_backups.md` |
-| Notices | Templates per channel; WhatsApp buttons; SMS credits never block OTP or receipts | `feedback_notification_policies.md` |
+| Notices | Templates per channel; WhatsApp buttons; messaging plans never block sign-in codes or receipts | `feedback_notification_policies.md` |

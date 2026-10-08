@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
+	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 
 	"github.com/bengobox/maskani-api/internal/ent"
@@ -159,7 +160,15 @@ func (c *Consumer) apply(ctx context.Context, tenantID, accountID uuid.UUID, p m
 		"account_id": acc.ID, "account_ref": acc.AccountRef, "amount": str(p["amount"]),
 		"receipt": str(p["provider_reference"]), "balance": led.Balance.StringFixed(2),
 		"phone": acc.CustomerPhone, "name": acc.CustomerName, "intent_id": str(p["intent_id"]),
+		"email": accounts.CustomerEmail(acc), "fund": fundCode(acc), "method": str(p["payment_method"]),
 	})
+}
+
+func fundCode(acc *ent.UnitAccount) string {
+	if acc.Edges.Fund != nil {
+		return acc.Edges.Fund.Code
+	}
+	return ""
 }
 
 func str(v any) string {

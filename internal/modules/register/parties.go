@@ -264,7 +264,7 @@ func (s *Service) LinkParty(ctx context.Context, unitID, actor uuid.UUID, in Lin
 	switch link.Role {
 	case unitparty.RoleOwner, unitparty.RoleJointOwner:
 		if in.IsPrimary || link.Role == unitparty.RoleOwner {
-			if _, err := s.accounts.Ensure(ctx, u, "estate", &accounts.Party{ID: p.ID, Name: p.DisplayName, Phone: p.Phone}); err != nil {
+			if _, err := s.accounts.Ensure(ctx, u, "estate", &accounts.Party{ID: p.ID, Name: p.DisplayName, Phone: p.Phone, Email: p.Email}); err != nil {
 				s.log.Warn("estate account not opened", zap.Error(err))
 			}
 		}
@@ -316,7 +316,7 @@ func (s *Service) Invite(ctx context.Context, partyID uuid.UUID, tenantSlug, por
 		return nil, err
 	}
 	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, p.ID.String(), events.PartyInvited, map[string]any{
-		"party_id": p.ID, "name": p.DisplayName, "phone": p.Phone, "tenant_slug": tenantSlug,
+		"party_id": p.ID, "name": p.DisplayName, "phone": p.Phone, "email": p.Email, "tenant_slug": tenantSlug,
 		"portal_url": portalURL, "role": role,
 	}); err != nil {
 		_ = tx.Rollback()

@@ -362,7 +362,7 @@ func (s *Service) arrival(ctx context.Context, ev *ent.GateEvent) map[string]any
 		if p, err := s.client.VisitorPass.Get(ctx, *ev.PassID); err == nil && p.HostPartyID != nil {
 			out["host_party_id"] = *p.HostPartyID
 			if h, err := s.client.Party.Get(ctx, *p.HostPartyID); err == nil {
-				out["host_phone"], out["host_name"] = h.Phone, h.DisplayName
+				out["host_phone"], out["host_name"], out["host_email"] = h.Phone, h.DisplayName, h.Email
 			}
 		}
 	}

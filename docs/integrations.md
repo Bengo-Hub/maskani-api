@@ -28,8 +28,8 @@ service listens on 80, the others on 4000). Re-check there before changing them.
 | Tenant lookup | `GET /api/v1/tenants/by-slug/{slug}`, `/by-id/{id}` through the tenant syncer |
 | Events consumed | `auth.tenant.created`, `auth.outlet.*`, `auth.user.*`, `auth.apikey.changed` (broadcast) |
 
-Phone OTP rules: codes hashed, 5 minute expiry, rate limited per phone and per IP, delivered by SMS
-through notifications-api with WhatsApp fallback. Only a phone already linked to a tenant member can
+Phone OTP rules: codes hashed, 5 minute expiry, rate limited per phone and per IP, delivered on
+WhatsApp through notifications-api (`auth_otp` template). Built in auth-api dd2080c. Only a phone already linked to a tenant member can
 request a code, so the endpoint cannot be used to enumerate or create accounts.
 
 ## treasury-api
@@ -145,19 +145,23 @@ that credit to a later invoice is not built yet (treasury backlog).
 
 `POST /api/v1/{tenant}/notifications/messages`
 
-```json
-{ "channel": "sms", "tenant": "<slug>", "template": "maskani_bill_issued",
-  "data": { "unit_code": "B07", "amount": "6,450", "due_date": "10 Nov 2026", "paybill": "...", "account": "B07" },
-  "to": ["254712345678"], "metadata": { "source_service": "maskani", "entity_id": "..." } }
-```
+Used directly only for notices to an audience. Everything else is event driven.
 
-- Event-driven messages: notifications-api subscribes to `maskani.>` and sends the templated
-  messages listed in [events.md](events.md).
-- WhatsApp links are always buttons (`_btn` templates, fixed domain, URL suffix as
-  `template_button_param`), never raw link text.
+- Active channels are **email and WhatsApp** (no SMS). notifications-api's maskani consumer
+  (`cmd/worker/maskani_consumer.go`, durable `notifications-maskani`) sends each mapped event in
+  [events.md](events.md) by email when the payload has an address (owners' and buyers' email is
+  kept in `unit_accounts.metadata.customer_email`) and by WhatsApp with approved `maskani_*`
+  UTILITY templates.
+- WhatsApp links are always URL buttons on `https://maskaniapp.codevertexafrica.com/{{1}}` with
+  the suffix `<slug>/<path>`, never body text. Deep links: `portal`, `portal/purchase`,
+  `portal/walk-ins/{id}`, `security/incidents/{id}`, `works/{id}`, `vendors/{id}` (maskani-ui must
+  serve these; see its UX spec).
+- Bills are itemised. Optional lines show only when present: quantity x rate for rated charges,
+  VAT per taxed charge, subtotal and VAT rows only on a taxed bill, the paybill block only when the
+  fund has one. WhatsApp uses one of three templates for that reason.
+- Phone sign-in codes go on WhatsApp (`auth_otp`, platform number), so tenant plans never block
+  sign-in.
 - Quiet hours 21:00 to 07:00 for routine notices; emergency alerts bypass them.
-- SMS and WhatsApp consume the tenant's messaging credits; OTP and payment receipts are never
-  blocked by plan gating.
 
 ## subscriptions-api
 

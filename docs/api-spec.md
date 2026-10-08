@@ -42,7 +42,7 @@ Swagger UI at `/v1/docs/`. All bodies are JSON; money is a decimal string or num
 | GET `/units/{id}/timeline` | Bills, payments, readings, works, documents for one unit | `units.view` |
 | GET, POST `/units/{id}/parties`; PATCH `/unit-parties/{id}`; POST `/unit-parties/{id}/end` | Ownerships and occupancies with dates and bill-to | `parties.manage` |
 | GET, POST `/units/{id}/vehicles`; DELETE `/vehicles/{id}` | Vehicles | `parties.manage` |
-| GET, POST `/parties`; GET, PATCH `/parties/{id}`; POST `/parties/{id}/invite` | Parties; invite links the auth user and sends the portal SMS | `parties.view` / `parties.manage` |
+| GET, POST `/parties`; GET, PATCH `/parties/{id}`; POST `/parties/{id}/invite` | Parties; invite links the auth user and sends the portal invite by WhatsApp and email | `parties.view` / `parties.manage` |
 | GET, POST `/properties/{id}/staff`; DELETE `/staff-assignments/{id}` | Staff per property with property role and ERP employee | `users.manage` |
 | POST `/imports` (multipart, `kind`, `dry_run`) ; GET `/imports/{id}` | CSV import of properties, units, parties, ownerships, opening balances | `imports.run` |
 
@@ -122,7 +122,7 @@ Swagger UI at `/v1/docs/`. All bodies are JSON; money is a decimal string or num
 | POST `/gate/verify` | Verify a QR token or 6-digit code; returns pass and host | registered device + guard PIN |
 | POST `/gate/events` | Record entry, exit, denial, walk-in | registered device |
 | POST `/gate/sync` | Batch upload of offline events (idempotent by `client_event_id`); returns passes valid for 24 hours and active badges | registered device |
-| POST `/gate/walk-ins`; GET `/gate/walk-ins/{id}` | Walk-in host approval (portal or SMS reply), 5 minute timeout | device; host via portal |
+| POST `/gate/walk-ins`; GET `/gate/walk-ins/{id}` | Walk-in host approval (portal, opened from the WhatsApp button), 5 minute timeout | device; host via portal |
 | GET `/gate/events`; GET `/visitor-passes` | Logs | `gate.view` |
 | GET, POST `/guard-posts`, `/patrol-checkpoints`; POST `/patrols/scans` | Posts and patrol scans | `gate.manage`; device |
 | GET, POST `/incidents`; PATCH `/incidents/{id}` | Incidents and occurrence book | `gate.view` / `gate.manage`; device |

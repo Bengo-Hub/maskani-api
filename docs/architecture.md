@@ -10,7 +10,7 @@
 | auth-api | Existing, extended | Tenants, branches (properties), SSO, roles; extended with customer phone OTP sign-in |
 | treasury-api | Existing, extended | Invoices, payment intents, M-Pesa, PayHero, Paystack, C2B, AR, vendor bills, payouts, GL; extended with C2B account routes and the `account_payment` allocator |
 | erp-api | Existing | Staff, attendance, payroll, casual payments, assets |
-| notifications-api | Existing | SMS, WhatsApp, email, push with per-tenant sender |
+| notifications-api | Existing | Email and WhatsApp (the active channels) with per-tenant sender; maskani consumer added 2026-10-08 |
 | subscriptions-api | Existing | Plans, feature entitlements, limits |
 | marketflow-api, maps | Existing, R3 | Leads from enquiries; geocoding and map tiles |
 

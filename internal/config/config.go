@@ -29,13 +29,15 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
-	Host           string        `envconfig:"HTTP_HOST" default:"0.0.0.0"`
-	Port           int           `envconfig:"HTTP_PORT" default:"4000"`
-	ReadTimeout    time.Duration `envconfig:"HTTP_READ_TIMEOUT" default:"20s"`
-	WriteTimeout   time.Duration `envconfig:"HTTP_WRITE_TIMEOUT" default:"60s"`
-	IdleTimeout    time.Duration `envconfig:"HTTP_IDLE_TIMEOUT" default:"90s"`
-	PublicBaseURL  string        `envconfig:"HTTP_PUBLIC_BASE_URL" default:"https://maskaniapi.codevertexafrica.com"`
-	AllowedOrigins []string      `envconfig:"HTTP_ALLOWED_ORIGINS" default:"https://maskaniapp.codevertexafrica.com,https://maskani.codevertexafrica.com,https://accounts.codevertexafrica.com"`
+	Host          string        `envconfig:"HTTP_HOST" default:"0.0.0.0"`
+	Port          int           `envconfig:"HTTP_PORT" default:"4000"`
+	ReadTimeout   time.Duration `envconfig:"HTTP_READ_TIMEOUT" default:"20s"`
+	WriteTimeout  time.Duration `envconfig:"HTTP_WRITE_TIMEOUT" default:"60s"`
+	IdleTimeout   time.Duration `envconfig:"HTTP_IDLE_TIMEOUT" default:"90s"`
+	PublicBaseURL string        `envconfig:"HTTP_PUBLIC_BASE_URL" default:"https://maskaniapi.codevertexafrica.com"`
+	// AppURL is maskani-ui, the base of every link in a message (portal invites, walk-in decisions).
+	AppURL         string   `envconfig:"MASKANI_APP_URL" default:"https://maskaniapp.codevertexafrica.com"`
+	AllowedOrigins []string `envconfig:"HTTP_ALLOWED_ORIGINS" default:"https://maskaniapp.codevertexafrica.com,https://maskani.codevertexafrica.com,https://accounts.codevertexafrica.com"`
 }
 
 type PostgresConfig struct {

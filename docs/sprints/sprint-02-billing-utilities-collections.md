@@ -39,6 +39,7 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
 - [x] Collections: STK with per-attempt references, paybill routes, suspense queue and assign
 - [x] Payment consumer: account resolved from `metadata.unit_account_id`
 - [x] Statements API from the treasury account ledger
+- [x] Bill and receipt messages by email and WhatsApp, bills itemised with optional VAT, rate and paybill lines (notifications 5830c60)
 - [ ] Statement PDF and CSV
 - [ ] Reminder job (1, 7, 14 days)
 - [ ] Adjustments and bill queries (after demo)
@@ -64,5 +65,5 @@ Standing backend rules in [README.md](README.md), plus:
 | Invoice types and AR figures | One invoice-type registry; one "still owed" definition including credit notes | `treasury-receivables-credit-notes-dashboard-sql-stats-2026-09-26.md` |
 | Fleet-wide jobs | Keyset pagination with SQL predicates, never an unbounded `.All()`; jobs once per fleet via `ClaimPeriod` | `boi-treasury-pos-recurring-discrepancy-root-audit-2026-09-11.md`, `multi-pod-scaling-ratelimit-realtime-media-2026-09-29.md` |
 | Duplicate protection | Anchor idempotency on stable keys (period, receipt, intent), never on a created_at window | `boi-treasury-duplicate-receipts-incident-2026-09-14.md` |
-| Messages | SMS and WhatsApp through notifications-api; WhatsApp links always buttons; quiet hours | `feedback_whatsapp_links_as_buttons.md`, `feedback_notification_policies.md` |
+| Messages | Email and WhatsApp (the active channels) through notifications-api; WhatsApp links always buttons; quiet hours | `feedback_whatsapp_links_as_buttons.md`, `feedback_notification_policies.md` |
 | Live tests | KES 1 tests on both paybills only after the user confirms | `feedback_confirm_sensitive_commands.md` (global) |

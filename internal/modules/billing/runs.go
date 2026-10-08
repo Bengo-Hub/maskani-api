@@ -22,6 +22,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/unitcharge"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
@@ -358,6 +359,9 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 	if f.TreasuryBankAccountID != nil {
 		req.SettlementAccountID = f.TreasuryBankAccountID
 	}
+	// items is the bill breakdown carried on bill.issued, so the email and WhatsApp messages show
+	// each charge, not only the total.
+	items := make([]map[string]any, 0, len(l.Lines))
 	for _, raw := range l.Lines {
 		b, _ := json.Marshal(raw)
 		var ln Line
@@ -365,10 +369,11 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 		qty, _ := ln.Quantity.Float64()
 		amt, _ := ln.Amount.Float64()
 		price := amt
+		rated := false
 		if qty > 0 && ln.ChargeCode != "" {
 			rate, _ := ln.Rate.Float64()
 			if rate > 0 && ln.Quantity.Mul(ln.Rate).Round(2).Equal(ln.Amount) {
-				price = rate
+				price, rated = rate, true
 			} else {
 				qty = 1
 			}
@@ -377,6 +382,15 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 		}
 		req.Lines = append(req.Lines, treasury.InvoiceLine{Description: ln.Description, ItemSKU: ln.ChargeCode,
 			ItemType: "service", Quantity: qty, UnitPrice: price, TaxRate: ln.TaxRate})
+		item := map[string]any{"description": ln.Description, "amount": ln.Amount.StringFixed(2)}
+		// Quantity and rate only where they explain the amount (metered water, per-sqm charges).
+		if rated && !ln.Quantity.Equal(decimal.NewFromInt(1)) {
+			item["quantity"], item["rate"] = ln.Quantity.String(), ln.Rate.StringFixed(2)
+		}
+		if ln.Tax.IsPositive() {
+			item["tax"] = ln.Tax.StringFixed(2)
+		}
+		items = append(items, item)
 	}
 	inv, err := s.treasury.IssueInvoice(ctx, tenantID, req)
 	if err != nil {
@@ -397,7 +411,10 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 		"unit_code": l.UnitCode, "account_ref": acc.AccountRef, "amount": l.Total.StringFixed(2),
 		"due_date": run.DueDate.Format("2 Jan 2006"), "period": run.Period, "invoice_id": inv.ID,
 		"invoice_number": inv.InvoiceNumber, "pay_token": inv.PublicToken, "phone": acc.CustomerPhone,
-		"name": acc.CustomerName, "paybill": f.PaybillShortcode, "fund": f.Code,
+		"email": accounts.CustomerEmail(acc),
+		"name":  acc.CustomerName, "paybill": f.PaybillShortcode, "fund": f.Code, "fund_name": f.Name,
+		"items": items, "subtotal": l.Subtotal.StringFixed(2), "tax_total": l.TaxTotal.StringFixed(2),
+		"invoice_date": run.InvoiceDate.Format("2 Jan 2006"),
 	})
 	_ = tx.Commit()
 }

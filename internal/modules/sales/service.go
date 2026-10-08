@@ -223,7 +223,7 @@ func (s *Service) Reserve(ctx context.Context, actor uuid.UUID, in ReserveInput)
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone})
+	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email})
 	if err == nil && it.ReservationFee.IsPositive() {
 		inv, ierr := s.invoice(ctx, acc, treasury.RefReservationFee, res.ID, "Reservation fee "+u.Code, it.ReservationFee, now, now.AddDate(0, 0, days))
 		if ierr == nil {
@@ -370,7 +370,7 @@ func (s *Service) Activate(ctx context.Context, contractID uuid.UUID, signedAt t
 	if err != nil {
 		return nil, err
 	}
-	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone})
+	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email})
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +432,7 @@ func (s *Service) Activate(ctx context.Context, contractID uuid.UUID, signedAt t
 	tenantID, _ := tenantguard.TenantID(ctx)
 	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, sc.ID.String(), events.SaleContractActivated, map[string]any{
 		"contract_id": sc.ID, "contract_number": sc.ContractNumber, "unit_code": u.Code, "buyer": buyer.DisplayName,
-		"phone": buyer.Phone, "account_ref": acc.AccountRef, "net_price": sc.NetPrice.StringFixed(2),
+		"phone": buyer.Phone, "email": buyer.Email, "account_ref": acc.AccountRef, "net_price": sc.NetPrice.StringFixed(2),
 	}); err != nil {
 		_ = tx.Rollback()
 		return nil, err
@@ -577,6 +577,7 @@ func (s *Service) SyncProgress(ctx context.Context, accountID uuid.UUID) error {
 			_ = s.client.Unit.UpdateOneID(sc.UnitID).SetSaleStatus(unit.SaleStatusFullyPaid).Exec(ctx)
 			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, sc.ID.String(), events.SaleContractFullyPaid, map[string]any{
 				"contract_id": sc.ID, "contract_number": sc.ContractNumber, "account_ref": acc.AccountRef, "phone": acc.CustomerPhone,
+				"email": accounts.CustomerEmail(acc), "name": acc.CustomerName,
 			})
 		}
 		_ = up.Exec(ctx)

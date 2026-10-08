@@ -16,7 +16,7 @@ SRDD weeks 2 to 3. Requirements FR-01 to FR-04, FR-06 to FR-15, FR-18, FR-19.
 | Vehicles | Plates per unit | Yes |
 | Staff per property | Property role on outlet assignment, ERP employee link | Yes |
 | Import | CSV for properties, units, parties, ownerships, opening balances; dry run report; commit in batches of 500 | Units and owners |
-| Owner portal identity | Party invite creates or links the auth user (`/s2s/tenants/{id}/members`), SMS invite; phone OTP sign-in through auth-api; terms acceptance recorded | Yes |
+| Owner portal identity | Party invite creates or links the auth user (`/s2s/tenants/{id}/members`), invite by WhatsApp and email; phone OTP sign-in through auth-api; terms acceptance recorded | Yes |
 | `/auth/me` | Roles, permissions, assigned properties, modules, party links | Yes |
 | Cross-tenant tests | Two tenants with overlapping unit codes | Yes |
 
@@ -36,7 +36,8 @@ API state as of 2026-10-08. The console and portal screens are in maskani-ui spr
 - [x] Staff per property: list, assign, remove
 - [ ] CSV import with dry run
 - [x] Owner portal API: party invite, `/me/*` routes, terms acceptance
-- [ ] Phone OTP sign-in (waits on auth-api)
+- [x] Phone code sign-in in auth-api, code delivered on WhatsApp (auth-api dd2080c)
+- [x] Portal invite message by WhatsApp and email (notifications 05efd7f)
 - [x] Cross-tenant test: tenant guard integration test passes on the local database
 - [ ] maskani-ui console and portal screens
 

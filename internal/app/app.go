@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect"
@@ -183,7 +184,7 @@ func New(ctx context.Context) (*App, error) {
 	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, PortalURL: "https://maskaniapp.codevertexafrica.com",
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log}}
 
 	var limiter *ratelimit.Limiter
