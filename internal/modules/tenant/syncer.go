@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	entoutlet "github.com/bengobox/maskani-api/internal/ent/outlet"
 	enttenant "github.com/bengobox/maskani-api/internal/ent/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 )
@@ -321,7 +322,7 @@ func (s *Syncer) SyncOutlets(ctx context.Context, tenantID uuid.UUID, tenantSlug
 		if it.Address != "" {
 			q.SetAddressJSON(map[string]any{"street": it.Address})
 		}
-		if err := q.OnConflict().UpdateNewValues().Exec(ctx); err != nil {
+		if err := q.OnConflictColumns(entoutlet.FieldID).UpdateNewValues().Exec(ctx); err != nil {
 			s.log.Warn("outlet upsert failed", zap.String("code", it.Code), zap.Error(err))
 		}
 	}
