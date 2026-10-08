@@ -197,7 +197,14 @@ func mount(r chi.Router, d Deps) {
 	r.Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
 	r.With(perm(rbac.PermUsersView)).Get("/users", h.ListUsers)
 	r.With(perm(rbac.PermUsersView)).Get("/roles", h.ListRoles)
+	r.With(perm(rbac.PermUsersView)).Get("/permissions", h.ListPermissions)
+	r.With(perm(rbac.PermUsersManage)).Post("/roles", h.CreateRole)
+	r.With(perm(rbac.PermUsersManage)).Post("/roles/customize", h.CustomizeRole)
+	r.With(perm(rbac.PermUsersManage)).Put("/roles/{id}", h.UpdateRole)
+	r.With(perm(rbac.PermUsersManage)).Delete("/roles/{id}", h.DeleteRole)
+	r.With(perm(rbac.PermUsersManage)).Post("/users/invite", h.InviteStaff)
 	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/roles", h.SetUserRoles)
+	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/status", h.SetUserStatus)
 
 	// Register.
 	r.Group(func(g chi.Router) {
@@ -236,6 +243,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingView)).Get("/funds", h.ListFunds)
 		g.With(perm(rbac.PermBillingManage)).Patch("/funds/{id}", h.UpdateFund)
 		g.With(perm(rbac.PermBillingView)).Get("/charge-types", h.ListCharges)
+		g.With(perm(rbac.PermBillingManage)).Get("/charge-types/catalogue", h.ChargeCatalogue)
 		g.With(perm(rbac.PermBillingManage)).Post("/charge-types", h.CreateCharge)
 		g.With(perm(rbac.PermBillingManage)).Post("/charge-types/enable", h.EnableCharge)
 		g.With(perm(rbac.PermBillingManage)).Patch("/charge-types/{id}", h.UpdateCharge)

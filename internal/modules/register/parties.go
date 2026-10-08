@@ -400,6 +400,37 @@ func (s *Service) Invite(ctx context.Context, partyID uuid.UUID, tenantSlug, por
 	return p, tx.Commit()
 }
 
+// StaffInvite is a new estate staff member to add from Maskani (no trip to Codevertex accounts).
+type StaffInvite struct {
+	Email       string      `json:"email"`
+	Name        string      `json:"name"`
+	Phone       string      `json:"phone"`
+	Roles       []string    `json:"roles"`        // Maskani role codes
+	PropertyIDs []uuid.UUID `json:"property_ids"` // optional; none means every property
+}
+
+// InviteStaffMember creates or attaches the person in auth-api (which owns identities) as a tenant
+// member with the neutral "member" role, added to any roles they already hold. The Maskani roles
+// are given locally by the caller. A brand-new account gets a welcome email with the sign-in link
+// from auth-api, and a temporary password returned once.
+func (s *Service) InviteStaffMember(ctx context.Context, tenantID uuid.UUID, in StaffInvite) (*authapi.MemberResult, error) {
+	email := strings.ToLower(strings.TrimSpace(in.Email))
+	if email == "" || !strings.Contains(email, "@") {
+		return nil, httpx.Invalid("a valid email is required; staff sign in with it")
+	}
+	if len(in.Roles) == 0 {
+		return nil, httpx.Invalid("choose at least one role")
+	}
+	req := authapi.MemberRequest{Email: email, Name: strings.TrimSpace(in.Name), Roles: []string{"member"}, MergeRoles: true}
+	if p := strings.TrimSpace(in.Phone); p != "" {
+		if secure.NormalizePhone(p) == "" {
+			return nil, httpx.Invalid("phone number is not valid")
+		}
+		req.Phone = "+" + secure.NormalizePhone(p)
+	}
+	return s.auth.AddMember(ctx, tenantID, req)
+}
+
 // AssignStaff assigns a staff user to a property (its outlet) with a property role.
 func (s *Service) AssignStaff(ctx context.Context, propertyID, authUserID, actor uuid.UUID, role, erpEmployeeID string) (*ent.MaskaniUserOutlet, error) {
 	prop, err := s.client.Property.Get(ctx, propertyID)

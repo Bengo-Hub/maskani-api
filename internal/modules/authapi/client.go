@@ -52,6 +52,9 @@ type MemberRequest struct {
 type MemberResult struct {
 	UserID string `json:"user_id"`
 	Status string `json:"status"`
+	// TempPassword is set once, when the call created a brand-new account (email invites). Show it
+	// to the inviting admin once; never store or log it.
+	TempPassword string `json:"temp_password,omitempty"`
 }
 
 // AddMember creates or links a tenant member and returns the auth user id.

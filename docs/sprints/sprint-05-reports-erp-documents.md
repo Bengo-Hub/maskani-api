@@ -29,6 +29,8 @@ API state as of 2026-10-08.
 - [ ] Nightly `daily_stats` rebuild
 - [x] Notices: create, send, scheduled job, deliveries, portal list
 - [x] Notices delivered by WhatsApp and email only, one-line WhatsApp parameter, urgent subject for emergencies (bddeb41, notifications 0cbe513)
+- [x] Notices handed to notifications-api as approved service-notice broadcasts: `maskani_residents` audience paged from `GET /api/v1/internal/residents/reach`, completion consumer updates counts; direct send kept as fallback (`9593fb5`, notifications `2a0d2c8`)
+- [x] Rich text sanitised on save (bluemonday), plain text for WhatsApp and the marketplace (`9593fb5`)
 - [ ] ERP staff picker
 - [ ] Audit log writes (schema exists)
 - [ ] Budgets, documents, privacy (after demo)

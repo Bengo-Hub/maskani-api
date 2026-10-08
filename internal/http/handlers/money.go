@@ -10,6 +10,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
+	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
@@ -49,6 +50,29 @@ func (h *H) ListCharges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+}
+
+// ChargeCatalogue is GET /charge-types/catalogue: the platform's standard charges this estate has
+// not added yet, for "Add from the catalogue".
+func (h *H) ChargeCatalogue(w http.ResponseWriter, r *http.Request) {
+	have, err := h.Billing.ListCharges(r.Context(), true)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	taken := make(map[string]bool, len(have))
+	for _, c := range have {
+		taken[c.Code] = true
+	}
+	out := make([]map[string]string, 0, len(settings.ChargeDefaults))
+	for _, d := range settings.ChargeDefaults {
+		if taken[d.Code] {
+			continue
+		}
+		out = append(out, map[string]string{"code": d.Code, "name": d.Name, "charge_group": d.Group, "basis": d.Basis,
+			"frequency": d.Frequency, "bill_to": d.BillTo, "fund_code": d.Fund})
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
 // CreateCharge is POST /charge-types.

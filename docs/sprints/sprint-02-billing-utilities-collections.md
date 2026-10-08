@@ -30,6 +30,7 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
 
 - [x] Funds: list and update (bank account, paybill, prefix)
 - [x] Charge catalogue: seeded, enable, create, update
+- [x] `GET /charge-types/catalogue` lists standard charges not yet added (2026-10-08)
 - [x] Rates: dated rates per charge
 - [x] Unit accounts with C2B routes registered by the `maskani:c2b-routes` job
 - [x] treasury C2B account routes, allocator and account ledger (treasury e8b5dbc, 059f27a)

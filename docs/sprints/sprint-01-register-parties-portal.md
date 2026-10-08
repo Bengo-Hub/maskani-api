@@ -34,7 +34,10 @@ API state as of 2026-10-08. The console and portal screens are in maskani-ui spr
 - [x] Unit parties: link and end with dates
 - [x] Vehicles per unit
 - [x] Staff per property: list, assign, remove
-- [ ] CSV import with dry run
+- [x] CSV import with dry run (`7cf73f9`; routes on `imports.run` since `9593fb5`)
+- [x] Only property outlets and property people admitted; demo estate seeded on codevertex-demo (`65683d3`, `84576a0`)
+- [x] Catalogue entries can be added by whoever manages what the list describes (`9593fb5`)
+- [x] Roles like hospital-api (customise default, create, edit, reset), staff invite over S2S, suspend (2026-10-08)
 - [x] Owner portal API: party invite, `/me/*` routes, terms acceptance
 - [x] Phone code sign-in in auth-api, code delivered on WhatsApp (auth-api dd2080c)
 - [x] Portal invite message by WhatsApp and email (notifications 05efd7f)

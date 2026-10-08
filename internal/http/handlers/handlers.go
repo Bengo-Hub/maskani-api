@@ -229,16 +229,6 @@ func (h *H) ListUsers(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
-// ListRoles is GET /roles.
-func (h *H) ListRoles(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.RBAC.ListRoles(r.Context(), access(r).TenantID)
-	if err != nil {
-		httpx.Fail(w, err)
-		return
-	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
-}
-
 // SetUserRoles is PUT /users/{id}/roles.
 func (h *H) SetUserRoles(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")

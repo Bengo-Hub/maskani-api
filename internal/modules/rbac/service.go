@@ -197,8 +197,8 @@ func (s *Service) EnsureUser(ctx context.Context, id Identity) (*ent.MaskaniUser
 		has, err := s.client.UserRoleAssignment.Query().
 			Where(userroleassignment.TenantID(id.TenantID), userroleassignment.UserID(userID)).Exist(ctx)
 		if err == nil && !has {
-			if role, rerr := s.client.MaskaniRole.Query().
-				Where(maskanirole.RoleCode(roleCode), maskanirole.TenantIDIsNil()).Only(ctx); rerr == nil {
+			if roles, rerr := s.EffectiveRoles(ctx, id.TenantID, []string{roleCode}); rerr == nil && len(roles) == 1 {
+				role := roles[0]
 				_ = s.client.UserRoleAssignment.Create().
 					SetTenantID(id.TenantID).SetUserID(userID).SetRoleID(role.ID).SetAssignedBy(id.AuthUserID).
 					OnConflictColumns(userroleassignment.FieldTenantID, userroleassignment.FieldUserID, userroleassignment.FieldRoleID).
@@ -310,9 +310,8 @@ func (s *Service) SetUserRoles(ctx context.Context, tenantID, userID, actor uuid
 	if err != nil || user.TenantID != tenantID {
 		return fmt.Errorf("user not found")
 	}
-	roles, err := s.client.MaskaniRole.Query().
-		Where(maskanirole.RoleCodeIn(roleCodes...),
-			maskanirole.Or(maskanirole.TenantIDIsNil(), maskanirole.TenantID(tenantID))).All(ctx)
+	// The tenant's own copy of a role replaces the global one, so a code never assigns both.
+	roles, err := s.EffectiveRoles(ctx, tenantID, roleCodes)
 	if err != nil {
 		return err
 	}
@@ -340,13 +339,6 @@ func (s *Service) SetUserRoles(ctx context.Context, tenantID, userID, actor uuid
 	}
 	s.invalidate(tenantID, user.AuthServiceUserID)
 	return nil
-}
-
-// ListRoles returns the global roles plus the tenant's own.
-func (s *Service) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]*ent.MaskaniRole, error) {
-	return s.client.MaskaniRole.Query().
-		Where(maskanirole.Or(maskanirole.TenantIDIsNil(), maskanirole.TenantID(tenantID))).
-		WithPermissions().Order(ent.Asc(maskanirole.FieldName)).All(ctx)
 }
 
 // UserView is a user row with role codes for the admin screen.
