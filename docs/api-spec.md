@@ -166,6 +166,7 @@ Staff side (module `gate`):
 | GET `/gate/events?property_id=` (keyset) | Gate log | `gate.view` |
 | GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes; POST returns `code` and `qr_token` once | `gate.view` / `gate.manage` |
 | GET `/incidents` (keyset; `property_id`, `open`); POST `/incidents` | Incidents | `gate.view` |
+| GET `/incidents/{id}` | One incident (incident alert deep link), property scoped | `gate.view` |
 | `/guard-posts`, `/patrol-checkpoints`, `/patrols/scans`; PATCH `/incidents/{id}` | | planned (sprint 4) |
 
 Tablet side, `/api/v1/gate` with header `X-Device-Key`:
@@ -177,7 +178,7 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 | GET `/gate/sync` | `{device, cache: {server_time, passes: [...device-salted hashes], badges: [{id, badge_number, name, role, vendor_id, has_pin}]}}`; badges are active personnel deployed to the device's property |
 | POST `/gate/sign-on` `{badge, pin}` | Guard sign-on; `200 {guard: {id, name, badge}, signed_on_at}`; `401 invalid_credentials` for any wrong badge, PIN or a guard not deployed to this property. Rate limited per device (10 a minute) and per IP (30 a minute) |
 | GET `/gate/units` | Unit codes for the walk-in host picker |
-| GET `/gate/walk-ins/{id}` | Host decision so far |
+| GET `/gate/walk-ins/{id}` | Host decision so far; `{id}` is the event id or the `client_event_id` the tablet generated, scoped to the calling device |
 | POST `/gate/incidents` | Incident from the gate |
 
 ## Communication (module `communication`)
