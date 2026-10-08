@@ -37,15 +37,17 @@ As of 2026-10-08.
 - [x] notifications-api: `maskani.>` consumer, email and WhatsApp templates, itemised bills (dde0a44, 05efd7f, 5830c60)
 - [x] Bill-to email kept in `unit_accounts.metadata.customer_email`; events carry email; bill events carry items, subtotal and VAT
 - [ ] Sync the `maskani_*` WhatsApp templates to Meta after the notifications deploy (dry run first)
-- [ ] devops-k8s apps for maskani-ui and maskani-commerce committed
-- [ ] HA values (min 2 replicas, PDB) after the first image; fleet-health-watcher URLs
+- [x] devops-k8s apps for maskani-ui and maskani-commerce committed (`b3846451`), ArgoCD apps applied; CI tag bumps now land through `update_helm_values`
+- [x] HA values: API 2 replicas, HPA 2 to 3, PDB (2026-10-08)
+- [x] PgBouncer fix: no `statement_timeout` startup parameter (it failed every pool connection, `fb46c61`)
+- [ ] fleet-health-watcher URLs
 - [x] `seed-tenant` command: idempotent Shaba Village dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
 - [x] Live updates: `GET /stream` (SSE, `?token=`), realtime hub on the shared FanoutHub over NATS `_rt.maskani.*` (2026-10-08)
 - [x] Keyset pagination on growing lists, limit capped at 100, migration `keyset_list_indexes` (2026-10-08)
 - [ ] Swagger annotations
-- [ ] maskani-ui and maskani-commerce scaffolds and repos
+- [x] maskani-ui and maskani-commerce scaffolds and repos (both public, CI green)
 - [x] subscriptions-api: `plans_maskani.go` (four tiers from SRDD 25.3), `maskani_*` module codes, `max_units`, plan matrix doc, test (641e99c)
-- [ ] shared-ui-lib: app switcher entry
+- [x] shared-ui-lib: app switcher entry (v0.1.104)
 
 ## Acceptance
 

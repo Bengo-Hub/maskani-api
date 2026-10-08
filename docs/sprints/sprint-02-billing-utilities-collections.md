@@ -46,7 +46,7 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
 - [ ] Reminder job (1, 7, 14 days)
 - [ ] Adjustments and bill queries (after demo)
 - [ ] KES 1 live tests on both paybills (user confirms first)
-- [ ] maskani-ui billing, meters and collections screens
+- [x] maskani-ui billing, meters and collections screens (meter photo optional since `fb46c61`)
 
 ## Acceptance
 

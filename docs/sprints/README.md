@@ -14,7 +14,8 @@ marks what is in the **demo slice** and what remains.
 | S5 | [sprint-05-reports-erp-documents.md](sprint-05-reports-erp-documents.md) | Planned |
 | S6 | [sprint-06-hardening-launch.md](sprint-06-hardening-launch.md) | Planned |
 | S7 | [sprint-07-r2-rentals.md](sprint-07-r2-rentals.md) | Planned (R2) |
-| S8 | [sprint-08-r3-marketplace.md](sprint-08-r3-marketplace.md) | Planned (R3, R4 notes) |
+| S8 | [sprint-08-r3-marketplace.md](sprint-08-r3-marketplace.md) | Planned (R3) |
+| S9 | [sprint-09-r4-extensions.md](sprint-09-r4-extensions.md) | Planned (R4, by demand) |
 
 UI work for each sprint is in `maskani-ui/docs/sprints/`; marketplace work in
 `maskani-commerce/docs/sprints/`.

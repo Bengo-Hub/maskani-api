@@ -42,7 +42,7 @@ API state as of 2026-10-08. The console and portal screens are in maskani-ui spr
 - [x] Party detail `GET /parties/{id}` with masked ids and unit links (2026-10-08)
 - [x] Property scope on staff list and assign, party links and vehicles; handler scope test (2026-10-08)
 - [x] `/auth/me` returns `bypass` for platform owners, superusers and S2S (2026-10-08)
-- [ ] maskani-ui console and portal screens
+- [x] maskani-ui console and portal screens
 
 ## Acceptance
 
