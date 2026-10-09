@@ -162,7 +162,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET, POST `/me/passes`; POST `/me/passes/{id}/cancel` | Visitor passes for own units |
 | GET, POST `/me/requests`; POST `/me/requests/{id}/actions` | Work requests; confirm or reopen within 7 days |
 | GET `/me/notices`; POST `/me/terms/accept` `{version}` | Notices; terms acceptance |
-| POST `/me/walk-ins/{id}/decide` `{approve}` | Host decision on a walk-in |
+| POST `/me/walk-ins/{id}/decide` `{approve}` | Host decision on a walk-in, recorded with `decided_by: host`. The 5 minutes run from the latest ask (a ring restarts them). A walk-in the guard already settled comes back unchanged, so the page can say who answered |
 | POST `/me/queries`; GET, POST `/me/household` | planned (sprint 2, sprint 1) |
 
 ## Works (module `maintenance`) and vendors (module `providers`)

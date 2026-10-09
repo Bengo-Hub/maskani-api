@@ -697,7 +697,9 @@ func (s *Service) DeviceEvent(ctx context.Context, deviceID uuid.UUID, id string
 		Where(gateevent.DeviceID(deviceID), gateevent.ClientEventID(id)).Only(ctx)
 }
 
-// Decide records the host's walk-in decision.
+// Decide records the host's walk-in decision. A walk-in the guard already settled is returned as
+// it stands (decided_by tells the host who answered). The 5 minutes run from the latest ask, so an
+// answer to a ring counts.
 func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (*ent.GateEvent, error) {
 	ev, err := s.client.GateEvent.Get(ctx, eventID)
 	if err != nil {
@@ -710,10 +712,16 @@ func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (
 	if approve {
 		d = gateevent.DecisionApproved
 	}
-	if time.Since(ev.OccurredAt) > 5*time.Minute {
+	asked := ev.OccurredAt
+	if last, ok := ev.Metadata["rang_at"].(string); ok {
+		if t, err := time.Parse(time.RFC3339Nano, last); err == nil && t.After(asked) {
+			asked = t
+		}
+	}
+	if time.Since(asked) > 5*time.Minute {
 		d = gateevent.DecisionTimeout
 	}
-	ev, err = ev.Update().SetDecision(d).SetDecidedAt(time.Now()).Save(ctx)
+	ev, err = ev.Update().SetDecision(d).SetDecidedBy("host").SetDecidedAt(time.Now()).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
