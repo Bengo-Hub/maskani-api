@@ -46,7 +46,7 @@ type Document struct {
 	// PartyIds holds the value of the "party_ids" field.
 	PartyIds []string `json:"party_ids,omitempty"`
 	// FileKey holds the value of the "file_key" field.
-	FileKey string `json:"file_key,omitempty"`
+	FileKey string `json:"-"`
 	// Sha256 holds the value of the "sha256" field.
 	Sha256 string `json:"sha256,omitempty"`
 	// VerificationCode holds the value of the "verification_code" field.
@@ -349,8 +349,7 @@ func (_m *Document) String() string {
 	builder.WriteString("party_ids=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PartyIds))
 	builder.WriteString(", ")
-	builder.WriteString("file_key=")
-	builder.WriteString(_m.FileKey)
+	builder.WriteString("file_key=<sensitive>")
 	builder.WriteString(", ")
 	builder.WriteString("sha256=")
 	builder.WriteString(_m.Sha256)

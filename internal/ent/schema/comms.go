@@ -114,7 +114,7 @@ func (Document) Fields() []ent.Field {
 		field.UUID("entity_id", uuid.UUID{}),
 		field.UUID("unit_id", uuid.UUID{}).Optional().Nillable(),
 		field.Strings("party_ids").Optional(),
-		field.String("file_key").Optional(),
+		field.String("file_key").Optional().Sensitive(), // storage path under the media root; never sent to clients
 		field.String("sha256").Optional(),
 		field.String("verification_code").NotEmpty(),
 		field.Enum("status").Values("draft", "issued", "partly_signed", "executed", "expired", "superseded").Default("draft"),
