@@ -50,7 +50,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Property scope on Reserve, CreateContract, GetContract, ActivateContract, ReleaseMilestone and AssignSuspense (FR-13, `15375db`)
 - [x] Instalment invoicing loads contracts, accounts and funds for the batch in three queries, each invoice's instalment and contract total commit together; schedules written with `CreateBulk`; reservation expiry in set-based batches (NFR-05, `b8be252`)
 - [x] Progress sync reads all instalments in one query and keeps the mirrored amount for instalments older than the 500-invoice ledger page instead of resetting them to zero (bug fix, `b8be252`)
-- [ ] Indexes `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (wave 1b, index migration)
+- [x] Indexes `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (`3ae57a5`)
 - [x] Portal purchase plans in one instalment query (`b8be252`)
 - [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
 - [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)

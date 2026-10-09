@@ -58,7 +58,11 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Phone numbers validated with the fleet's httpware `contact` rules, stored form unchanged (`b8be252`)
 - [ ] Custom field definitions with validation of `custom_fields` on write, filters and exports (FR-07, wave 2.11)
 - [ ] Layered configuration: property overrides read by the module check (FR-07, FR-08, wave 2.11)
-- [ ] Module switched off keeps its data readable and exportable; only writes and jobs stop (FR-09, wave 1b)
+- [x] Module switched off (or off the plan) keeps its data readable: reads pass with `X-Module-Read-Only`, writes refused (FR-09, `3ae57a5`); jobs skipping switched-off modules still open
+- [x] Terms acceptance read back from the server: `/auth/me` carries `terms_accepted_version` (FR-19, `4d05518`)
+- [x] Tenant syncer on shared-service-client with a slug cache; access facts cached 30 seconds and cleared on staff, role, invite and link changes (`35df00b`)
+- [x] Keyset indexes on units and parties (`3ae57a5`)
+- [x] Imports: validated jobs expire after 7 days and lose their raw rows; stuck commits resume (`35df00b`)
 - [ ] Plan limits on units and staff users counted in SQL (FR-03, wave 2.4)
 - [ ] Terms and privacy acceptance history (version, time, IP) read back by the portal instead of device storage (FR-19, wave 2.4)
 - [ ] Links end on their `end_date` by a daily job: portal and pass access revoked, final reading requested, bill-to reverts after `revert_after_days` (FR-14, SRDD 8.3 and 16.4, wave 2.7)

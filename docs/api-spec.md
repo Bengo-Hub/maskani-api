@@ -213,6 +213,8 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 | Method and path | Purpose | Permission |
 |---|---|---|
 | GET `/reports/dashboard?property_id=&period=` | See below | `reports.view` |
+| GET `/reports/insights?property_id=&period=` | Staff dashboard business view: `months` (12 months of billed, collected, collection_rate, work_opened, work_closed, contracts_signed, sales_value), `kpis` (each with `last_month` and `last_year`; outstanding, days_sales_outstanding, occupancy_pct, available_for_sale, open_work_orders, avg_resolve_hours_90d), `forecast` (12 months of instalments plus recurring), `forecast_basis` (inputs and method), `sales` (pace, months to sell out), `revenue_mix`, `blocks`, `work_by_category` | `reports.view` |
+| GET `/reports/arrears?property_id=&q=&min=` | Owing accounts, largest first (keyset); `q` matches the account reference prefix or the owner's name, `min` the smallest balance; phones masked without `billing.collect` | `reports.view` |
 | GET `/reports/collections`, `/instalment-receivables`, `/maintenance`, `/vendor-scorecard`, `/security`; CSV and PDF export | | planned (sprint 5) |
 
 The dashboard reads through the read-only database and is cached for 60 seconds per tenant, scope

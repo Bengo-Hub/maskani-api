@@ -43,7 +43,9 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] `daily_stats`: collections written in the consumer transaction on the payment's day (`15375db`); nightly rebuild of every other metric for every tenant in one statement each (`bf20a0d`)
 - [x] `weeklySQL` compares `daily_stats.day` directly (`bf20a0d`)
 - [x] Sales position cached 60 seconds (`bf20a0d`)
-- [ ] Reports suite: collections by month, charge type and block; payment channel; 24-month instalment receivables; handover and title tracker; water trend; maintenance performance; vendor scorecard; security summary; every figure links to its records (FR-66, wave 2.3)
+- [x] Business insights API for the staff dashboard (user request 2026-10-09): 12-month trends, KPIs against last month and last year, days sales outstanding, occupancy, 12-month cash-in forecast with its method, sales pace and months to sell out, revenue mix by charge, blocks compared, maintenance by category (`e55188a`, `GET /reports/insights`)
+- [x] Arrears searched in SQL (`q`, `min`) (`e166219`)
+- [ ] Reports suite (remaining): collections by month, charge type and block as an exportable report; payment channel; 24-month instalment receivables; handover and title tracker; water trend; maintenance performance; vendor scorecard; security summary; every figure links to its records (FR-66, wave 2.3)
 - [ ] Exports `?format=pdf|csv|xlsx` on every report through the copied docs engine (FR-66, wave 2.1)
 - [x] Notice direct-send fallback pages recipients in 500s and resumes a send a stopped pod left half done (`b8be252`); deliveries list paging still open
 - [x] Property scope on notice create (estate-wide needs every property), send and deliveries and on enquiry update (`15375db`)

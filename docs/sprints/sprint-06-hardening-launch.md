@@ -34,7 +34,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md`, wave 3 unl
 
 - [ ] The live-diff migrate drops undeclared indexes and partitions: partitions need an Atlas exclusion and a rotation job before they ship
 - [ ] Cross-tenant suite extended to every route, export, file link, event and report added in waves 1 and 2
-- [ ] `tenantguard.With` on a system context keeps the system flag, so per-tenant scoping inside system jobs does nothing; jobs that write must set a real tenant context (wave 1b)
+- [x] `tenantguard.With` now drops an inherited system flag, so a job narrowing to one tenant is guarded again (test, `35df00b`)
 - [ ] Load script in the repo: 1,000-unit billing run and 50 requests per second
 - [ ] Ops items, each confirmed with the user first: Meta sync of `maskani_*` templates, prune-users dry runs then `--apply`, fleet-health-watcher URLs, KES 1 tests, restore drill
 

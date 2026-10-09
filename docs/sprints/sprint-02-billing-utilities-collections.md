@@ -62,9 +62,9 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Water balance and arrears read from the replica with a 60 second cache invalidated across pods (`bf20a0d`)
 - [x] Billing issue and retry run under a per-run fleet lease, mark themselves alive per batch, and a two-minute job resumes runs a stopped pod left in "issuing" (NFR-06, `bf20a0d`)
 - [x] Billing run accounts read once per batch of 500 instead of once per line (`bf20a0d`)
-- [ ] C2B route registration batched with a partial index on unregistered accounts (wave 1b, index migration)
+- [x] Partial index on unregistered paybill accounts for the route job (`3ae57a5`); the job still makes one treasury call per account, which the route API requires
 - [x] Payment consumer: consumed-event row, daily collection and receipt event in one transaction; collections counted on the payment's own day (NFR-08, `15375db`)
-- [ ] `billing_run_lines(tenant_id, treasury_invoice_id)` index for the payment consumer lookup (wave 1b, index migration)
+- [x] `billing_run_lines(tenant_id, treasury_invoice_id)` index for the payment consumer lookup (`3ae57a5`)
 - [x] Treasury and auth-api errors keep only the service's own message before they are stored or returned (`15375db`)
 
 ## Acceptance
