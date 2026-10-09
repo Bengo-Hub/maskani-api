@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
@@ -27,7 +28,9 @@ func (GateDevice) Fields() []ent.Field {
 }
 
 func (GateDevice) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "property_id", "status"), index.Fields("device_key_hash").Unique()}
+	return []ent.Index{index.Fields("tenant_id", "property_id", "status"), index.Fields("device_key_hash").Unique(),
+		// The offline-tablet job scans every tenant for active devices not yet alerted.
+		index.Fields("last_seen_at").Annotations(entsql.IndexWhere("status = 'active' AND offline_alerted = false"))}
 }
 
 // GuardPost is a manned post with guard counts per shift.
@@ -190,6 +193,10 @@ func (GateEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "device_id", "client_event_id").Unique(),
 		index.Fields("tenant_id", "property_id", "occurred_at"),
+		// The gate log pages by (created_at DESC, id DESC) per property.
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		// The 90-day retention purge scans every tenant by age.
+		index.Fields("occurred_at"),
 	}
 }
 

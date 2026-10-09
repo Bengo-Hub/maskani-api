@@ -266,6 +266,12 @@ func (WorkOrder) Indexes() []ent.Index {
 		index.Fields("tenant_id", "resolution_due_at").
 			Annotations(entsql.IndexWhere("status NOT IN ('completed','confirmed','closed','cancelled')")),
 		index.Fields("tenant_id", "requested_by_party_id"),
+		// Keyset lists, by property and tenant wide.
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
+		// The SLA breach job scans every tenant: only open, unflagged orders, by due time.
+		index.Fields("resolution_due_at").
+			Annotations(entsql.IndexWhere("sla_breached = false AND status NOT IN ('completed','confirmed','closed','cancelled')")),
 	}
 }
 

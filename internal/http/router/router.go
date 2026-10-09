@@ -57,7 +57,7 @@ func New(d Deps) http.Handler {
 		AllowedOrigins:   d.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Origin", "X-Request-ID", "X-Tenant-ID", "X-Tenant-Slug", "X-API-Key", "Idempotency-Key", "X-Outlet-ID", "X-Device-Key"},
-		ExposedHeaders:   []string{"Link", "Retry-After"},
+		ExposedHeaders:   []string{"Link", "Retry-After", "X-Module-Read-Only"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))

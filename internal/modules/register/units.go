@@ -254,7 +254,7 @@ type UnitCode struct {
 // ListUnitCodes returns every active unit code of a property (pickers, gate host lookup).
 func (s *Service) ListUnitCodes(ctx context.Context, propertyID uuid.UUID) ([]UnitCode, error) {
 	rows, err := s.client.Unit.Query().Where(unit.PropertyID(propertyID), unit.StatusEQ(unit.StatusActive)).
-		Order(ent.Asc(unit.FieldCode)).Select(unit.FieldID, unit.FieldCode).All(ctx)
+		Order(ent.Asc(unit.FieldCode)).Select(unit.FieldID, unit.FieldCode).Limit(5000).All(ctx)
 	if err != nil {
 		return nil, err
 	}

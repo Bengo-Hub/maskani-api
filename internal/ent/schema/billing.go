@@ -177,6 +177,8 @@ func (UnitAccount) Indexes() []ent.Index {
 		// Keyset lists: accounts newest first, arrears largest balance first.
 		index.Fields("tenant_id", "created_at", "id"),
 		index.Fields("tenant_id", "balance", "id"),
+		// The paybill route job scans every tenant for accounts not yet registered with treasury.
+		index.Fields("created_at").Annotations(entsql.IndexWhere("c2b_route_registered_at IS NULL AND status = 'active'")),
 	}
 }
 
@@ -217,6 +219,8 @@ func (BillingRun) Indexes() []ent.Index {
 		index.Fields("tenant_id", "status"),
 		index.Fields("tenant_id", "property_id", "created_at", "id"),
 		index.Fields("tenant_id", "created_at", "id"),
+		// The resume job scans every tenant for runs left issuing.
+		index.Fields("updated_at").Annotations(entsql.IndexWhere("status = 'issuing'")),
 	}
 }
 
@@ -256,6 +260,7 @@ func (BillingRunLine) Indexes() []ent.Index {
 		index.Fields("run_id", "unit_account_id").Unique(),
 		index.Fields("tenant_id", "status"),
 		index.Fields("tenant_id", "unit_account_id"),
+		index.Fields("tenant_id", "treasury_invoice_id"), // payment consumer: invoice to run line
 	}
 }
 

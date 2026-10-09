@@ -110,7 +110,7 @@ func (s *Service) CreateMeter(ctx context.Context, in MeterInput) (*ent.Meter, e
 // ListMeters returns a property's meters.
 func (s *Service) ListMeters(ctx context.Context, propertyID uuid.UUID) ([]*ent.Meter, error) {
 	return s.client.Meter.Query().Where(meter.PropertyID(propertyID)).
-		Order(ent.Asc(meter.FieldKind), ent.Asc(meter.FieldWalkingOrder), ent.Asc(meter.FieldSerial)).All(ctx)
+		Order(ent.Asc(meter.FieldKind), ent.Asc(meter.FieldWalkingOrder), ent.Asc(meter.FieldSerial)).Limit(5000).All(ctx)
 }
 
 // RoundRow is one meter on a round with its previous and current reading.

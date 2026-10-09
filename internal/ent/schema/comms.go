@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -39,7 +40,9 @@ func (Notice) Edges() []ent.Edge {
 
 func (Notice) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "status", "scheduled_at"), index.Fields("tenant_id", "created_at", "id"),
-		index.Fields("tenant_id", "property_id", "created_at", "id")}
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		// The scheduled-notices job scans every tenant for notices now due.
+		index.Fields("scheduled_at").Annotations(entsql.IndexWhere("status = 'scheduled'"))}
 }
 
 // NoticeDelivery tracks one recipient and channel.

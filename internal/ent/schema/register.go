@@ -170,6 +170,9 @@ func (Unit) Indexes() []ent.Index {
 		index.Fields("tenant_id", "property_id", "sale_status"),
 		index.Fields("tenant_id", "property_id", "occupancy_status"),
 		index.Fields("tenant_id", "block_id"),
+		// Keyset lists (created_at DESC, id DESC), by property and tenant wide.
+		index.Fields("tenant_id", "property_id", "created_at", "id"),
+		index.Fields("tenant_id", "created_at", "id"),
 	}
 }
 

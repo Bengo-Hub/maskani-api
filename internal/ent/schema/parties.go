@@ -57,6 +57,7 @@ func (Party) Indexes() []ent.Index {
 		index.Fields("tenant_id", "phone_hash"),
 		index.Fields("tenant_id", "auth_user_id"),
 		index.Fields("tenant_id", "display_name"),
+		index.Fields("tenant_id", "created_at", "id"), // keyset list
 	}
 }
 

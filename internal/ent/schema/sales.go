@@ -93,6 +93,8 @@ func (Reservation) Indexes() []ent.Index {
 		index.Fields("tenant_id", "unit_id").Unique().
 			Annotations(entsql.IndexWhere("status IN ('pending_payment','active')")),
 		index.Fields("tenant_id", "created_at", "id"),
+		// The expiry job scans every tenant for open holds past their time.
+		index.Fields("expires_at").Annotations(entsql.IndexWhere("status IN ('pending_payment','active')")),
 	}
 }
 
@@ -154,6 +156,7 @@ func (SaleContract) Indexes() []ent.Index {
 		index.Fields("tenant_id", "status"),
 		index.Fields("tenant_id", "unit_id"),
 		index.Fields("tenant_id", "primary_buyer_id"),
+		index.Fields("tenant_id", "unit_account_id"), // purchase progress after a payment
 		index.Fields("tenant_id", "property_id", "created_at", "id"),
 		index.Fields("tenant_id", "created_at", "id"),
 	}
@@ -223,6 +226,7 @@ func (Instalment) Indexes() []ent.Index {
 		index.Fields("schedule_id", "seq").Unique(),
 		index.Fields("tenant_id", "status", "due_date"),
 		index.Fields("tenant_id", "contract_id"),
+		index.Fields("tenant_id", "treasury_invoice_id"), // payment consumer: invoice to instalment
 	}
 }
 

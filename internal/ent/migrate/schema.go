@@ -183,6 +183,14 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{BillingRunsColumns[1], BillingRunsColumns[2], BillingRunsColumns[0]},
 			},
+			{
+				Name:    "billingrun_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillingRunsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'issuing'",
+				},
+			},
 		},
 	}
 	// BillingRunLinesColumns holds the columns for the "billing_run_lines" table.
@@ -236,6 +244,11 @@ var (
 				Name:    "billingrunline_tenant_id_unit_account_id",
 				Unique:  false,
 				Columns: []*schema.Column{BillingRunLinesColumns[1], BillingRunLinesColumns[6]},
+			},
+			{
+				Name:    "billingrunline_tenant_id_treasury_invoice_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingRunLinesColumns[1], BillingRunLinesColumns[15]},
 			},
 		},
 	}
@@ -788,6 +801,14 @@ var (
 				Unique:  true,
 				Columns: []*schema.Column{GateDevicesColumns[8]},
 			},
+			{
+				Name:    "gatedevice_last_seen_at",
+				Unique:  false,
+				Columns: []*schema.Column{GateDevicesColumns[10]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'active' AND offline_alerted = false",
+				},
+			},
 		},
 	}
 	// GateEventsColumns holds the columns for the "gate_events" table.
@@ -829,6 +850,16 @@ var (
 				Name:    "gateevent_tenant_id_property_id_occurred_at",
 				Unique:  false,
 				Columns: []*schema.Column{GateEventsColumns[1], GateEventsColumns[5], GateEventsColumns[14]},
+			},
+			{
+				Name:    "gateevent_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{GateEventsColumns[1], GateEventsColumns[5], GateEventsColumns[2], GateEventsColumns[0]},
+			},
+			{
+				Name:    "gateevent_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{GateEventsColumns[14]},
 			},
 		},
 	}
@@ -1030,6 +1061,11 @@ var (
 				Name:    "instalment_tenant_id_contract_id",
 				Unique:  false,
 				Columns: []*schema.Column{InstalmentsColumns[1], InstalmentsColumns[5]},
+			},
+			{
+				Name:    "instalment_tenant_id_treasury_invoice_id",
+				Unique:  false,
+				Columns: []*schema.Column{InstalmentsColumns[1], InstalmentsColumns[15]},
 			},
 		},
 	}
@@ -1379,6 +1415,14 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{NoticesColumns[1], NoticesColumns[5], NoticesColumns[2], NoticesColumns[0]},
 			},
+			{
+				Name:    "notice_scheduled_at",
+				Unique:  false,
+				Columns: []*schema.Column{NoticesColumns[12]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'scheduled'",
+				},
+			},
 		},
 	}
 	// NoticeDeliveriesColumns holds the columns for the "notice_deliveries" table.
@@ -1580,6 +1624,11 @@ var (
 				Name:    "party_tenant_id_display_name",
 				Unique:  false,
 				Columns: []*schema.Column{PartiesColumns[1], PartiesColumns[6]},
+			},
+			{
+				Name:    "party_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{PartiesColumns[1], PartiesColumns[2], PartiesColumns[0]},
 			},
 		},
 	}
@@ -1941,6 +1990,14 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{ReservationsColumns[1], ReservationsColumns[2], ReservationsColumns[0]},
 			},
+			{
+				Name:    "reservation_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{ReservationsColumns[13]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('pending_payment','active')",
+				},
+			},
 		},
 	}
 	// RolePermissionsColumns holds the columns for the "role_permissions" table.
@@ -2077,6 +2134,11 @@ var (
 				Name:    "salecontract_tenant_id_primary_buyer_id",
 				Unique:  false,
 				Columns: []*schema.Column{SaleContractsColumns[1], SaleContractsColumns[8]},
+			},
+			{
+				Name:    "salecontract_tenant_id_unit_account_id",
+				Unique:  false,
+				Columns: []*schema.Column{SaleContractsColumns[1], SaleContractsColumns[28]},
 			},
 			{
 				Name:    "salecontract_tenant_id_property_id_created_at_id",
@@ -2358,6 +2420,16 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{UnitsColumns[1], UnitsColumns[27]},
 			},
+			{
+				Name:    "unit_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{UnitsColumns[1], UnitsColumns[28], UnitsColumns[2], UnitsColumns[0]},
+			},
+			{
+				Name:    "unit_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{UnitsColumns[1], UnitsColumns[2], UnitsColumns[0]},
+			},
 		},
 	}
 	// UnitAccountsColumns holds the columns for the "unit_accounts" table.
@@ -2424,6 +2496,14 @@ var (
 				Name:    "unitaccount_tenant_id_balance_id",
 				Unique:  false,
 				Columns: []*schema.Column{UnitAccountsColumns[1], UnitAccountsColumns[10], UnitAccountsColumns[0]},
+			},
+			{
+				Name:    "unitaccount_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{UnitAccountsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "c2b_route_registered_at IS NULL AND status = 'active'",
+				},
 			},
 		},
 	}
@@ -2906,6 +2986,24 @@ var (
 				Name:    "workorder_tenant_id_requested_by_party_id",
 				Unique:  false,
 				Columns: []*schema.Column{WorkOrdersColumns[1], WorkOrdersColumns[14]},
+			},
+			{
+				Name:    "workorder_tenant_id_property_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkOrdersColumns[1], WorkOrdersColumns[6], WorkOrdersColumns[2], WorkOrdersColumns[0]},
+			},
+			{
+				Name:    "workorder_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkOrdersColumns[1], WorkOrdersColumns[2], WorkOrdersColumns[0]},
+			},
+			{
+				Name:    "workorder_resolution_due_at",
+				Unique:  false,
+				Columns: []*schema.Column{WorkOrdersColumns[21]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "sla_breached = false AND status NOT IN ('completed','confirmed','closed','cancelled')",
+				},
 			},
 		},
 	}

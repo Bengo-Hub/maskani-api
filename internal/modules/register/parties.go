@@ -501,7 +501,7 @@ func (s *Service) ListStaff(ctx context.Context, propertyID uuid.UUID) ([]*ent.M
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
 	return s.client.MaskaniUserOutlet.Query().
-		Where(maskaniuseroutlet.TenantID(tenantID), maskaniuseroutlet.OutletID(*prop.OutletID)).All(ctx)
+		Where(maskaniuseroutlet.TenantID(tenantID), maskaniuseroutlet.OutletID(*prop.OutletID)).Limit(500).All(ctx)
 }
 
 // RemoveStaff deletes an assignment.

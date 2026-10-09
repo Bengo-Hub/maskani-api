@@ -620,6 +620,8 @@ func (s *Service) GetRun(ctx context.Context, id uuid.UUID) (*RunView, error) {
 
 // RunLines returns a run's lines.
 func (s *Service) RunLines(ctx context.Context, runID uuid.UUID) ([]*ent.BillingRunLine, error) {
+	// A run has one line per unit account of one property; the cap guards memory until the run
+	// screen pages by keyset (wave 1c).
 	return s.client.BillingRunLine.Query().Where(billingrunline.RunID(runID)).
-		Order(ent.Asc(billingrunline.FieldUnitCode)).All(ctx)
+		Order(ent.Asc(billingrunline.FieldUnitCode)).Limit(5000).All(ctx)
 }

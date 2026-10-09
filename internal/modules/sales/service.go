@@ -123,7 +123,7 @@ func (s *Service) CreatePriceList(ctx context.Context, actor uuid.UUID, in Price
 // ListPriceLists returns a property's price lists with items.
 func (s *Service) ListPriceLists(ctx context.Context, propertyID uuid.UUID) ([]*ent.PriceList, error) {
 	return s.client.PriceList.Query().Where(pricelist.PropertyID(propertyID)).WithItems().
-		Order(ent.Desc(pricelist.FieldEffectiveFrom)).All(ctx)
+		Order(ent.Desc(pricelist.FieldEffectiveFrom)).Limit(100).All(ctx)
 }
 
 // Availability is a unit with its current price.
