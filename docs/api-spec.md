@@ -227,7 +227,7 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET `/reports/dashboard?property_id=&period=` | See below | `reports.view` |
+| GET `/reports/dashboard?property_id=&from=&to=&block_id=&fund=` (`period=` is one month) | See below. `from` and `to` are months (YYYY-MM, at most 12; billed and collected cover the range, the weekly chart every week of it); `block_id` (its property must be in scope) and `fund` narrow billed, outstanding, arrears and ageing, units, work orders and sales; collections are kept per property, so with a block or fund `collections_scope` is `property` | `reports.view` |
 | GET `/reports/insights?property_id=&period=` | Staff dashboard business view: `months` (12 months of billed, collected, collection_rate, work_opened, work_closed, contracts_signed, sales_value), `kpis` (each with `last_month` and `last_year`; outstanding, days_sales_outstanding, occupancy_pct, available_for_sale, open_work_orders, avg_resolve_hours_90d), `forecast` (12 months of instalments plus recurring), `forecast_basis` (inputs and method), `sales` (pace, months to sell out), `revenue_mix`, `blocks`, `work_by_category` | `reports.view` |
 | GET `/reports/arrears?property_id=&q=&min=` | Owing accounts, largest first (keyset); `q` matches the account reference prefix or the owner's name, `min` the smallest balance; phones masked without `billing.collect` | `reports.view` |
 | GET `/reports/arrears/export?format=&property_id=&q=&min=` | Every matching owing account (up to 10,000, the document says when cut) with the ageing chart; same phone masking | `reports.view` and `reports.export` |

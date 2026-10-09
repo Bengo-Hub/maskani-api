@@ -22,6 +22,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
 	"github.com/bengobox/maskani-api/internal/ent/billingrunline"
 	"github.com/bengobox/maskani-api/internal/ent/dailystat"
+	"github.com/bengobox/maskani-api/internal/ent/fund"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
@@ -129,7 +130,12 @@ func (sc Scope) sqlIDs() any {
 
 // Dashboard is the manager dashboard (SRDD figure 14).
 type Dashboard struct {
-	Period            string           `json:"period"`
+	Period string `json:"period"` // the last month of the range
+	From   string `json:"from"`
+	To     string `json:"to"`
+	// CollectionsScope is "filtered", or "property" when a block or fund is chosen: collections are
+	// recorded per property and day, so they follow the property and months only.
+	CollectionsScope  string           `json:"collections_scope"`
 	Billed            decimal.Decimal  `json:"billed"`
 	Collected         decimal.Decimal  `json:"collected"`
 	CollectionRate    decimal.Decimal  `json:"collection_rate"`
@@ -172,34 +178,86 @@ var AgeBuckets = []string{"0-30", "31-60", "61-90", "90+"}
 
 // Dashboard computes the dashboard for a property (or the caller's properties) and month. Results
 // are cached for 60 seconds per tenant, scope and period.
-func (s *Service) Dashboard(ctx context.Context, sc Scope, period string) (*Dashboard, error) {
-	if period == "" {
-		period = time.Now().In(s.loc).Format("2006-01")
+// DashboardFilter narrows the dashboard: a range of months (From to To, YYYY-MM, at most 12), a
+// block and a fund. Block and fund narrow what is kept per unit or account (billed, outstanding,
+// arrears, units, work orders, sales); collections are recorded per property, so they follow the
+// property and months only and the response says so in CollectionsScope.
+type DashboardFilter struct {
+	From, To string
+	BlockID  *uuid.UUID
+	FundID   *uuid.UUID
+}
+
+func (f DashboardFilter) key() string {
+	k := f.From + ".." + f.To
+	if f.BlockID != nil {
+		k += ":b" + f.BlockID.String()
 	}
-	if _, err := time.ParseInLocation("2006-01", period, s.loc); err != nil {
-		return nil, httpx.Invalid("period must be YYYY-MM")
+	if f.FundID != nil {
+		k += ":f" + f.FundID.String()
 	}
-	v, err := s.cached(ctx, "dashboard:"+period+":"+sc.key(), func() (any, error) { return s.dashboard(ctx, sc, period) })
+	return k
+}
+
+// unitsOfBlock limits rows with a unit_id column to the units of a block.
+func unitsOfBlock(block uuid.UUID) func(*sql.Selector) {
+	return func(sel *sql.Selector) {
+		ut := sql.Table(unit.Table)
+		sel.Where(sql.In(sel.C("unit_id"), sql.Select(ut.C(unit.FieldID)).From(ut).Where(sql.EQ(ut.C(unit.FieldBlockID), block))))
+	}
+}
+
+func (s *Service) Dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*Dashboard, error) {
+	now := time.Now().In(s.loc).Format("2006-01")
+	if f.To == "" {
+		f.To = now
+	}
+	if f.From == "" {
+		f.From = f.To
+	}
+	from, err1 := time.ParseInLocation("2006-01", f.From, s.loc)
+	to, err2 := time.ParseInLocation("2006-01", f.To, s.loc)
+	if err1 != nil || err2 != nil {
+		return nil, httpx.Invalid("from and to must be YYYY-MM")
+	}
+	if to.Before(from) {
+		return nil, httpx.Invalid("from is after to")
+	}
+	if from.AddDate(1, 0, 0).Before(to.AddDate(0, 1, 0)) {
+		return nil, httpx.Invalid("choose at most 12 months")
+	}
+	v, err := s.cached(ctx, "dashboard:"+f.key()+":"+sc.key(), func() (any, error) { return s.dashboard(ctx, sc, f) })
 	if err != nil {
 		return nil, err
 	}
 	return v.(*Dashboard), nil
 }
 
-func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dashboard, error) {
-	d := &Dashboard{Period: period}
-	start, _ := time.ParseInLocation("2006-01", period, s.loc)
-	end := start.AddDate(0, 1, 0)
+func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*Dashboard, error) {
+	period := f.To
+	d := &Dashboard{Period: period, From: f.From, To: f.To, CollectionsScope: "filtered"}
+	if f.BlockID != nil || f.FundID != nil {
+		d.CollectionsScope = "property"
+	}
+	start, _ := time.ParseInLocation("2006-01", f.From, s.loc)
+	last, _ := time.ParseInLocation("2006-01", f.To, s.loc)
+	end := last.AddDate(0, 1, 0)
 	ids := sc.ids()
 
-	// Billed: issued lines of this period's runs.
+	// Billed: issued lines of the months' runs.
 	var billed []struct {
 		Total decimal.Decimal `json:"total"`
 	}
 	lq := s.client.BillingRunLine.Query().Where(billingrunline.StatusEQ(billingrunline.StatusIssued),
-		billingrunline.HasRunWith(billingrun.Period(period)))
+		billingrunline.HasRunWith(billingrun.PeriodGTE(f.From), billingrun.PeriodLTE(f.To)))
 	if ids != nil {
 		lq = lq.Where(billingrunline.HasRunWith(billingrun.PropertyIDIn(ids...)))
+	}
+	if f.FundID != nil {
+		lq = lq.Where(billingrunline.HasRunWith(billingrun.FundID(*f.FundID)))
+	}
+	if f.BlockID != nil {
+		lq = lq.Where(unitsOfBlock(*f.BlockID))
 	}
 	if err := lq.Aggregate(sqlx.SumAs(billingrunline.FieldTotal, "total", "")).Scan(ctx, &billed); err != nil {
 		return nil, err
@@ -208,13 +266,14 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 		d.Billed = billed[0].Total
 	}
 
-	// Collected: daily_stats maintained by the payment consumer.
+	// Collected: daily_stats maintained by the payment consumer (per property and day).
 	var coll []struct {
 		Collected decimal.Decimal `json:"collected"`
 	}
 	// daily_stats.day holds the local date at UTC midnight (RecordCollection).
 	dayFrom := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, time.UTC)
-	sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(dayFrom), dailystat.DayLT(dayFrom.AddDate(0, 1, 0)))
+	dayTo := time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, time.UTC)
+	sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(dayFrom), dailystat.DayLT(dayTo))
 	if ids != nil {
 		sq = sq.Where(dailystat.PropertyIDIn(ids...))
 	}
@@ -233,6 +292,12 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 	aq := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero))
 	if ids != nil {
 		aq = aq.Where(unitaccount.HasUnitWith(unit.PropertyIDIn(ids...)))
+	}
+	if f.BlockID != nil {
+		aq = aq.Where(unitaccount.HasUnitWith(unit.BlockID(*f.BlockID)))
+	}
+	if f.FundID != nil {
+		aq = aq.Where(unitaccount.FundID(*f.FundID))
 	}
 	var owing []struct {
 		N   int             `json:"n"`
@@ -269,6 +334,9 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 	if ids != nil {
 		wq = wq.Where(workorder.PropertyIDIn(ids...))
 	}
+	if f.BlockID != nil {
+		wq = wq.Where(unitsOfBlock(*f.BlockID))
+	}
 	var wo []struct {
 		Open int `json:"open"`
 		Past int `json:"past"`
@@ -284,6 +352,9 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 	uq := s.client.Unit.Query().Where(unit.StatusEQ(unit.StatusActive))
 	if ids != nil {
 		uq = uq.Where(unit.PropertyIDIn(ids...))
+	}
+	if f.BlockID != nil {
+		uq = uq.Where(unit.BlockID(*f.BlockID))
 	}
 	var uc []struct {
 		Units    int `json:"units"`
@@ -301,6 +372,9 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 	if ids != nil {
 		cq = cq.Where(salecontract.PropertyIDIn(ids...))
 	}
+	if f.BlockID != nil {
+		cq = cq.Where(unitsOfBlock(*f.BlockID))
+	}
 	var sales []struct {
 		Value decimal.Decimal `json:"value"`
 		Paid  decimal.Decimal `json:"paid"`
@@ -314,10 +388,10 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 
 	tenantID, _ := tenantguard.TenantID(ctx)
 	var err error
-	if d.CollectionsByWeek, err = s.weekly(ctx, tenantID, sc, period, start, end); err != nil {
+	if d.CollectionsByWeek, err = s.weekly(ctx, tenantID, sc, f, start, end); err != nil {
 		return nil, err
 	}
-	if d.ArrearsAgeing, err = s.ageing(ctx, tenantID, sc); err != nil {
+	if d.ArrearsAgeing, err = s.ageing(ctx, tenantID, sc, f.BlockID, f.FundID); err != nil {
 		return nil, err
 	}
 
@@ -339,9 +413,10 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, period string) (*Dash
 	return d, nil
 }
 
-// weeklySQL returns billed and collected per week (Monday start) of a month, in one grouped query.
-// Parameters: $1 tenant, $2 first day (date), $3 first day of next month (date), $4 period (YYYY-MM),
-// $5 property ids as a uuid array literal or NULL, $6 time zone. The guard does not apply to raw
+// weeklySQL returns billed and collected per week (Monday start) over a range of months, in one grouped query.
+// Parameters: $1 tenant, $2 first day (date), $3 first day after the range (date), $4 first period (YYYY-MM),
+// $5 property ids as a uuid array literal or NULL, $6 time zone, $7 last period, $8 block or NULL,
+// $9 fund or NULL (block and fund narrow billed only). The guard does not apply to raw
 // SQL, so every table is filtered by tenant_id here.
 const weeklySQL = `
 WITH weeks AS (
@@ -350,7 +425,9 @@ WITH weeks AS (
 ), billed AS (
   SELECT date_trunc('week', (r.invoice_date AT TIME ZONE $6))::date AS wk, SUM(l.total) AS amt
     FROM billing_run_lines l JOIN billing_runs r ON r.id = l.run_id AND r.tenant_id = $1
-   WHERE l.tenant_id = $1 AND l.status = 'issued' AND r.period = $4
+   WHERE l.tenant_id = $1 AND l.status = 'issued' AND r.period >= $4 AND r.period <= $7
+     AND ($8::uuid IS NULL OR l.unit_id IN (SELECT id FROM units WHERE tenant_id = $1 AND block_id = $8::uuid))
+     AND ($9::uuid IS NULL OR r.fund_id = $9::uuid)
      AND ($5::text IS NULL OR r.property_id = ANY($5::text::uuid[]))
    GROUP BY 1
 ), coll AS (
@@ -368,13 +445,15 @@ SELECT to_char(w.week_start, 'YYYY-MM-DD'), COALESCE(b.amt, 0), COALESCE(c.amt, 
 // against the account's issued bills and instalment invoices from the newest back (treasury settles
 // oldest first, so what is still owed is the newest debt); the oldest bill the balance reaches
 // sets the age. Accounts with a balance but no issued bill (opening balances) count as 0-30.
-// Parameters: $1 tenant, $2 property ids as a uuid array literal or NULL.
+// Parameters: $1 tenant, $2 property ids as a uuid array literal or NULL, $3 block or NULL, $4 fund or NULL.
 const ageingSQL = `
 WITH acc AS (
   SELECT ua.id, ua.balance
     FROM unit_accounts ua JOIN units u ON u.id = ua.unit_id AND u.tenant_id = $1
    WHERE ua.tenant_id = $1 AND ua.status = 'active' AND ua.balance > 0
      AND ($2::text IS NULL OR u.property_id = ANY($2::text::uuid[]))
+     AND ($3::uuid IS NULL OR u.block_id = $3::uuid)
+     AND ($4::uuid IS NULL OR ua.fund_id = $4::uuid)
 ), dues AS (
   SELECT l.unit_account_id AS acc_id, r.due_date, l.total AS amount
     FROM billing_run_lines l JOIN billing_runs r ON r.id = l.run_id AND r.tenant_id = $1
@@ -400,13 +479,13 @@ SELECT CASE WHEN age <= 30 THEN '0-30' WHEN age <= 60 THEN '31-60' WHEN age <= 9
        COUNT(*), COALESCE(SUM(balance), 0)
   FROM aged GROUP BY 1`
 
-func (s *Service) weekly(ctx context.Context, tenantID uuid.UUID, sc Scope, period string, start, end time.Time) ([]WeekFigures, error) {
+func (s *Service) weekly(ctx context.Context, tenantID uuid.UUID, sc Scope, f DashboardFilter, start, end time.Time) ([]WeekFigures, error) {
 	out := []WeekFigures{}
 	if s.db == nil {
 		return out, nil
 	}
 	rows, err := s.db.QueryContext(ctx, weeklySQL, tenantID, start.Format("2006-01-02"), end.Format("2006-01-02"),
-		period, sc.sqlIDs(), s.loc.String())
+		f.From, sc.sqlIDs(), s.loc.String(), f.To, nullUUID(f.BlockID), nullUUID(f.FundID))
 	if err != nil {
 		return nil, fmt.Errorf("collections by week: %w", err)
 	}
@@ -421,10 +500,10 @@ func (s *Service) weekly(ctx context.Context, tenantID uuid.UUID, sc Scope, peri
 	return out, rows.Err()
 }
 
-func (s *Service) ageing(ctx context.Context, tenantID uuid.UUID, sc Scope) ([]AgeBucket, error) {
+func (s *Service) ageing(ctx context.Context, tenantID uuid.UUID, sc Scope, block, fund *uuid.UUID) ([]AgeBucket, error) {
 	byName := map[string]AgeBucket{}
 	if s.db != nil {
-		rows, err := s.db.QueryContext(ctx, ageingSQL, tenantID, sc.sqlIDs())
+		rows, err := s.db.QueryContext(ctx, ageingSQL, tenantID, sc.sqlIDs(), nullUUID(block), nullUUID(fund))
 		if err != nil {
 			return nil, fmt.Errorf("arrears ageing: %w", err)
 		}
@@ -503,7 +582,7 @@ func (s *Service) ArrearsAll(ctx context.Context, sc Scope, f ArrearsFilter) ([]
 func (s *Service) Ageing(ctx context.Context, sc Scope) ([]AgeBucket, error) {
 	v, err := s.cached(ctx, "ageing:"+sc.key(), func() (any, error) {
 		tenantID, _ := tenantguard.TenantID(ctx)
-		return s.ageing(ctx, tenantID, sc)
+		return s.ageing(ctx, tenantID, sc, nil, nil)
 	})
 	if err != nil {
 		return nil, err
@@ -612,4 +691,32 @@ func RecordCollection(ctx context.Context, client *ent.Client, tenantID, propert
 			u.AddCollected(amount)
 			u.AddPaymentsCount(1)
 		}).Exec(ctx)
+}
+
+// nullUUID is a nullable uuid parameter for raw SQL.
+func nullUUID(id *uuid.UUID) any {
+	if id == nil {
+		return nil
+	}
+	return id.String()
+}
+
+// FilterIDs resolves a dashboard's block and fund: the block's property (for the scope check)
+// and the fund's id from its code. Unknown values are refused.
+func (s *Service) FilterIDs(ctx context.Context, blockID *uuid.UUID, fundCode string) (blockProperty *uuid.UUID, fundID *uuid.UUID, err error) {
+	if blockID != nil {
+		b, err := s.client.Block.Get(ctx, *blockID)
+		if err != nil {
+			return nil, nil, httpx.Invalid("unknown block")
+		}
+		blockProperty = &b.PropertyID
+	}
+	if fundCode != "" {
+		f, err := s.client.Fund.Query().Where(fund.Code(fundCode)).Only(ctx)
+		if err != nil {
+			return nil, nil, httpx.Invalid("unknown fund")
+		}
+		fundID = &f.ID
+	}
+	return blockProperty, fundID, nil
 }

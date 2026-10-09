@@ -634,14 +634,32 @@ func (h *H) NoticeDeliveries(w http.ResponseWriter, r *http.Request) {
 
 // --- Reports and enquiries ---
 
-// Dashboard is GET /reports/dashboard?property_id=&period=.
+// Dashboard is GET /reports/dashboard?property_id=&from=&to=&block_id=&fund= (period= still means
+// one month).
 func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
 	f, ok := scopeFilter(w, r)
 	if !ok {
 		return
 	}
-	d, err := h.Reports.Dashboard(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		r.URL.Query().Get("period"))
+	q := r.URL.Query()
+	df := reports.DashboardFilter{From: q.Get("from"), To: q.Get("to"), BlockID: httpx.QueryUUID(r, "block_id")}
+	if p := q.Get("period"); p != "" && df.From == "" && df.To == "" {
+		df.From, df.To = p, p
+	}
+	blockProp, fundID, err := h.Reports.FilterIDs(r.Context(), df.BlockID, q.Get("fund"))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	// A block narrows to its property, which the caller must be able to see.
+	if blockProp != nil {
+		if !requireProperty(w, r, *blockProp) {
+			return
+		}
+		f.PropertyID = blockProp
+	}
+	df.FundID = fundID
+	d, err := h.Reports.Dashboard(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties}, df)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
