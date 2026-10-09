@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/meterreading"
 	"github.com/bengobox/maskani-api/internal/ent/notice"
 	"github.com/bengobox/maskani-api/internal/ent/party"
 	"github.com/bengobox/maskani-api/internal/ent/predicate"
@@ -31,12 +34,23 @@ func NewService(client *ent.Client, log *zap.Logger) *Service {
 	return &Service{client: client, log: log.Named("portal")}
 }
 
-// MyUnit is a unit the caller is linked to, with its accounts.
+// MyUnit is a unit the caller is linked to, with its accounts and last water reading.
 type MyUnit struct {
-	Link     *ent.UnitParty     `json:"link"`
-	Unit     *ent.Unit          `json:"unit"`
-	Property *ent.Property      `json:"property"`
-	Accounts []*ent.UnitAccount `json:"accounts"`
+	Link        *ent.UnitParty     `json:"link"`
+	Unit        *ent.Unit          `json:"unit"`
+	Property    *ent.Property      `json:"property"`
+	Accounts    []*ent.UnitAccount `json:"accounts"`
+	LastReading *LastReading       `json:"last_reading,omitempty"`
+}
+
+// LastReading is the unit meter's latest accepted reading, for the portal home (SRDD figure 14).
+type LastReading struct {
+	Period      string          `json:"period"`
+	Reading     decimal.Decimal `json:"reading"`
+	Consumption decimal.Decimal `json:"consumption"`
+	ReadAt      time.Time       `json:"read_at"`
+	Estimated   bool            `json:"estimated"`
+	PhotoKey    string          `json:"photo_key,omitempty"`
 }
 
 // maxLinks bounds a caller's own links; one person never holds more units than this in an estate.
@@ -89,6 +103,22 @@ func (s *Service) Units(ctx context.Context, partyIDs []uuid.UUID) ([]MyUnit, er
 	for _, a := range accs {
 		byUnit[a.UnitID] = append(byUnit[a.UnitID], a)
 	}
+	// Latest accepted reading per unit over the last six months, in one bounded query.
+	since := time.Now().AddDate(0, -6, 0).Format("2006-01")
+	reads, err := s.client.MeterReading.Query().Where(meterreading.UnitIDIn(unitIDs...),
+		meterreading.StatusEQ(meterreading.StatusAccepted), meterreading.PeriodGTE(since)).
+		Order(ent.Desc(meterreading.FieldPeriod), ent.Desc(meterreading.FieldReadAt)).Limit(len(unitIDs)*8 + 1).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	lastRead := map[uuid.UUID]*LastReading{}
+	for _, r := range reads {
+		if r.UnitID == nil || lastRead[*r.UnitID] != nil {
+			continue
+		}
+		lastRead[*r.UnitID] = &LastReading{Period: r.Period, Reading: r.Reading, Consumption: r.Consumption,
+			ReadAt: r.ReadAt, Estimated: r.IsEstimated, PhotoKey: r.PhotoKey}
+	}
 	out := []MyUnit{}
 	seen := map[uuid.UUID]bool{}
 	for _, l := range links {
@@ -97,7 +127,7 @@ func (s *Service) Units(ctx context.Context, partyIDs []uuid.UUID) ([]MyUnit, er
 			continue
 		}
 		seen[l.UnitID] = true
-		mu := MyUnit{Link: l, Unit: u, Property: u.Edges.Property, Accounts: []*ent.UnitAccount{}}
+		mu := MyUnit{Link: l, Unit: u, Property: u.Edges.Property, Accounts: []*ent.UnitAccount{}, LastReading: lastRead[l.UnitID]}
 		for _, a := range byUnit[l.UnitID] {
 			if accountVisible(l, a) {
 				mu.Accounts = append(mu.Accounts, a)
