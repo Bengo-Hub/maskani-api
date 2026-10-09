@@ -15,17 +15,44 @@ Maskani is one platform serving three kinds of business, each an isolated tenant
 Maskani Marketplace (repo `maskani-commerce`, host `maskani.codevertexafrica.com`) publishes verified
 vacancies and units for sale in Release 3. A small estate showcase ships with the demo.
 
+### Who the platform connects
+
+Maskani is meant to be the one place where every side of a Kenyan property deal meets. Market
+research behind this list is in [docs/market-research.md](docs/market-research.md).
+
+| Person or business | What they come for | Release |
+|---|---|---|
+| Estate operator or developer | Sell units outright or by instalments, then run the estate and bill owners | R1 |
+| Unit owner | Pay estate charges, follow a purchase, manage household and visitors; choose to let the unit long term or run it as a short stay | R1, R2 |
+| Service provider (security, cleaning, garbage, maintenance) | Contracts, schedules, evidence, invoices paid on delivered service | R1 |
+| Landlord | Let or lease units directly, or hand them to a manager under a mandate | R2 |
+| Property management firm (for example Lockwood) | Manage portfolios for landlords, collect rent, remit net of fees; bid for new mandates | R2, R3 |
+| Short-stay host | Run a unit as a short stay, with bookings in pos-api's hotel engine and income shown in Maskani | R2 |
+| House hunter, buyer, diaspora investor | Find real, verified homes and land; enquire, view, apply or offer safely | R3 |
+| Office, shop or co-working seeker | Find workspace by the hour, day, month or on a lease | R3 |
+| Agent or land seller | List verified property and land, receive masked enquiries as leads | R3 |
+| Property owner seeking a manager | Post a management tender and compare bids side by side | R3 |
+
 ## Releases
 
 | Release | Scope | Timing |
 |---|---|---|
 | R1 MVP | Multi-tenant core, register, staff per property, estate billing, utilities, sales and instalments, owner portal, providers, works, gate, ERP staff, reports | Shaba launch, February 2027 |
-| R2 | Landlord portfolios and mandates, applications, leases, deposits, inspections, turnover, remittances, commercial leases | Q2 2027 |
-| R3 | Public marketplace: listings, search and map, enquiries, viewings, applications, verified listers, featured listings | Q3 2027 |
-| R4 | Native apps, smart meters, e-signatures, credit checks, owner voting, amenity booking | Later |
+| R2 | Landlord portfolios and mandates, applications, leases, deposits, inspections, turnover, remittances, commercial leases, short stays through pos-api's hotel engine | Q2 2027 |
+| R3 | Public marketplace: listings (homes, offices and co-working, shops, warehouses, land) for sale, rent, lease and short stay; search and map; enquiries, viewings, applications; verified listers; featured listings; management tenders | Q3 2027 |
+| R4 | Native apps, smart meters, e-signatures, credit checks, owner voting, amenity booking, channel sync with Airbnb and Booking.com | Later |
 
 Excluded from every release: conveyancing and legal advice, mortgage origination, Codevertex holding
-client money, short-stay holiday booking.
+client money. The SRDD also excluded short-stay booking; the user changed that on 2026-10-09: short
+stays are supported in R2, but the booking engine stays in pos-api and Maskani never builds a second
+one.
+
+## Current plan
+
+`.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` closes every Release 1 gap found by
+the 2026-10-09 audit, revamps queries and jobs for growth, then builds Release 2. Gaps are listed in
+each sprint file under "Gaps found by the 2026-10-09 audit" and summarised in
+[docs/backlog.md](docs/backlog.md).
 
 ## Demo MVP slice (Shaba Village, Sunday 11 October 2026)
 

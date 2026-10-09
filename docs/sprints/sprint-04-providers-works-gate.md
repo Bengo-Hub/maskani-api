@@ -39,6 +39,28 @@ API state as of 2026-10-08. Screens and the gate tablet app are in maskani-ui sp
 - [ ] Schedules and visits, preventive maintenance, vendor invoices (after demo)
 - [x] maskani-ui works screens and gate tablet app
 
+### Gaps found by the 2026-10-09 audit
+Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
+
+- [ ] Property scope on ActWorkOrder, staff ReportIncident, ListMeters and reading writes (FR-13, wave 1a)
+- [ ] `maskani.pass.created` and arrival payloads carry ids only, never the plain pass code or phones; notifications resolves contacts (acceptance rule above, wave 1a)
+- [ ] Per-device rate limits on `/gate/verify` and `/gate/events` (wave 1a)
+- [ ] Gate event recording in bulk: events inserted together, passes consumed in one statement, arrival lookups by id set, device `last_seen_at` throttled (NFR-04, wave 1b)
+- [ ] `/gate/sync` filters personnel in SQL by deployment property instead of loading 2,000 rows (wave 1b)
+- [ ] Gate log list order and index agree (`created_at` sort has no index today) (wave 1b)
+- [ ] Partial indexes for system jobs: open SLA work orders by due time, devices by `last_seen_at` (wave 1b)
+- [ ] Vendor linked to a treasury vendor by S2S lookup, not free text (FR-51, wave 2.8)
+- [ ] Vendor contracts with SLA, fee basis, service credits and renewal (FR-52, wave 2.8)
+- [ ] Service schedules and visits with photos and a missed-visit job; preventive maintenance schedules raising work orders (FR-53, FR-58, wave 2.8)
+- [ ] Vendor invoices: entered in the vendor portal with the eTIMS number, compared with contract, visits and coverage, confirmed by the manager, then `maskani.vendor_invoice.approved` makes treasury raise the bill through a new subscriber modelled on `arpa/service_delivery_bill_subscriber.go`; `treasury.payout.completed` marks it paid (FR-56, wave 2.8)
+- [ ] Vendor supervisor phone sign-in and vendor portal (FR-18, wave 2.8)
+- [ ] ERP staff picker through an erp-api S2S employee list; casual payments linked to the work order cost line (FR-63, wave 2.8)
+- [ ] Guard posts, rosters uploaded by the agency, sign-on and sign-off checked against the roster, unmanned time report (FR-54, wave 2.9)
+- [ ] Patrol checkpoints with QR tags scanned on the tablet, missed checkpoints in the morning summary (FR-54, wave 2.9)
+- [ ] Digital occurrence book (FR-62, wave 2.9)
+- [ ] Gate device list and revoke (wave 2.9)
+- [ ] Guard and vendor PINs hashed through the shared password-hasher instead of direct bcrypt (wave 1b)
+
 ## Acceptance
 
 - Gate verify answers within 1 second; an offline entry queued on the tablet syncs once, with no

@@ -44,6 +44,21 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
 - [ ] Restructure, handover, title tracking (after demo)
 - [x] maskani-ui sales screens
 
+### Gaps found by the 2026-10-09 audit
+Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
+
+- [ ] Property scope on Reserve, CreateContract, GetContract, ActivateContract, ReleaseMilestone and AssignSuspense (FR-13, wave 1a)
+- [ ] Instalment invoicing without N+1: contracts, accounts and funds preloaded by id set, treasury by-reference lookups batched, schedule rows written with `CreateBulk`, reservation expiry as one set-based update (NFR-05, wave 1b)
+- [ ] Progress sync pages through the whole treasury ledger (no 500 cap) and updates instalments in bulk; index `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (wave 1b)
+- [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
+- [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
+- [ ] Overpayment reduces the next instalment, read from the ledger's unapplied amount, unless the buyer asks for early completion (SRDD 9.3, wave 2.6)
+- [ ] Restructure as a new schedule version under approval, original kept, buyer acceptance by OTP (FR-23, wave 2.6)
+- [ ] Handover with snag list, meter readings, keys and signatures; publishes `maskani.unit.handed_over` and starts estate billing prorated (FR-25, wave 2.6)
+- [ ] Title stages with dates and documents (FR-25, wave 2.6)
+- [ ] Purchase and completion statements as PDF and spreadsheet (FR-25, FR-35, wave 2.1)
+- [ ] Console price list editor, reservations list and milestone release (wave 2.6)
+
 ## Acceptance
 
 - A lapsed reservation releases the unit to available within 15 minutes.

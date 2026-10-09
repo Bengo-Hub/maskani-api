@@ -16,6 +16,11 @@ Every outbound write carries an `Idempotency-Key`.
 Hostnames and ports were checked against `devops-k8s/apps/*/values.yaml` on 2026-10-07 (erp-api's
 service listens on 80, the others on 4000). Re-check there before changing them.
 
+The 2026-10-09 audit found that the Go defaults in `internal/config/config.go` still point at the
+public `*.codevertexafrica.com` hosts, which go through Cloudflare when a variable is missing. Wave 1a
+changes the defaults to the in-cluster names above (`s2s-cloudflare-loopback-fleetwide-fix`). The
+tenant syncer also moves from a raw `net/http` client to shared-service-client.
+
 ## auth-api
 
 | Use | Call |
@@ -128,18 +133,56 @@ that credit to a later invoice is not built yet (treasury backlog).
   refreshes maskani's cached `unit_accounts.balance` and purchase progress and publishes
   `maskani.payment.applied`; the cached figure is display only.
 
-### Deferred (after the demo)
+### Vendor bills (wave 2.8)
 
-- Treasury instalment plans wired to sale contracts (today maskani owns the schedule and raises one
-  invoice per due instalment).
-- S2S vendor bills with withholding tax (today vendor invoices are recorded through `POST /expenses`).
+Treasury has no S2S vendor-bill create route, but it already raises payables from events: the
+`ServiceDeliveryBillSubscriber` (`internal/modules/arpa/service_delivery_bill_subscriber.go`, durable
+`SubscribeQueueWithRebind` on `inventory.service_delivery.created`) and the PO and goods-receipt bill
+subscribers. Maskani follows the same shape:
+
+1. The vendor supervisor enters the monthly invoice in the vendor portal with its eTIMS number.
+2. maskani shows it beside the contract fee, visits delivered and missed, post coverage and the
+   service credit due; the estate manager confirms.
+3. maskani publishes `maskani.vendor_invoice.approved` (vendor's treasury id, amount net of the
+   service credit, eTIMS number, cost centre, budget line, fund, withholding flag) in the same
+   transaction as the status change.
+4. A new treasury subscriber (`arpa/maskani_vendor_bill_subscriber.go`) creates the bill through the
+   existing arpa service, idempotent on the maskani invoice id. Approval and payout follow treasury's
+   per-flow approval policy.
+5. `treasury.payout.completed` marks the maskani invoice paid and notifies the vendor.
+
+Vendors are linked to treasury vendors by lookup (`GET /api/v1/s2s/{tenant}/ap/vendors`), never by a
+typed id.
+
+### Budgets, ledger and cost centres (wave 2.10)
+
+Budget against actual, income and expenditure and the sinking fund statement read treasury's
+existing S2S routes (`BudgetsHandler`, `Ledger` and `CostCenters` `RegisterS2SRoutes`). maskani keeps
+no copy of budget or ledger figures.
+
+### Deferred
+
+- Treasury instalment plans wired to sale contracts. maskani owns the schedule and raises one
+  invoice per due instalment, which already works; see [backlog.md](backlog.md).
 
 ## erp-api
 
+pos-api already calls erp-api with `X-API-Key` and `X-Tenant-ID` (`handlers/staff_purchase.go`
+`resolveTenant`). The employee list (`GET /api/v1/hrm/employees`) reads the tenant only from the
+JWT today, so wave 2.8 makes it accept the S2S tenant the same way, with a search filter and keyset
+paging.
+
 | Use | Call |
 |---|---|
-| Staff picker for work orders and service checks | `GET /api/v1/hrm/employees` with `X-API-Key` and `X-Tenant-ID` |
-| Casual worker payments | Recorded in ERP casual payments; maskani stores the employee ID on the work order cost line |
+| Staff picker for work orders and service checks | `GET /api/v1/hrm/employees?search=` with `X-API-Key` and `X-Tenant-ID` |
+| Casual worker payments | Created through erp casual payments (`/casual-payments`); maskani stores the employee ID and payment ID on the work order cost line |
+
+## pos-api (Release 2 short stays)
+
+A unit switched to short stay (`metadata.occupancy_mode = "short_stay"`) becomes a room in pos-api's
+hotel module under the property's outlet. Bookings, folios, the public booking widget and the booking
+policy stay in pos-api. maskani reads bookings and income for the owner and landlord statements. The
+S2S room and booking routes are checked, and added in pos-api if missing, in wave 4.
 
 ## notifications-api
 
@@ -185,5 +228,6 @@ Used directly only for notices to an audience. Everything else is event driven.
 
 ## marketflow-api and maps (R3)
 
-Enquiries become CRM leads with the source listing; geocoding and map search use the Codevertex maps
-service. Not wired in R1.
+Enquiries become CRM leads with the source listing through marketflow's S2S
+`POST /internal/contacts/upsert` (create or get by phone); geocoding and map search use the
+Codevertex maps service (`@bengo-hub/maps`). Not wired in R1.

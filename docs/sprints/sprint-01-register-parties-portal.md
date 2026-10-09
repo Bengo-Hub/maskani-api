@@ -47,6 +47,25 @@ API state as of 2026-10-08. The console and portal screens are in maskani-ui spr
 - [x] `/auth/me` returns `bypass` for platform owners, superusers and S2S (2026-10-08)
 - [x] maskani-ui console and portal screens
 
+### Gaps found by the 2026-10-09 audit
+Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
+
+- [ ] Property scope on EndLink, UpdateParty, InviteParty, RemoveStaff; ListParties scoped by linked units; CreateParty never returns a party from another property (FR-13, wave 1a)
+- [ ] `SetUserRoles` refuses roles above the actor's own; a property-limited admin can only invite staff into their own properties (FR-13, wave 1a)
+- [ ] Portal `OwnsAccount` follows bill-to and role: an occupant reads and pays only the accounts assigned to them, and access ends at the link's `end_date` (FR-14, wave 1a)
+- [ ] Media upload needs a permission or portal session, is rate limited and capped in bytes and pixels; signing checks the record scope; `MediaSigningSecret` required in production (NFR-09, wave 1a)
+- [ ] Custom field definitions with validation of `custom_fields` on write, filters and exports (FR-07, wave 2.11)
+- [ ] Layered configuration: property overrides read by the module check (FR-07, FR-08, wave 2.11)
+- [ ] Module switched off keeps its data readable and exportable; only writes and jobs stop (FR-09, wave 1b)
+- [ ] Plan limits on units and staff users counted in SQL (FR-03, wave 2.4)
+- [ ] Terms and privacy acceptance history (version, time, IP) read back by the portal instead of device storage (FR-19, wave 2.4)
+- [ ] Links end on their `end_date` by a daily job: portal and pass access revoked, final reading requested, bill-to reverts after `revert_after_days` (FR-14, SRDD 8.3 and 16.4, wave 2.7)
+- [ ] Resale and transfer: clearance, close ownership, invite the new owner, split reading, apportion by days (SRDD 16.3, wave 2.7)
+- [ ] Portal household, vehicles and domestic staff, each able to get gate passes (SRDD 16.2 step 5, wave 2.7)
+- [ ] Import: natural-key maps preloaded per 500-row batch, validation once, no raw contacts kept after validation, uncommitted jobs purged after 7 days (wave 1a and 1b)
+- [ ] Tenant syncer on shared-service-client and `cache.GetTenantDetails`; access resolution cached per user and tenant (wave 1b)
+- [ ] Keyset indexes `(tenant_id, property_id, created_at, id)` on units and parties (wave 1b)
+
 ## Acceptance
 
 - A staff user assigned to one property cannot list or open another property's units (403 or empty).

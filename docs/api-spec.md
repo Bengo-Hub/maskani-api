@@ -1,7 +1,9 @@
 # maskani-api API specification
 
 Base: `https://maskaniapi.codevertexafrica.com/api/v1/{tenant}/maskani` (tenant = slug or UUID).
-Swagger UI at `/v1/docs/`. All bodies are JSON; money is a decimal string in KES.
+`/v1/docs/` serves a route table today; Swagger annotations and the Swagger UI arrive in wave 2.13
+of `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md`. All bodies are JSON; money is a
+decimal string in KES.
 
 Routes marked **planned (sprint N)** are designed but not built yet; everything else is live.
 

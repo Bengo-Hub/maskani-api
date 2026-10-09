@@ -24,6 +24,32 @@ Design targets (SRDD NFR-04 to NFR-06): 500 tenants, 200,000 units, 2 million ga
    same at 40 units or 40,000.
 7. **Treasury stays authoritative.** Balances shown in maskani are a display cache refreshed from
    treasury events; reconciliation never sums local copies of money.
+8. **No query or S2S call per row.** A loop over rows never calls the database or another service
+   once per row. Load what the loop needs by id set first (`IDIn(...)` into a map), write with
+   `CreateBulk` or one set-based `UPDATE`, and batch S2S lookups. The 2026-10-09 audit found this in
+   instalment invoicing, progress sync, billing issue, gate event recording, notice delivery, portal
+   units, the market projection and imports; wave 1b of the current plan removes each one and adds a
+   query-count test on the hot paths.
+9. **Long work is resumable.** A billing run, import commit or notice send stores its status and
+   is picked up by a minute job holding a `RunOnce` claim on the run id. Never start it in a bare
+   goroutine, which a pod restart leaves stuck.
+10. **Filter in SQL, never after the limit.** Search, minimum balance and scope filters go in the
+    WHERE clause. Filtering a loaded page in Go or the browser gives wrong answers on keyset lists.
+11. **System jobs set a real tenant context when they write.** `tenantguard.With` on a system
+    context keeps the system flag, so a job that loops over tenants must build a fresh tenant
+    context per tenant, and its cross-tenant scan needs an index that does not lead with
+    `tenant_id` (a partial index on the job's predicate).
+12. **Jobs respect modules.** Every scheduled job and consumer skips tenants and properties where
+    its module is off.
+
+## daily_stats
+
+One row per tenant, property and day with billed, collected, payments count, arrears, occupancy,
+water and work order figures. The payment consumer adds to `collected` and `payments_count` in the
+same transaction as its `consumed_events` row, keyed by the payment's own day, so a redelivery never
+counts twice. A nightly `ClaimPeriod` job recomputes every metric for the previous day from SQL and
+treasury's ledger, which repairs anything an event missed. Report queries compare
+`daily_stats.day` directly with date bounds; casting the column defeats its index.
 
 ## Uniqueness that makes retries safe
 

@@ -36,6 +36,23 @@ API state as of 2026-10-08.
 - [ ] Budgets, documents, privacy (after demo)
 - [ ] maskani-ui reports and notices screens
 
+### Gaps found by the 2026-10-09 audit
+Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
+
+- [ ] Correction: the dashboard ageing summary exists, but there is no standalone arrears ageing report with 0 to 30, 31 to 60, 61 to 90 and over 90 bands and last payment date (SRDD 19, wave 2.3)
+- [ ] `daily_stats` writes only `collected` and `payments_count`, uses `time.Now()` instead of the payment time, and can double count on redelivery. Fix: write it in the consumer transaction keyed by payment day, add the nightly rebuild of all metrics (wave 1b)
+- [ ] `weeklySQL` casts `daily_stats.day` and defeats its index (wave 1b)
+- [ ] Reports suite: collections by month, charge type and block; payment channel; 24-month instalment receivables; handover and title tracker; water trend; maintenance performance; vendor scorecard; security summary; every figure links to its records (FR-66, wave 2.3)
+- [ ] Exports `?format=pdf|csv|xlsx` on every report through the copied docs engine (FR-66, wave 2.1)
+- [ ] Notice recipients paged by keyset in 500s instead of 20,000 loaded in memory; deliveries list paged (wave 1b)
+- [ ] Property scope on notice create, send and deliveries and on enquiry update (wave 1a)
+- [ ] `AuditLog` written by one helper from money, contract, configuration, role and access changes (FR-67, wave 2.4)
+- [ ] Privacy requests with OTP identity, deadline, export and anonymisation, statutory records kept; retention purge jobs (FR-67, NFR-10, wave 2.4)
+- [ ] Documents: templates with merge fields, versions and approval; generation with reference and verification code; OTP acceptance; wet-signed upload; access log; public verify route (FR-46 to FR-49, wave 2.1)
+- [ ] Budgets against actual, income and expenditure and the sinking fund statement read from treasury budgets, ledger and cost-centre S2S; AGM pack (FR-65, wave 2.10)
+- [ ] ERP client: no client exists yet although `ERP_URL` is configured (FR-63, wave 2.8)
+- [ ] Swagger annotations: `/v1/docs/` is a route table today, not Swagger UI (wave 2.13)
+
 ## Rules to apply in this sprint
 
 Standing backend rules in [README.md](README.md), plus:

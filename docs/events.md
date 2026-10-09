@@ -25,7 +25,19 @@ envelope first and are idempotent on event ID.
 | `maskani.vendor.document_expiring` | 30, 14, 7 days before expiry | vendor_id, vendor, doc_type, expires_at, days_left | notifications: email to the tenant contact |
 | `maskani.notice.published` | Notice sent | notice, audience size, priority | notifications fan-out |
 | `maskani.document.executed` | Document fully signed | document, entity, key dates | key-date reminders |
-| `maskani.lease.*` (R2), `maskani.listing.*`, `maskani.enquiry.created` (R3) | Later releases | | |
+| `maskani.vendor_invoice.approved` | Manager confirms a vendor invoice (wave 2.8) | invoice_id, treasury_vendor_id, amount (net of service credit), etims_number, cost_center, budget_line, fund, wht | treasury: new arpa subscriber raises the vendor bill, idempotent on invoice_id |
+| `maskani.arrears.step` | Arrears ladder step reached (wave 2.2) | account_ref, unit_code, step (reminder_1, reminder_7, reminder_14, call_list, demand_letter, escalation), balance, days_overdue | notifications: reminders by email and WhatsApp |
+| `maskani.link.ended` | An occupancy or ownership link reached its end date (wave 2.7) | unit, party, role, end_date | gate pass revocation, final reading request |
+| `maskani.lease.*` (R2), `maskani.listing.*`, `maskani.enquiry.created`, `maskani.tender.*` (R3) | Later releases | | |
+
+Payload rule (2026-10-09 audit): events carry ids, display names and only the contact the receiving
+channel needs. `maskani.pass.created` must carry the plain code and visitor phone because
+notifications sends the code to the visitor and keeps no maskani data, so the code exists in the
+outbox row until it is published. Wave 1a keeps that window short (published outbox rows for
+`maskani.pass.*` are pruned on publish, not on the normal schedule) and drops every field the
+template does not use. As of
+2026-10-09 `maskani.instalment.due`, `.sale_contract.defaulted` and `.unit.handed_over` are declared
+but never published; waves 2.2 and 2.6 wire them.
 
 ## Consumed
 

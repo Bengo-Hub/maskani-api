@@ -20,7 +20,14 @@ and one self-managing landlord. Requirements FR-05, FR-16, FR-17, FR-36 to FR-45
 | Turnover | Projects with repaint, repair, cleaning tasks as work orders; landlord approval above the mandate limit; ready date drives listing availability |
 | Remittances | Rent collected less fees, approved expenses and withholding (MRI 7.5% resident, 30% non-resident) paid by treasury on the mandate day with a statement |
 
+| Short stays (user decision 2026-10-09) | An owner or manager can run a unit as a short stay instead of a long let. Unit `metadata.occupancy_mode` is `long_let` or `short_stay`. A short-stay unit becomes a room in pos-api's hotel module through S2S under the property's outlet, so bookings, folios, the public booking widget and the booking policy engine stay in pos-api. Maskani shows bookings and owner income read only and charges the management fee. There is no booking logic in Maskani. Channel sync with Airbnb and Booking.com is R4 |
+| Use case presets on sign-up | Estate operator, developer, residential manager, commercial manager, self-managing landlord, agent; applied on first sign-in from the auth-api `property` use case |
+
 All of these attach to existing `units`, `parties`, `unit_accounts`, `work_orders` and `documents`.
+
+## Progress
+
+- [ ] Not started. Built in wave 4 of `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md`, after Release 1 is complete.
 
 ## Rules to apply
 
