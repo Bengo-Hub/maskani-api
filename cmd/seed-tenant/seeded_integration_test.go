@@ -72,7 +72,7 @@ func TestSeededEstate(t *testing.T) {
 		t.Fatalf("B07 found %v, billable %d (want 29)", found, pv.Billable)
 	}
 	rep := reports.NewService(client, db, nil, loc, log)
-	d, err := rep.Dashboard(tctx, reports.Scope{PropertyID: &prop.ID}, "")
+	d, err := rep.Dashboard(tctx, reports.Scope{PropertyID: &prop.ID}, reports.DashboardFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
