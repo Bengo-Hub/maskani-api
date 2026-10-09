@@ -354,9 +354,9 @@ WITH weeks AS (
      AND ($5::text IS NULL OR r.property_id = ANY($5::text::uuid[]))
    GROUP BY 1
 ), coll AS (
-  SELECT date_trunc('week', (d.day AT TIME ZONE 'UTC'))::date AS wk, SUM(d.collected) AS amt
+  SELECT date_trunc('week', d.day)::date AS wk, SUM(d.collected) AS amt
     FROM daily_stats d
-   WHERE d.tenant_id = $1 AND (d.day AT TIME ZONE 'UTC')::date >= $2::date AND (d.day AT TIME ZONE 'UTC')::date < $3::date
+   WHERE d.tenant_id = $1 AND d.day >= $2::date AND d.day < $3::date
      AND ($5::text IS NULL OR d.property_id = ANY($5::text::uuid[]))
    GROUP BY 1
 )
@@ -462,8 +462,29 @@ type ArrearsRow struct {
 }
 
 // Arrears returns a keyset page of owing accounts, largest balance first, for one property or the
-// caller's properties.
+// caller's properties. Pages are cached for 60 seconds like the dashboard.
 func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.DecimalParams) (page.Result[ArrearsRow], error) {
+	sc := Scope{PropertyID: propertyID, IDs: scope, All: all}
+	key := fmt.Sprintf("arrears:%s:%d:%t:%s:%s", sc.key(), p.Limit, p.HasAfter, p.AfterID, p.AfterVal)
+	v, err := s.cached(ctx, key, func() (any, error) { return s.arrears(ctx, propertyID, scope, all, p) })
+	if err != nil {
+		return page.Result[ArrearsRow]{}, err
+	}
+	return v.(page.Result[ArrearsRow]), nil
+}
+
+// WaterBalance is the property's water balance trend, read from the replica and cached.
+func (s *Service) WaterBalance(ctx context.Context, propertyID uuid.UUID, period string) ([]utilities.BalancePoint, error) {
+	v, err := s.cached(ctx, "water:"+propertyID.String()+":"+period, func() (any, error) {
+		return s.utilities.WaterBalance(ctx, propertyID, period)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]utilities.BalancePoint), nil
+}
+
+func (s *Service) arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.DecimalParams) (page.Result[ArrearsRow], error) {
 	q := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero), unitaccount.StatusEQ(unitaccount.StatusActive))
 	if propertyID != nil {
 		q = q.Where(unitaccount.HasUnitWith(unit.PropertyID(*propertyID)))
@@ -491,8 +512,16 @@ type SalesPosition struct {
 	Balance   decimal.Decimal `json:"balance"`
 }
 
-// Sales returns the sales position for a property.
+// Sales returns the sales position for a property (cached 60 seconds).
 func (s *Service) Sales(ctx context.Context, propertyID uuid.UUID) (*SalesPosition, error) {
+	v, err := s.cached(ctx, "sales:"+propertyID.String(), func() (any, error) { return s.sales(ctx, propertyID) })
+	if err != nil {
+		return nil, err
+	}
+	return v.(*SalesPosition), nil
+}
+
+func (s *Service) sales(ctx context.Context, propertyID uuid.UUID) (*SalesPosition, error) {
 	var rows []struct {
 		SaleStatus string `json:"sale_status"`
 		Count      int    `json:"count"`

@@ -4,6 +4,7 @@ package jobs
 
 import (
 	"context"
+	stdsql "database/sql"
 	"time"
 
 	sharedcache "github.com/Bengo-Hub/cache"
@@ -14,8 +15,10 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
+	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
@@ -37,7 +40,10 @@ type Runner struct {
 // Deps are the services jobs call.
 type Deps struct {
 	Client   *ent.Client
+	SQL      *stdsql.DB // primary handle for set-based rollups
+	Loc      *time.Location
 	Accounts *accounts.Service
+	Billing  *billing.Service
 	Sales    *sales.Service
 	Works    *works.Service
 	Gate     *gate.Service
@@ -52,6 +58,10 @@ func New(d Deps) *Runner {
 	return &Runner{log: log, jobs: []Job{
 		{"maskani:c2b-routes", 5 * time.Minute, func(ctx context.Context) error {
 			_, err := d.Accounts.RegisterPending(sys(ctx), 200)
+			return err
+		}},
+		{"maskani:billing-resume", 2 * time.Minute, func(ctx context.Context) error {
+			_, err := d.Billing.ResumeStuck(sys(ctx))
 			return err
 		}},
 		{"maskani:reservation-expiry", 15 * time.Minute, func(ctx context.Context) error {
@@ -124,6 +134,16 @@ func New(d Deps) *Runner {
 				d.Notices.Resume(tenantguard.With(ctx, n.TenantID), n)
 			}
 			return nil
+		}},
+		// Yesterday's daily_stats rebuilt from the source tables, one statement per tenant, which
+		// repairs anything an event missed (collections stay with the payment consumer).
+		{"maskani:daily-stats-rebuild", 24 * time.Hour, func(ctx context.Context) error {
+			if d.SQL == nil {
+				return nil
+			}
+			n, err := reports.RebuildTenants(ctx, d.SQL, d.Loc)
+			log.Info("daily stats rebuilt", zap.Int("tenants", n))
+			return err
 		}},
 		{"maskani:outbox-prune-passes", 15 * time.Minute, func(ctx context.Context) error {
 			_, err := PruneOutbox(sys(ctx), d.Client, true)

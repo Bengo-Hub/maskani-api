@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -294,6 +295,26 @@ func (s *Service) Issue(ctx context.Context, actor uuid.UUID, in IssueInput) (*e
 	return run, nil
 }
 
+// stuckAfter is how long a run may sit in "issuing" without a batch finishing before the resume
+// job takes it over (a batch of 500 S2S calls takes well under this).
+const stuckAfter = 5 * time.Minute
+
+// ResumeStuck restarts runs left in "issuing" by a pod that stopped (system job, all tenants).
+// Lines already issued are skipped and treasury's by-reference check stops a double invoice, so
+// resuming is safe; the per-run lease stops two pods issuing the same run.
+func (s *Service) ResumeStuck(ctx context.Context) (int, error) {
+	runs, err := s.client.BillingRun.Query().Where(billingrun.StatusEQ(billingrun.StatusIssuing),
+		billingrun.UpdatedAtLT(time.Now().Add(-stuckAfter))).Select(billingrun.FieldID, billingrun.FieldTenantID).
+		Limit(50).All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, r := range runs {
+		go s.issueLines(tenantguard.With(context.Background(), r.TenantID), r.ID)
+	}
+	return len(runs), nil
+}
+
 // progress publishes a run progress hint. Called once per batch, never per line.
 func (s *Service) progress(tenantID uuid.UUID, run *ent.BillingRun) {
 	if run == nil {
@@ -327,7 +348,26 @@ func (s *Service) dates(ctx context.Context, in IssueInput) (time.Time, time.Tim
 }
 
 // issueLines raises invoices for pending and failed lines in batches, then settles the run status.
+// It holds a fleet-wide lease on the run while it works (renewed as it goes), so a resume never
+// runs alongside a live issue on another pod.
 func (s *Service) issueLines(ctx context.Context, runID uuid.UUID) {
+	if s.rdb == nil {
+		s.issueLinesLocked(ctx, runID)
+		return
+	}
+	ran, err := sharedcache.RunExclusive(ctx, s.rdb, s.log, "maskani:billing-run:"+runID.String(), 2*time.Minute,
+		func(lctx context.Context) error {
+			s.issueLinesLocked(lctx, runID)
+			return nil
+		})
+	if err != nil {
+		s.log.Warn("billing run lease unavailable; the resume job will retry", zap.String("run", runID.String()), zap.Error(err))
+	} else if !ran {
+		s.log.Info("billing run already issuing on another pod", zap.String("run", runID.String()))
+	}
+}
+
+func (s *Service) issueLinesLocked(ctx context.Context, runID uuid.UUID) {
 	run, err := s.client.BillingRun.Get(ctx, runID)
 	if err != nil {
 		s.log.Error("billing run not found", zap.Error(err))
@@ -344,18 +384,34 @@ func (s *Service) issueLines(ctx context.Context, runID uuid.UUID) {
 		if err != nil || len(lines) == 0 {
 			break
 		}
-		for _, l := range lines {
-			s.issueOne(ctx, tenantID, run, f, prop, l)
+		// The batch's accounts in one read instead of one per line.
+		accIDs := make([]uuid.UUID, len(lines))
+		for i, l := range lines {
+			accIDs[i] = l.UnitAccountID
 		}
+		accs := map[uuid.UUID]*ent.UnitAccount{}
+		if rows, err := s.client.UnitAccount.Query().Where(unitaccount.IDIn(accIDs...)).All(ctx); err == nil {
+			for _, a := range rows {
+				accs[a.ID] = a
+			}
+		}
+		for _, l := range lines {
+			if ctx.Err() != nil {
+				return // lease lost or shutting down; the resume job carries on
+			}
+			s.issueOne(ctx, tenantID, run, f, prop, l, accs[l.UnitAccountID])
+		}
+		// Each finished batch marks the run alive, so the resume job leaves it alone.
+		_ = s.client.BillingRun.UpdateOneID(runID).SetUpdatedAt(time.Now()).Exec(ctx)
 		s.progress(tenantID, run)
 	}
 	s.finishRun(ctx, tenantID, runID)
 }
 
-func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.BillingRun, f *ent.Fund, prop *ent.Property, l *ent.BillingRunLine) {
-	acc, err := s.client.UnitAccount.Get(ctx, l.UnitAccountID)
-	if err != nil {
-		_ = l.Update().SetStatus(billingrunline.StatusFailed).AddAttempts(1).SetLastError(err.Error()).Exec(ctx)
+func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.BillingRun, f *ent.Fund, prop *ent.Property,
+	l *ent.BillingRunLine, acc *ent.UnitAccount) {
+	if acc == nil {
+		_ = l.Update().SetStatus(billingrunline.StatusFailed).AddAttempts(1).SetLastError("unit account not found").Exec(ctx)
 		return
 	}
 	req := treasury.CreateInvoiceRequest{

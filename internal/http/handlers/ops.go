@@ -147,7 +147,7 @@ func (h *H) WaterBalance(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	pts, err := h.Utilities.WaterBalance(r.Context(), *pid, period(r))
+	pts, err := h.Reports.WaterBalance(r.Context(), *pid, period(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

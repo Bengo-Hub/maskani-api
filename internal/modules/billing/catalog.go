@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
@@ -29,10 +30,15 @@ type Service struct {
 	loc      *time.Location
 	log      *zap.Logger
 	rt       realtime.Publisher
+	rdb      redis.UniversalClient
 }
 
 // SetRealtime sets the publisher for run progress hints (nil disables them).
 func (s *Service) SetRealtime(p realtime.Publisher) { s.rt = p }
+
+// SetRedis lets run issuing take a fleet-wide lease per run, so a resumed run never overlaps one
+// still going on another pod (nil, as in local runs, issues without the lease).
+func (s *Service) SetRedis(rdb redis.UniversalClient) { s.rdb = rdb }
 
 // NewService creates the billing service.
 func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, loc *time.Location, log *zap.Logger) *Service {

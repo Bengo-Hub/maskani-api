@@ -164,6 +164,9 @@ func New(ctx context.Context) (*App, error) {
 	accSvc := accounts.NewService(orm, tc, log)
 	regSvc := register.NewService(orm, ac, accSvc, box, log)
 	billSvc := billing.NewService(orm, tc, accSvc, loc, log)
+	if rdb != nil {
+		billSvc.SetRedis(rdb)
+	}
 	collSvc := collections.NewService(orm, tc, accSvc, log)
 	utilSvc := utilities.NewService(orm, log)
 	salesSvc := sales.NewService(orm, tc, accSvc, seq, loc, log)
@@ -220,7 +223,7 @@ func New(ctx context.Context) (*App, error) {
 		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer,
 		InternalKey: cfg.Auth.APIKey})
 
-	runner := jobs.New(jobs.Deps{Client: orm, Accounts: accSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
+	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
 
 	return &App{cfg: cfg, log: log, pool: pool, cache: rdb, nc: nc, orm: orm, roOrm: roOrm, outbox: outbox,
 		consumer: consumer, notices: noticeSvc, jobs: runner,
