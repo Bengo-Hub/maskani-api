@@ -590,24 +590,33 @@ func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	res, err := h.Reports.Arrears(r.Context(), f.PropertyID, f.Scope, f.AllProperties, arrearsFilter(r), page.ParseDecimal(r))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if maskArrearsPhones(r) {
+		for i := range res.Data {
+			res.Data[i].Phone = secure.MaskPhone(res.Data[i].Phone)
+		}
+	}
+	httpx.JSON(w, http.StatusOK, res)
+}
+
+// arrearsFilter reads ?q (account prefix or name) and ?min (smallest balance).
+func arrearsFilter(r *http.Request) reports.ArrearsFilter {
 	af := reports.ArrearsFilter{Q: r.URL.Query().Get("q")}
 	if v := r.URL.Query().Get("min"); v != "" {
 		if d, err := decimal.NewFromString(v); err == nil {
 			af.Min = d
 		}
 	}
-	res, err := h.Reports.Arrears(r.Context(), f.PropertyID, f.Scope, f.AllProperties, af, page.ParseDecimal(r))
-	if err != nil {
-		httpx.Fail(w, err)
-		return
-	}
-	// The phone is for whoever follows up arrears; report viewers see it masked.
-	if !access(r).Has(rbac.PermBillingCollect, rbac.PermBillingManage) {
-		for i := range res.Data {
-			res.Data[i].Phone = secure.MaskPhone(res.Data[i].Phone)
-		}
-	}
-	httpx.JSON(w, http.StatusOK, res)
+	return af
+}
+
+// maskArrearsPhones: the phone is for whoever follows up arrears; report viewers see it masked.
+func maskArrearsPhones(r *http.Request) bool {
+	return !access(r).Has(rbac.PermBillingCollect, rbac.PermBillingManage)
 }
 
 // SalesPosition is GET /reports/sales-position?property_id=.

@@ -211,7 +211,7 @@ func New(ctx context.Context) (*App, error) {
 	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
 	importSvc := imports.NewService(orm, regSvc, log)
 	// Documents brand from auth-api's tenant record through the shared Redis tenant cache (in-cluster).
-	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, loc)
+	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, reportSvc, loc)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),

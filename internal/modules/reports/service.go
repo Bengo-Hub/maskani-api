@@ -473,6 +473,44 @@ func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, scope []uu
 	return v.(page.Result[ArrearsRow]), nil
 }
 
+// ExportRowLimit caps a downloaded list; a longer one is cut and the document says so.
+const ExportRowLimit = 10000
+
+// ArrearsAll returns every owing account matching the filter, largest balance first, walking the
+// same keyset as the screen a page at a time (not cached: a download is a deliberate one-off).
+// The bool is true when the list was cut at ExportRowLimit.
+func (s *Service) ArrearsAll(ctx context.Context, sc Scope, f ArrearsFilter) ([]ArrearsRow, bool, error) {
+	var out []ArrearsRow
+	p := page.DecimalParams{Limit: page.MaxLimit}
+	for {
+		res, err := s.arrears(ctx, sc.PropertyID, sc.IDs, sc.All, f, p)
+		if err != nil {
+			return nil, false, err
+		}
+		out = append(out, res.Data...)
+		if !res.HasMore {
+			return out, false, nil
+		}
+		if len(out) >= ExportRowLimit {
+			return out[:ExportRowLimit], true, nil
+		}
+		last := res.Data[len(res.Data)-1]
+		p = page.DecimalParams{Limit: page.MaxLimit, AfterID: last.AccountID, AfterVal: last.Balance, HasAfter: true}
+	}
+}
+
+// Ageing is the owing balance by days since due for a scope, cached 60 seconds.
+func (s *Service) Ageing(ctx context.Context, sc Scope) ([]AgeBucket, error) {
+	v, err := s.cached(ctx, "ageing:"+sc.key(), func() (any, error) {
+		tenantID, _ := tenantguard.TenantID(ctx)
+		return s.ageing(ctx, tenantID, sc)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]AgeBucket), nil
+}
+
 // WaterBalance is the property's water balance trend, read from the replica and cached.
 func (s *Service) WaterBalance(ctx context.Context, propertyID uuid.UUID, period string) ([]utilities.BalancePoint, error) {
 	v, err := s.cached(ctx, "water:"+propertyID.String()+":"+period, func() (any, error) {

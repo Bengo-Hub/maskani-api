@@ -302,6 +302,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingCollect)).Get("/collections/suspense", h.Suspense)
 		g.With(perm(rbac.PermBillingCollect)).Post("/collections/suspense/{trans_id}/assign", h.AssignSuspense)
 		g.With(perm(rbac.PermReportsView)).Get("/reports/arrears", h.Arrears)
+		g.With(perm(rbac.PermReportsView), export).Get("/reports/arrears/export", h.ArrearsExport)
 	})
 
 	// Utilities.
@@ -314,6 +315,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters/{id}/estimate", h.EstimateReading)
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meter-readings/{id}/verify", h.VerifyReading)
 		g.With(perm(rbac.PermUtilitiesView)).Get("/water-balance", h.WaterBalance)
+		g.With(perm(rbac.PermUtilitiesView), export).Get("/water-balance/export", h.WaterBalanceExport)
 	})
 
 	// Sales.
@@ -376,6 +378,7 @@ func mount(r chi.Router, d Deps) {
 	})
 	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/insights", h.Insights)
+	r.With(perm(rbac.PermReportsView), export).Get("/reports/insights/export", h.PerformanceExport)
 	r.Get("/reports/role-summary", h.RoleSummary) // any staff; panels filtered by role on screen
 
 	// Portal: scoped by the caller's own unit links.

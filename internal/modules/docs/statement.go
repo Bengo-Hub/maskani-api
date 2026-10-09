@@ -15,6 +15,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
+	analytics "github.com/bengobox/maskani-api/internal/modules/reports"
 )
 
 // Service builds Maskani's documents.
@@ -22,12 +23,13 @@ type Service struct {
 	client      *ent.Client
 	brand       *Brander
 	collections *collections.Service
+	analytics   *analytics.Service
 	loc         *time.Location
 }
 
 // NewService creates the documents service.
-func NewService(client *ent.Client, brand *Brander, col *collections.Service, loc *time.Location) *Service {
-	return &Service{client: client, brand: brand, collections: col, loc: loc}
+func NewService(client *ent.Client, brand *Brander, col *collections.Service, an *analytics.Service, loc *time.Location) *Service {
+	return &Service{client: client, brand: brand, collections: col, analytics: an, loc: loc}
 }
 
 // File is a rendered document ready to download.
@@ -57,13 +59,7 @@ func (s *Service) Statement(ctx context.Context, tenantID uuid.UUID, slug string
 		}
 	}
 	statementReport(r, st, s.loc)
-
-	body, mime, err := reports.Generate(r, format)
-	if err != nil {
-		return nil, err
-	}
-	name := fmt.Sprintf("statement-%s-%s.%s", fileSafe(st.Account.AccountRef), now.Format("2006-01-02"), format.Ext())
-	return &File{Body: body, Mime: mime, Name: name}, nil
+	return s.render(r, format, "statement-"+st.Account.AccountRef)
 }
 
 // statementReport fills a branded report with the statement: account meta, summary cards and the

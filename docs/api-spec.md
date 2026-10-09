@@ -132,6 +132,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/meters/{id}/readings` `{period, reading, photo_key, read_at, notes}` | Record a reading; anomaly flags returned | `utilities.read` |
 | POST `/meters/{id}/estimate` `{period}`; POST `/meter-readings/{id}/verify` `{action}` | Estimate; accept, reject or recheck | `utilities.manage` |
 | GET `/water-balance?property_id=&period=` | Supplied, billed, common and loss for six periods | `utilities.view` |
+| GET `/water-balance/export?format=pdf\|csv\|xlsx&property_id=&period=` | The same as a branded document with a loss chart | `utilities.view` |
 | PATCH `/meters/{id}`; POST `/meters/{id}/replace`; POST `/reading-rounds/{id}/close` | | planned (sprint 2) |
 
 ## Sales (module `sales`)
@@ -216,6 +217,10 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 | GET `/reports/dashboard?property_id=&period=` | See below | `reports.view` |
 | GET `/reports/insights?property_id=&period=` | Staff dashboard business view: `months` (12 months of billed, collected, collection_rate, work_opened, work_closed, contracts_signed, sales_value), `kpis` (each with `last_month` and `last_year`; outstanding, days_sales_outstanding, occupancy_pct, available_for_sale, open_work_orders, avg_resolve_hours_90d), `forecast` (12 months of instalments plus recurring), `forecast_basis` (inputs and method), `sales` (pace, months to sell out), `revenue_mix`, `blocks`, `work_by_category` | `reports.view` |
 | GET `/reports/arrears?property_id=&q=&min=` | Owing accounts, largest first (keyset); `q` matches the account reference prefix or the owner's name, `min` the smallest balance; phones masked without `billing.collect` | `reports.view` |
+| GET `/reports/arrears/export?format=&property_id=&q=&min=` | Every matching owing account (up to 10,000, the document says when cut) with the ageing chart; same phone masking | `reports.view` |
+| GET `/reports/insights/export?format=&property_id=&period=` | The performance report: KPI cards with month-on-month change, 12-month collected chart and table, cash-in forecast with its method, revenue by charge, blocks, maintenance by category, occupancy and sales | `reports.view` |
+
+All exports render on `github.com/Bengo-Hub/reports`, send `Cache-Control: private, no-store`, and share a limit of 20 per user per minute.
 | GET `/reports/collections`, `/instalment-receivables`, `/maintenance`, `/vendor-scorecard`, `/security`; CSV and PDF export | | planned (sprint 5) |
 
 The dashboard reads through the read-only database and is cached for 60 seconds per tenant, scope
