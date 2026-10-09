@@ -129,7 +129,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | Method and path | Purpose | Permission |
 |---|---|---|
 | GET `/meters?property_id=`; POST `/meters` | Meters | `utilities.view` or `utilities.read` / `utilities.manage` |
-| GET `/reading-rounds/{period}?property_id=` | Round for a period in walking order (opens it if needed) | `utilities.read` |
+| GET `/reading-rounds/{period}?property_id=` | Round for a period in walking order (opens it if needed); each row has `previous_reading`, `average_use` (mean use over the meter's last three periods) and `spike_above` (the use the server flags as much higher than usual: three times the average) | `utilities.read` |
 | POST `/meters/{id}/readings` `{period, reading, photo_key, read_at, notes}` | Record a reading; anomaly flags returned | `utilities.read` |
 | POST `/meters/{id}/estimate` `{period}`; POST `/meter-readings/{id}/verify` `{action}` | Estimate; accept, reject or recheck | `utilities.manage` |
 | GET `/water-balance?property_id=&period=` | Supplied, billed, common and loss for six periods | `utilities.view` |
@@ -188,7 +188,9 @@ Staff side (module `gate`):
 | POST `/gate/devices` `{property_id, name, gate_name}` | Register a tablet; returns `device_key` once | `gate.manage` |
 | GET `/gate/events?property_id=&kind=` (keyset) | Gate log; each row adds `unit_code`, `block` and `guard_name`; entries carry `exited_at`, exits `entry_event_id`, walk-ins `decision` and `decided_by` (host, guard) | `gate.view` |
 | GET `/gate/inside?property_id=` | Who is inside now: entries and admitted walk-ins without an exit in the last 24 hours | `gate.view` |
-| GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes; POST returns `code` and `qr_token` once | `gate.view` / `gate.manage` |
+| GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes, each with `unit_code` and `block`; POST returns `code` and `qr_token` once, needs a `unit_id` at the property when given, and links the returning visitor | `gate.view` / `gate.manage` |
+| GET `/visitor-passes/{id}`; POST `/visitor-passes/{id}/cancel` | One pass; cancel an active pass (`409` when no longer active) | `gate.view` / `gate.manage` |
+| GET `/gate/devices?property_id=`; POST `/gate/devices/{id}/revoke` | Tablets with `last_seen_at` and `online` (seen in 15 minutes); revoke a lost or replaced tablet's key | `gate.manage` |
 | GET `/incidents` (keyset; `property_id`, `open`); POST `/incidents` | Incidents | `gate.view` |
 | GET `/incidents/{id}` | One incident (incident alert deep link), property scoped | `gate.view` |
 | `/guard-posts`, `/patrol-checkpoints`, `/patrols/scans`; PATCH `/incidents/{id}` | | planned (sprint 4) |

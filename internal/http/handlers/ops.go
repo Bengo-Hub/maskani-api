@@ -393,12 +393,89 @@ func (h *H) ListPasses(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := h.Gate.PagePasses(r.Context(), f, r.URL.Query().Get("active") == "true", page.Parse(r))
+	res, err := h.Gate.PagePassViews(r.Context(), f, r.URL.Query().Get("active") == "true", page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, res)
+}
+
+// GetPass is GET /visitor-passes/{id}: one pass with its unit and block (property scoped).
+func (h *H) GetPass(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	p, err := h.Gate.Pass(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !requireProperty(w, r, p.PropertyID) {
+		return
+	}
+	httpx.JSON(w, http.StatusOK, p)
+}
+
+// StaffCancelPass is POST /visitor-passes/{id}/cancel.
+func (h *H) StaffCancelPass(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	p, err := h.Gate.Pass(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !requireProperty(w, r, p.PropertyID) {
+		return
+	}
+	if err := h.Gate.CancelActivePass(r.Context(), id); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListDevices is GET /gate/devices?property_id=: the property's tablets with last seen and online.
+func (h *H) ListDevices(w http.ResponseWriter, r *http.Request) {
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid == nil {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
+		return
+	}
+	if !requireProperty(w, r, *pid) {
+		return
+	}
+	rows, err := h.Gate.Devices(r.Context(), *pid)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+}
+
+// RevokeDevice is POST /gate/devices/{id}/revoke: the tablet's key stops working.
+func (h *H) RevokeDevice(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	pid, err := h.Gate.DevicePropertyID(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !requireProperty(w, r, pid) {
+		return
+	}
+	if err := h.Gate.RevokeDevice(r.Context(), id); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ListGateEvents is GET /gate/events?property_id=.

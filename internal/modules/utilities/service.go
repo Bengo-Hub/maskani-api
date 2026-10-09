@@ -123,6 +123,10 @@ type RoundRow struct {
 	Block           string            `json:"block,omitempty"`
 	PreviousReading decimal.Decimal   `json:"previous_reading"`
 	Current         *ent.MeterReading `json:"current,omitempty"`
+	// AverageUse is the meter's mean use over its last three periods, and SpikeAbove the use the
+	// server flags as much higher than usual (three times that); both absent without history.
+	AverageUse *decimal.Decimal `json:"average_use,omitempty"`
+	SpikeAbove *decimal.Decimal `json:"spike_above,omitempty"`
 }
 
 // Round is a property's reading round for a period.
@@ -182,11 +186,16 @@ func (s *Service) GetRound(ctx context.Context, propertyID uuid.UUID, period str
 	if err != nil {
 		return nil, err
 	}
+	avgs := s.averages(ctx, meterIDs, period)
 	out := &Round{ReadingRound: rr, Total: len(meters)}
 	for _, m := range meters {
 		row := RoundRow{MeterID: m.ID, Serial: m.Serial, Kind: string(m.Kind), UnitID: m.UnitID, PreviousReading: m.InitialReading}
 		if p, ok := prevByMeter[m.ID]; ok {
 			row.PreviousReading = p
+		}
+		if a, ok := avgs[m.ID]; ok && a.IsPositive() {
+			spike := a.Mul(spikeFactor)
+			row.AverageUse, row.SpikeAbove = &a, &spike
 		}
 		if m.UnitID != nil {
 			if u := unitByID[*m.UnitID]; u != nil {
@@ -287,7 +296,7 @@ func (s *Service) Record(ctx context.Context, meterID, readBy uuid.UUID, in Read
 			flags = append(flags, FlagZero)
 		}
 	}
-	if avg := s.average(ctx, meterID, in.Period); avg.IsPositive() && consumption.GreaterThan(avg.Mul(decimal.NewFromInt(3))) {
+	if avg := s.average(ctx, meterID, in.Period); avg.IsPositive() && consumption.GreaterThan(avg.Mul(spikeFactor)) {
 		flags = append(flags, FlagSpike)
 	}
 	status := meterreading.StatusAccepted
@@ -322,19 +331,43 @@ func (s *Service) Record(ctx context.Context, meterID, readBy uuid.UUID, in Read
 	return s.saved(ctx, m.PropertyID, r, err)
 }
 
+// spikeFactor flags a reading whose use is more than this many times the meter's recent average.
+var spikeFactor = decimal.NewFromInt(3)
+
 // average is the mean consumption over the meter's last three periods.
 func (s *Service) average(ctx context.Context, meterID uuid.UUID, period string) decimal.Decimal {
+	return s.averages(ctx, []uuid.UUID{meterID}, period)[meterID]
+}
+
+// averages is the mean consumption over each meter's last three periods before period, from one
+// query over the six periods before it (a meter skipped some months still has three to average).
+// Meters without history are absent.
+func (s *Service) averages(ctx context.Context, meterIDs []uuid.UUID, period string) map[uuid.UUID]decimal.Decimal {
+	out := map[uuid.UUID]decimal.Decimal{}
+	start, err := time.Parse("2006-01", period)
+	if err != nil || len(meterIDs) == 0 {
+		return out
+	}
 	rows, err := s.client.MeterReading.Query().
-		Where(meterreading.MeterID(meterID), meterreading.PeriodLT(period), meterreading.StatusNEQ(meterreading.StatusRejected)).
-		Order(ent.Desc(meterreading.FieldPeriod)).Limit(3).All(ctx)
-	if err != nil || len(rows) == 0 {
-		return decimal.Zero
+		Where(meterreading.MeterIDIn(meterIDs...), meterreading.PeriodLT(period),
+			meterreading.PeriodGTE(start.AddDate(0, -6, 0).Format("2006-01")), meterreading.StatusNEQ(meterreading.StatusRejected)).
+		Select(meterreading.FieldMeterID, meterreading.FieldPeriod, meterreading.FieldConsumption).
+		Order(ent.Desc(meterreading.FieldPeriod)).All(ctx)
+	if err != nil {
+		return out
 	}
-	sum := decimal.Zero
+	sums, counts := map[uuid.UUID]decimal.Decimal{}, map[uuid.UUID]int64{}
 	for _, r := range rows {
-		sum = sum.Add(r.Consumption)
+		if counts[r.MeterID] == 3 {
+			continue // newest first: the three latest are in
+		}
+		sums[r.MeterID] = sums[r.MeterID].Add(r.Consumption)
+		counts[r.MeterID]++
 	}
-	return sum.Div(decimal.NewFromInt(int64(len(rows))))
+	for id, n := range counts {
+		out[id] = sums[id].Div(decimal.NewFromInt(n))
+	}
+	return out
 }
 
 // Verify accepts, rejects or asks for a re-check of a flagged reading.
