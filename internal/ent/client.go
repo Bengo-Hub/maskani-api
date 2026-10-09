@@ -86,6 +86,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
+	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
@@ -236,6 +237,8 @@ type Client struct {
 	VendorDocument *VendorDocumentClient
 	// VendorPersonnel is the client for interacting with the VendorPersonnel builders.
 	VendorPersonnel *VendorPersonnelClient
+	// Visitor is the client for interacting with the Visitor builders.
+	Visitor *VisitorClient
 	// VisitorPass is the client for interacting with the VisitorPass builders.
 	VisitorPass *VisitorPassClient
 	// WorkOrder is the client for interacting with the WorkOrder builders.
@@ -323,6 +326,7 @@ func (c *Client) init() {
 	c.VendorContract = NewVendorContractClient(c.config)
 	c.VendorDocument = NewVendorDocumentClient(c.config)
 	c.VendorPersonnel = NewVendorPersonnelClient(c.config)
+	c.Visitor = NewVisitorClient(c.config)
 	c.VisitorPass = NewVisitorPassClient(c.config)
 	c.WorkOrder = NewWorkOrderClient(c.config)
 	c.WorkOrderEvent = NewWorkOrderEventClient(c.config)
@@ -488,6 +492,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		VendorContract:      NewVendorContractClient(cfg),
 		VendorDocument:      NewVendorDocumentClient(cfg),
 		VendorPersonnel:     NewVendorPersonnelClient(cfg),
+		Visitor:             NewVisitorClient(cfg),
 		VisitorPass:         NewVisitorPassClient(cfg),
 		WorkOrder:           NewWorkOrderClient(cfg),
 		WorkOrderEvent:      NewWorkOrderEventClient(cfg),
@@ -580,6 +585,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		VendorContract:      NewVendorContractClient(cfg),
 		VendorDocument:      NewVendorDocumentClient(cfg),
 		VendorPersonnel:     NewVendorPersonnelClient(cfg),
+		Visitor:             NewVisitorClient(cfg),
 		VisitorPass:         NewVisitorPassClient(cfg),
 		WorkOrder:           NewWorkOrderClient(cfg),
 		WorkOrderEvent:      NewWorkOrderEventClient(cfg),
@@ -626,8 +632,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule, c.ServiceVisit,
 		c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount,
 		c.UnitCharge, c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor,
-		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.VisitorPass,
-		c.WorkOrder, c.WorkOrderEvent,
+		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.Visitor,
+		c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -651,8 +657,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule, c.ServiceVisit,
 		c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount,
 		c.UnitCharge, c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor,
-		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.VisitorPass,
-		c.WorkOrder, c.WorkOrderEvent,
+		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.Visitor,
+		c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -801,6 +807,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.VendorDocument.mutate(ctx, m)
 	case *VendorPersonnelMutation:
 		return c.VendorPersonnel.mutate(ctx, m)
+	case *VisitorMutation:
+		return c.Visitor.mutate(ctx, m)
 	case *VisitorPassMutation:
 		return c.VisitorPass.mutate(ctx, m)
 	case *WorkOrderMutation:
@@ -11066,6 +11074,141 @@ func (c *VendorPersonnelClient) mutate(ctx context.Context, m *VendorPersonnelMu
 	}
 }
 
+// VisitorClient is a client for the Visitor schema.
+type VisitorClient struct {
+	config
+}
+
+// NewVisitorClient returns a client for the Visitor from the given config.
+func NewVisitorClient(c config) *VisitorClient {
+	return &VisitorClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `visitor.Hooks(f(g(h())))`.
+func (c *VisitorClient) Use(hooks ...Hook) {
+	c.hooks.Visitor = append(c.hooks.Visitor, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `visitor.Intercept(f(g(h())))`.
+func (c *VisitorClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Visitor = append(c.inters.Visitor, interceptors...)
+}
+
+// Create returns a builder for creating a Visitor entity.
+func (c *VisitorClient) Create() *VisitorCreate {
+	mutation := newVisitorMutation(c.config, OpCreate)
+	return &VisitorCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Visitor entities.
+func (c *VisitorClient) CreateBulk(builders ...*VisitorCreate) *VisitorCreateBulk {
+	return &VisitorCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VisitorClient) MapCreateBulk(slice any, setFunc func(*VisitorCreate, int)) *VisitorCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VisitorCreateBulk{err: fmt.Errorf("calling to VisitorClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VisitorCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VisitorCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Visitor.
+func (c *VisitorClient) Update() *VisitorUpdate {
+	mutation := newVisitorMutation(c.config, OpUpdate)
+	return &VisitorUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VisitorClient) UpdateOne(_m *Visitor) *VisitorUpdateOne {
+	mutation := newVisitorMutation(c.config, OpUpdateOne, withVisitor(_m))
+	return &VisitorUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VisitorClient) UpdateOneID(id uuid.UUID) *VisitorUpdateOne {
+	mutation := newVisitorMutation(c.config, OpUpdateOne, withVisitorID(id))
+	return &VisitorUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Visitor.
+func (c *VisitorClient) Delete() *VisitorDelete {
+	mutation := newVisitorMutation(c.config, OpDelete)
+	return &VisitorDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VisitorClient) DeleteOne(_m *Visitor) *VisitorDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VisitorClient) DeleteOneID(id uuid.UUID) *VisitorDeleteOne {
+	builder := c.Delete().Where(visitor.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VisitorDeleteOne{builder}
+}
+
+// Query returns a query builder for Visitor.
+func (c *VisitorClient) Query() *VisitorQuery {
+	return &VisitorQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVisitor},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Visitor entity by its id.
+func (c *VisitorClient) Get(ctx context.Context, id uuid.UUID) (*Visitor, error) {
+	return c.Query().Where(visitor.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VisitorClient) GetX(ctx context.Context, id uuid.UUID) *Visitor {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VisitorClient) Hooks() []Hook {
+	hooks := c.hooks.Visitor
+	return append(hooks[:len(hooks):len(hooks)], visitor.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *VisitorClient) Interceptors() []Interceptor {
+	inters := c.inters.Visitor
+	return append(inters[:len(inters):len(inters)], visitor.Interceptors[:]...)
+}
+
+func (c *VisitorClient) mutate(ctx context.Context, m *VisitorMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VisitorCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VisitorUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VisitorUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VisitorDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Visitor mutation op: %q", m.Op())
+	}
+}
+
 // VisitorPassClient is a client for the VisitorPass schema.
 type VisitorPassClient struct {
 	config
@@ -11518,7 +11661,7 @@ type (
 		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
 		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
 		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, VisitorPass, WorkOrder, WorkOrderEvent []ent.Hook
+		VendorPersonnel, Visitor, VisitorPass, WorkOrder, WorkOrderEvent []ent.Hook
 	}
 	inters struct {
 		Adjustment, ApprovalRule, AuditLog, BillQuery, BillingRun, BillingRunLine,
@@ -11533,6 +11676,7 @@ type (
 		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
 		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
 		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, VisitorPass, WorkOrder, WorkOrderEvent []ent.Interceptor
+		VendorPersonnel, Visitor, VisitorPass, WorkOrder,
+		WorkOrderEvent []ent.Interceptor
 	}
 )

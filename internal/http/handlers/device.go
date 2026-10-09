@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
@@ -95,7 +97,81 @@ func (h *H) DeviceWalkIn(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "not_found", "not found")
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"id": ev.ID, "decision": ev.Decision, "decided_at": ev.DecidedAt})
+	httpx.JSON(w, http.StatusOK, map[string]any{"id": ev.ID, "decision": ev.Decision, "decided_at": ev.DecidedAt,
+		"decided_by": ev.DecidedBy, "rings": ev.Metadata["rings"]})
+}
+
+// walkInID resolves {id} (server id or the tablet's client id) to a walk-in on this device.
+func (h *H) walkInID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	id := chiParam(r, "id")
+	if id == "" || len(id) > 64 {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "invalid id")
+		return uuid.Nil, false
+	}
+	ev, err := h.Gate.DeviceEvent(r.Context(), device(r).ID, id)
+	if err != nil || ev.PropertyID != device(r).PropertyID {
+		httpx.Error(w, http.StatusNotFound, "not_found", "not found")
+		return uuid.Nil, false
+	}
+	return ev.ID, true
+}
+
+// DeviceResolveWalkIn is POST /gate/walk-ins/{id}/resolve {admit, note}: the guard lets the visitor
+// in or turns them away, on the walk-in's own row (one log line, not two). Allowed at any time; a
+// host's own answer stands.
+func (h *H) DeviceResolveWalkIn(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.walkInID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Admit bool   `json:"admit"`
+		Note  string `json:"note"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	ev, err := h.Gate.ResolveWalkIn(r.Context(), device(r), id, in.Admit, in.Note)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"id": ev.ID, "decision": ev.Decision, "decided_by": ev.DecidedBy, "decided_at": ev.DecidedAt})
+}
+
+// DeviceRingHost is POST /gate/walk-ins/{id}/ring: push to the host's phone plus WhatsApp again, at
+// most every 30 seconds.
+func (h *H) DeviceRingHost(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.walkInID(w, r)
+	if !ok {
+		return
+	}
+	ev, err := h.Gate.RingHost(r.Context(), device(r), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"id": ev.ID, "decision": ev.Decision, "rings": ev.Metadata["rings"]})
+}
+
+// DeviceInside is GET /gate/inside: who is inside now, for the exit picker.
+func (h *H) DeviceInside(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Gate.Inside(r.Context(), device(r).PropertyID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+}
+
+// DeviceVisitors is GET /gate/visitors?q=: returning visitors matching a phone, plate or name.
+func (h *H) DeviceVisitors(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Gate.LookupVisitors(r.Context(), device(r).PropertyID, r.URL.Query().Get("q"))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
 // DeviceIncident is POST /gate/incidents.

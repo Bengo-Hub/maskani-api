@@ -152,6 +152,8 @@ type Tx struct {
 	VendorDocument *VendorDocumentClient
 	// VendorPersonnel is the client for interacting with the VendorPersonnel builders.
 	VendorPersonnel *VendorPersonnelClient
+	// Visitor is the client for interacting with the Visitor builders.
+	Visitor *VisitorClient
 	// VisitorPass is the client for interacting with the VisitorPass builders.
 	VisitorPass *VisitorPassClient
 	// WorkOrder is the client for interacting with the WorkOrder builders.
@@ -359,6 +361,7 @@ func (tx *Tx) init() {
 	tx.VendorContract = NewVendorContractClient(tx.config)
 	tx.VendorDocument = NewVendorDocumentClient(tx.config)
 	tx.VendorPersonnel = NewVendorPersonnelClient(tx.config)
+	tx.Visitor = NewVisitorClient(tx.config)
 	tx.VisitorPass = NewVisitorPassClient(tx.config)
 	tx.WorkOrder = NewWorkOrderClient(tx.config)
 	tx.WorkOrderEvent = NewWorkOrderEventClient(tx.config)

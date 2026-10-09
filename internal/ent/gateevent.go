@@ -57,8 +57,16 @@ type GateEvent struct {
 	Decision gateevent.Decision `json:"decision,omitempty"`
 	// DecidedAt holds the value of the "decided_at" field.
 	DecidedAt *time.Time `json:"decided_at,omitempty"`
+	// DecidedBy holds the value of the "decided_by" field.
+	DecidedBy string `json:"decided_by,omitempty"`
 	// Notes holds the value of the "notes" field.
-	Notes        string `json:"notes,omitempty"`
+	Notes string `json:"notes,omitempty"`
+	// VisitorID holds the value of the "visitor_id" field.
+	VisitorID *uuid.UUID `json:"visitor_id,omitempty"`
+	// ExitedAt holds the value of the "exited_at" field.
+	ExitedAt *time.Time `json:"exited_at,omitempty"`
+	// EntryEventID holds the value of the "entry_event_id" field.
+	EntryEventID *uuid.UUID `json:"entry_event_id,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -67,15 +75,15 @@ func (*GateEvent) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case gateevent.FieldDeviceID, gateevent.FieldPassID, gateevent.FieldHostUnitID, gateevent.FieldGuardPersonnelID:
+		case gateevent.FieldDeviceID, gateevent.FieldPassID, gateevent.FieldHostUnitID, gateevent.FieldGuardPersonnelID, gateevent.FieldVisitorID, gateevent.FieldEntryEventID:
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case gateevent.FieldMetadata:
 			values[i] = new([]byte)
 		case gateevent.FieldIDSighted, gateevent.FieldOffline:
 			values[i] = new(sql.NullBool)
-		case gateevent.FieldKind, gateevent.FieldVisitorName, gateevent.FieldVisitorPhone, gateevent.FieldVehiclePlate, gateevent.FieldClientEventID, gateevent.FieldDecision, gateevent.FieldNotes:
+		case gateevent.FieldKind, gateevent.FieldVisitorName, gateevent.FieldVisitorPhone, gateevent.FieldVehiclePlate, gateevent.FieldClientEventID, gateevent.FieldDecision, gateevent.FieldDecidedBy, gateevent.FieldNotes:
 			values[i] = new(sql.NullString)
-		case gateevent.FieldCreatedAt, gateevent.FieldUpdatedAt, gateevent.FieldOccurredAt, gateevent.FieldDecidedAt:
+		case gateevent.FieldCreatedAt, gateevent.FieldUpdatedAt, gateevent.FieldOccurredAt, gateevent.FieldDecidedAt, gateevent.FieldExitedAt:
 			values[i] = new(sql.NullTime)
 		case gateevent.FieldID, gateevent.FieldTenantID, gateevent.FieldPropertyID:
 			values[i] = new(uuid.UUID)
@@ -221,11 +229,38 @@ func (_m *GateEvent) assignValues(columns []string, values []any) error {
 				_m.DecidedAt = new(time.Time)
 				*_m.DecidedAt = value.Time
 			}
+		case gateevent.FieldDecidedBy:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field decided_by", values[i])
+			} else if value.Valid {
+				_m.DecidedBy = value.String
+			}
 		case gateevent.FieldNotes:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field notes", values[i])
 			} else if value.Valid {
 				_m.Notes = value.String
+			}
+		case gateevent.FieldVisitorID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field visitor_id", values[i])
+			} else if value.Valid {
+				_m.VisitorID = new(uuid.UUID)
+				*_m.VisitorID = *value.S.(*uuid.UUID)
+			}
+		case gateevent.FieldExitedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field exited_at", values[i])
+			} else if value.Valid {
+				_m.ExitedAt = new(time.Time)
+				*_m.ExitedAt = value.Time
+			}
+		case gateevent.FieldEntryEventID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field entry_event_id", values[i])
+			} else if value.Valid {
+				_m.EntryEventID = new(uuid.UUID)
+				*_m.EntryEventID = *value.S.(*uuid.UUID)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -330,8 +365,26 @@ func (_m *GateEvent) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
+	builder.WriteString("decided_by=")
+	builder.WriteString(_m.DecidedBy)
+	builder.WriteString(", ")
 	builder.WriteString("notes=")
 	builder.WriteString(_m.Notes)
+	builder.WriteString(", ")
+	if v := _m.VisitorID; v != nil {
+		builder.WriteString("visitor_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ExitedAt; v != nil {
+		builder.WriteString("exited_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.EntryEventID; v != nil {
+		builder.WriteString("entry_event_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -150,6 +150,11 @@ func Notes(v string) predicate.VisitorPass {
 	return predicate.VisitorPass(sql.FieldEQ(FieldNotes, v))
 }
 
+// VisitorID applies equality check predicate on the "visitor_id" field. It's identical to VisitorIDEQ.
+func VisitorID(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldEQ(FieldVisitorID, v))
+}
+
 // TenantIDEQ applies the EQ predicate on the "tenant_id" field.
 func TenantIDEQ(v uuid.UUID) predicate.VisitorPass {
 	return predicate.VisitorPass(sql.FieldEQ(FieldTenantID, v))
@@ -1253,6 +1258,56 @@ func NotesEqualFold(v string) predicate.VisitorPass {
 // NotesContainsFold applies the ContainsFold predicate on the "notes" field.
 func NotesContainsFold(v string) predicate.VisitorPass {
 	return predicate.VisitorPass(sql.FieldContainsFold(FieldNotes, v))
+}
+
+// VisitorIDEQ applies the EQ predicate on the "visitor_id" field.
+func VisitorIDEQ(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldEQ(FieldVisitorID, v))
+}
+
+// VisitorIDNEQ applies the NEQ predicate on the "visitor_id" field.
+func VisitorIDNEQ(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldNEQ(FieldVisitorID, v))
+}
+
+// VisitorIDIn applies the In predicate on the "visitor_id" field.
+func VisitorIDIn(vs ...uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldIn(FieldVisitorID, vs...))
+}
+
+// VisitorIDNotIn applies the NotIn predicate on the "visitor_id" field.
+func VisitorIDNotIn(vs ...uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldNotIn(FieldVisitorID, vs...))
+}
+
+// VisitorIDGT applies the GT predicate on the "visitor_id" field.
+func VisitorIDGT(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldGT(FieldVisitorID, v))
+}
+
+// VisitorIDGTE applies the GTE predicate on the "visitor_id" field.
+func VisitorIDGTE(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldGTE(FieldVisitorID, v))
+}
+
+// VisitorIDLT applies the LT predicate on the "visitor_id" field.
+func VisitorIDLT(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldLT(FieldVisitorID, v))
+}
+
+// VisitorIDLTE applies the LTE predicate on the "visitor_id" field.
+func VisitorIDLTE(v uuid.UUID) predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldLTE(FieldVisitorID, v))
+}
+
+// VisitorIDIsNil applies the IsNil predicate on the "visitor_id" field.
+func VisitorIDIsNil() predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldIsNull(FieldVisitorID))
+}
+
+// VisitorIDNotNil applies the NotNil predicate on the "visitor_id" field.
+func VisitorIDNotNil() predicate.VisitorPass {
+	return predicate.VisitorPass(sql.FieldNotNull(FieldVisitorID))
 }
 
 // And groups predicates with the AND operator between them.

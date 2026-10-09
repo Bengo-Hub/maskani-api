@@ -79,6 +79,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
+	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
@@ -2030,6 +2031,33 @@ func (f TraverseVendorPersonnel) Traverse(ctx context.Context, q ent.Query) erro
 	return fmt.Errorf("unexpected query type %T. expect *ent.VendorPersonnelQuery", q)
 }
 
+// The VisitorFunc type is an adapter to allow the use of ordinary function as a Querier.
+type VisitorFunc func(context.Context, *ent.VisitorQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f VisitorFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.VisitorQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.VisitorQuery", q)
+}
+
+// The TraverseVisitor type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseVisitor func(context.Context, *ent.VisitorQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseVisitor) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseVisitor) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.VisitorQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.VisitorQuery", q)
+}
+
 // The VisitorPassFunc type is an adapter to allow the use of ordinary function as a Querier.
 type VisitorPassFunc func(context.Context, *ent.VisitorPassQuery) (ent.Value, error)
 
@@ -2254,6 +2282,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.VendorDocumentQuery, predicate.VendorDocument, vendordocument.OrderOption]{typ: ent.TypeVendorDocument, tq: q}, nil
 	case *ent.VendorPersonnelQuery:
 		return &query[*ent.VendorPersonnelQuery, predicate.VendorPersonnel, vendorpersonnel.OrderOption]{typ: ent.TypeVendorPersonnel, tq: q}, nil
+	case *ent.VisitorQuery:
+		return &query[*ent.VisitorQuery, predicate.Visitor, visitor.OrderOption]{typ: ent.TypeVisitor, tq: q}, nil
 	case *ent.VisitorPassQuery:
 		return &query[*ent.VisitorPassQuery, predicate.VisitorPass, visitorpass.OrderOption]{typ: ent.TypeVisitorPass, tq: q}, nil
 	case *ent.WorkOrderQuery:

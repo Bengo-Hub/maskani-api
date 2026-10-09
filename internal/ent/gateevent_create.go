@@ -242,6 +242,20 @@ func (_c *GateEventCreate) SetNillableDecidedAt(v *time.Time) *GateEventCreate {
 	return _c
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (_c *GateEventCreate) SetDecidedBy(v string) *GateEventCreate {
+	_c.mutation.SetDecidedBy(v)
+	return _c
+}
+
+// SetNillableDecidedBy sets the "decided_by" field if the given value is not nil.
+func (_c *GateEventCreate) SetNillableDecidedBy(v *string) *GateEventCreate {
+	if v != nil {
+		_c.SetDecidedBy(*v)
+	}
+	return _c
+}
+
 // SetNotes sets the "notes" field.
 func (_c *GateEventCreate) SetNotes(v string) *GateEventCreate {
 	_c.mutation.SetNotes(v)
@@ -252,6 +266,48 @@ func (_c *GateEventCreate) SetNotes(v string) *GateEventCreate {
 func (_c *GateEventCreate) SetNillableNotes(v *string) *GateEventCreate {
 	if v != nil {
 		_c.SetNotes(*v)
+	}
+	return _c
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (_c *GateEventCreate) SetVisitorID(v uuid.UUID) *GateEventCreate {
+	_c.mutation.SetVisitorID(v)
+	return _c
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_c *GateEventCreate) SetNillableVisitorID(v *uuid.UUID) *GateEventCreate {
+	if v != nil {
+		_c.SetVisitorID(*v)
+	}
+	return _c
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (_c *GateEventCreate) SetExitedAt(v time.Time) *GateEventCreate {
+	_c.mutation.SetExitedAt(v)
+	return _c
+}
+
+// SetNillableExitedAt sets the "exited_at" field if the given value is not nil.
+func (_c *GateEventCreate) SetNillableExitedAt(v *time.Time) *GateEventCreate {
+	if v != nil {
+		_c.SetExitedAt(*v)
+	}
+	return _c
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (_c *GateEventCreate) SetEntryEventID(v uuid.UUID) *GateEventCreate {
+	_c.mutation.SetEntryEventID(v)
+	return _c
+}
+
+// SetNillableEntryEventID sets the "entry_event_id" field if the given value is not nil.
+func (_c *GateEventCreate) SetNillableEntryEventID(v *uuid.UUID) *GateEventCreate {
+	if v != nil {
+		_c.SetEntryEventID(*v)
 	}
 	return _c
 }
@@ -502,9 +558,25 @@ func (_c *GateEventCreate) createSpec() (*GateEvent, *sqlgraph.CreateSpec) {
 		_spec.SetField(gateevent.FieldDecidedAt, field.TypeTime, value)
 		_node.DecidedAt = &value
 	}
+	if value, ok := _c.mutation.DecidedBy(); ok {
+		_spec.SetField(gateevent.FieldDecidedBy, field.TypeString, value)
+		_node.DecidedBy = value
+	}
 	if value, ok := _c.mutation.Notes(); ok {
 		_spec.SetField(gateevent.FieldNotes, field.TypeString, value)
 		_node.Notes = value
+	}
+	if value, ok := _c.mutation.VisitorID(); ok {
+		_spec.SetField(gateevent.FieldVisitorID, field.TypeUUID, value)
+		_node.VisitorID = &value
+	}
+	if value, ok := _c.mutation.ExitedAt(); ok {
+		_spec.SetField(gateevent.FieldExitedAt, field.TypeTime, value)
+		_node.ExitedAt = &value
+	}
+	if value, ok := _c.mutation.EntryEventID(); ok {
+		_spec.SetField(gateevent.FieldEntryEventID, field.TypeUUID, value)
+		_node.EntryEventID = &value
 	}
 	return _node, _spec
 }
@@ -816,6 +888,24 @@ func (u *GateEventUpsert) ClearDecidedAt() *GateEventUpsert {
 	return u
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (u *GateEventUpsert) SetDecidedBy(v string) *GateEventUpsert {
+	u.Set(gateevent.FieldDecidedBy, v)
+	return u
+}
+
+// UpdateDecidedBy sets the "decided_by" field to the value that was provided on create.
+func (u *GateEventUpsert) UpdateDecidedBy() *GateEventUpsert {
+	u.SetExcluded(gateevent.FieldDecidedBy)
+	return u
+}
+
+// ClearDecidedBy clears the value of the "decided_by" field.
+func (u *GateEventUpsert) ClearDecidedBy() *GateEventUpsert {
+	u.SetNull(gateevent.FieldDecidedBy)
+	return u
+}
+
 // SetNotes sets the "notes" field.
 func (u *GateEventUpsert) SetNotes(v string) *GateEventUpsert {
 	u.Set(gateevent.FieldNotes, v)
@@ -831,6 +921,60 @@ func (u *GateEventUpsert) UpdateNotes() *GateEventUpsert {
 // ClearNotes clears the value of the "notes" field.
 func (u *GateEventUpsert) ClearNotes() *GateEventUpsert {
 	u.SetNull(gateevent.FieldNotes)
+	return u
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *GateEventUpsert) SetVisitorID(v uuid.UUID) *GateEventUpsert {
+	u.Set(gateevent.FieldVisitorID, v)
+	return u
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *GateEventUpsert) UpdateVisitorID() *GateEventUpsert {
+	u.SetExcluded(gateevent.FieldVisitorID)
+	return u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *GateEventUpsert) ClearVisitorID() *GateEventUpsert {
+	u.SetNull(gateevent.FieldVisitorID)
+	return u
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (u *GateEventUpsert) SetExitedAt(v time.Time) *GateEventUpsert {
+	u.Set(gateevent.FieldExitedAt, v)
+	return u
+}
+
+// UpdateExitedAt sets the "exited_at" field to the value that was provided on create.
+func (u *GateEventUpsert) UpdateExitedAt() *GateEventUpsert {
+	u.SetExcluded(gateevent.FieldExitedAt)
+	return u
+}
+
+// ClearExitedAt clears the value of the "exited_at" field.
+func (u *GateEventUpsert) ClearExitedAt() *GateEventUpsert {
+	u.SetNull(gateevent.FieldExitedAt)
+	return u
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (u *GateEventUpsert) SetEntryEventID(v uuid.UUID) *GateEventUpsert {
+	u.Set(gateevent.FieldEntryEventID, v)
+	return u
+}
+
+// UpdateEntryEventID sets the "entry_event_id" field to the value that was provided on create.
+func (u *GateEventUpsert) UpdateEntryEventID() *GateEventUpsert {
+	u.SetExcluded(gateevent.FieldEntryEventID)
+	return u
+}
+
+// ClearEntryEventID clears the value of the "entry_event_id" field.
+func (u *GateEventUpsert) ClearEntryEventID() *GateEventUpsert {
+	u.SetNull(gateevent.FieldEntryEventID)
 	return u
 }
 
@@ -1189,6 +1333,27 @@ func (u *GateEventUpsertOne) ClearDecidedAt() *GateEventUpsertOne {
 	})
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (u *GateEventUpsertOne) SetDecidedBy(v string) *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetDecidedBy(v)
+	})
+}
+
+// UpdateDecidedBy sets the "decided_by" field to the value that was provided on create.
+func (u *GateEventUpsertOne) UpdateDecidedBy() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateDecidedBy()
+	})
+}
+
+// ClearDecidedBy clears the value of the "decided_by" field.
+func (u *GateEventUpsertOne) ClearDecidedBy() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearDecidedBy()
+	})
+}
+
 // SetNotes sets the "notes" field.
 func (u *GateEventUpsertOne) SetNotes(v string) *GateEventUpsertOne {
 	return u.Update(func(s *GateEventUpsert) {
@@ -1207,6 +1372,69 @@ func (u *GateEventUpsertOne) UpdateNotes() *GateEventUpsertOne {
 func (u *GateEventUpsertOne) ClearNotes() *GateEventUpsertOne {
 	return u.Update(func(s *GateEventUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *GateEventUpsertOne) SetVisitorID(v uuid.UUID) *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetVisitorID(v)
+	})
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *GateEventUpsertOne) UpdateVisitorID() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateVisitorID()
+	})
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *GateEventUpsertOne) ClearVisitorID() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearVisitorID()
+	})
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (u *GateEventUpsertOne) SetExitedAt(v time.Time) *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetExitedAt(v)
+	})
+}
+
+// UpdateExitedAt sets the "exited_at" field to the value that was provided on create.
+func (u *GateEventUpsertOne) UpdateExitedAt() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateExitedAt()
+	})
+}
+
+// ClearExitedAt clears the value of the "exited_at" field.
+func (u *GateEventUpsertOne) ClearExitedAt() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearExitedAt()
+	})
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (u *GateEventUpsertOne) SetEntryEventID(v uuid.UUID) *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetEntryEventID(v)
+	})
+}
+
+// UpdateEntryEventID sets the "entry_event_id" field to the value that was provided on create.
+func (u *GateEventUpsertOne) UpdateEntryEventID() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateEntryEventID()
+	})
+}
+
+// ClearEntryEventID clears the value of the "entry_event_id" field.
+func (u *GateEventUpsertOne) ClearEntryEventID() *GateEventUpsertOne {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearEntryEventID()
 	})
 }
 
@@ -1732,6 +1960,27 @@ func (u *GateEventUpsertBulk) ClearDecidedAt() *GateEventUpsertBulk {
 	})
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (u *GateEventUpsertBulk) SetDecidedBy(v string) *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetDecidedBy(v)
+	})
+}
+
+// UpdateDecidedBy sets the "decided_by" field to the value that was provided on create.
+func (u *GateEventUpsertBulk) UpdateDecidedBy() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateDecidedBy()
+	})
+}
+
+// ClearDecidedBy clears the value of the "decided_by" field.
+func (u *GateEventUpsertBulk) ClearDecidedBy() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearDecidedBy()
+	})
+}
+
 // SetNotes sets the "notes" field.
 func (u *GateEventUpsertBulk) SetNotes(v string) *GateEventUpsertBulk {
 	return u.Update(func(s *GateEventUpsert) {
@@ -1750,6 +1999,69 @@ func (u *GateEventUpsertBulk) UpdateNotes() *GateEventUpsertBulk {
 func (u *GateEventUpsertBulk) ClearNotes() *GateEventUpsertBulk {
 	return u.Update(func(s *GateEventUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *GateEventUpsertBulk) SetVisitorID(v uuid.UUID) *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetVisitorID(v)
+	})
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *GateEventUpsertBulk) UpdateVisitorID() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateVisitorID()
+	})
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *GateEventUpsertBulk) ClearVisitorID() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearVisitorID()
+	})
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (u *GateEventUpsertBulk) SetExitedAt(v time.Time) *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetExitedAt(v)
+	})
+}
+
+// UpdateExitedAt sets the "exited_at" field to the value that was provided on create.
+func (u *GateEventUpsertBulk) UpdateExitedAt() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateExitedAt()
+	})
+}
+
+// ClearExitedAt clears the value of the "exited_at" field.
+func (u *GateEventUpsertBulk) ClearExitedAt() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearExitedAt()
+	})
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (u *GateEventUpsertBulk) SetEntryEventID(v uuid.UUID) *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.SetEntryEventID(v)
+	})
+}
+
+// UpdateEntryEventID sets the "entry_event_id" field to the value that was provided on create.
+func (u *GateEventUpsertBulk) UpdateEntryEventID() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.UpdateEntryEventID()
+	})
+}
+
+// ClearEntryEventID clears the value of the "entry_event_id" field.
+func (u *GateEventUpsertBulk) ClearEntryEventID() *GateEventUpsertBulk {
+	return u.Update(func(s *GateEventUpsert) {
+		s.ClearEntryEventID()
 	})
 }
 

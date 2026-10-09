@@ -15,12 +15,12 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/meterreading"
 	"github.com/bengobox/maskani-api/internal/ent/notice"
 	"github.com/bengobox/maskani-api/internal/ent/party"
-	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/register"
 )
 
 // Service is the portal service.
@@ -56,12 +56,8 @@ type LastReading struct {
 // maxLinks bounds a caller's own links; one person never holds more units than this in an estate.
 const maxLinks = 500
 
-// activeLink is a link that grants access now: active, and not past an end date already reached
-// (a future end date keeps it active until that day).
-func activeLink() predicate.UnitParty {
-	return unitparty.And(unitparty.StatusEQ(unitparty.StatusActive),
-		unitparty.Or(unitparty.EndDateIsNil(), unitparty.EndDateGT(time.Now())))
-}
+// activeLink is a link that grants access now (shared with the gate's host lookup).
+var activeLink = register.ActiveLink
 
 // isOccupantRole is a role that lives in or works at a unit without owning it.
 func isOccupantRole(r unitparty.Role) bool {

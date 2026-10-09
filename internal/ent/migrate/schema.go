@@ -833,7 +833,11 @@ var (
 		{Name: "guard_personnel_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "decision", Type: field.TypeEnum, Enums: []string{"pending", "approved", "declined", "timeout", "none"}, Default: "none"},
 		{Name: "decided_at", Type: field.TypeTime, Nullable: true},
+		{Name: "decided_by", Type: field.TypeString, Nullable: true},
 		{Name: "notes", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "visitor_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "exited_at", Type: field.TypeTime, Nullable: true},
+		{Name: "entry_event_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// GateEventsTable holds the schema information for the "gate_events" table.
 	GateEventsTable = &schema.Table{
@@ -850,6 +854,16 @@ var (
 				Name:    "gateevent_tenant_id_property_id_occurred_at",
 				Unique:  false,
 				Columns: []*schema.Column{GateEventsColumns[1], GateEventsColumns[5], GateEventsColumns[14]},
+			},
+			{
+				Name:    "gateevent_tenant_id_property_id_exited_at_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{GateEventsColumns[1], GateEventsColumns[5], GateEventsColumns[23], GateEventsColumns[14]},
+			},
+			{
+				Name:    "gateevent_tenant_id_visitor_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{GateEventsColumns[1], GateEventsColumns[22], GateEventsColumns[14]},
 			},
 			{
 				Name:    "gateevent_tenant_id_property_id_created_at_id",
@@ -2847,6 +2861,55 @@ var (
 			},
 		},
 	}
+	// VisitorsColumns holds the columns for the "visitors" table.
+	VisitorsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "property_id", Type: field.TypeUUID},
+		{Name: "name", Type: field.TypeString},
+		{Name: "phone", Type: field.TypeString, Nullable: true},
+		{Name: "id_number_hash", Type: field.TypeString, Nullable: true},
+		{Name: "id_number_hint", Type: field.TypeString, Nullable: true},
+		{Name: "vehicle_plate", Type: field.TypeString, Nullable: true},
+		{Name: "vehicle_plates", Type: field.TypeJSON, Nullable: true},
+		{Name: "company", Type: field.TypeString, Nullable: true},
+		{Name: "visits", Type: field.TypeInt, Default: 0},
+		{Name: "last_visit_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_host_unit_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "banned"}, Default: "active"},
+		{Name: "notes", Type: field.TypeString, Nullable: true, Size: 2147483647},
+	}
+	// VisitorsTable holds the schema information for the "visitors" table.
+	VisitorsTable = &schema.Table{
+		Name:       "visitors",
+		Columns:    VisitorsColumns,
+		PrimaryKey: []*schema.Column{VisitorsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "visitor_tenant_id_property_id_phone",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorsColumns[1], VisitorsColumns[5], VisitorsColumns[7]},
+			},
+			{
+				Name:    "visitor_tenant_id_property_id_id_number_hash",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorsColumns[1], VisitorsColumns[5], VisitorsColumns[8]},
+			},
+			{
+				Name:    "visitor_tenant_id_property_id_vehicle_plate",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorsColumns[1], VisitorsColumns[5], VisitorsColumns[10]},
+			},
+			{
+				Name:    "visitor_tenant_id_property_id_last_visit_at",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorsColumns[1], VisitorsColumns[5], VisitorsColumns[14]},
+			},
+		},
+	}
 	// VisitorPassesColumns holds the columns for the "visitor_passes" table.
 	VisitorPassesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -2874,6 +2937,7 @@ var (
 		{Name: "work_order_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "used", "expired", "cancelled"}, Default: "active"},
 		{Name: "notes", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "visitor_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// VisitorPassesTable holds the schema information for the "visitor_passes" table.
 	VisitorPassesTable = &schema.Table{
@@ -3115,6 +3179,7 @@ var (
 		VendorContractsTable,
 		VendorDocumentsTable,
 		VendorPersonnelsTable,
+		VisitorsTable,
 		VisitorPassesTable,
 		WorkOrdersTable,
 		WorkOrderEventsTable,

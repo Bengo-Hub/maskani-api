@@ -325,6 +325,25 @@ type UpdateInput struct {
 	PrivacyVersion     *string  `json:"privacy_version"`
 	PortalSupportPhone *string  `json:"portal_support_phone"`
 	PortalSupportEmail *string  `json:"portal_support_email"`
+	// WalkInPolicy is kept in metadata: guard_decides (default) or ask_host.
+	WalkInPolicy *string `json:"walk_in_policy"`
+}
+
+// Walk-in policies: by default the guard decides at the gate and the host is told who came in; an
+// estate can require the host's answer before a walk-in is let in.
+const (
+	WalkInGuardDecides = "guard_decides"
+	WalkInAskHost      = "ask_host"
+)
+
+// WalkInPolicy reads the estate's walk-in policy from its settings.
+func WalkInPolicy(st *ent.TenantSetting) string {
+	if st != nil {
+		if v, _ := st.Metadata["walk_in_policy"].(string); v == WalkInAskHost {
+			return WalkInAskHost
+		}
+	}
+	return WalkInGuardDecides
 }
 
 // Update applies settings changes with range checks.
@@ -381,6 +400,17 @@ func (s *Service) Update(ctx context.Context, tenantID uuid.UUID, in UpdateInput
 	}
 	if in.PortalSupportEmail != nil {
 		u.SetPortalSupportEmail(*in.PortalSupportEmail)
+	}
+	if in.WalkInPolicy != nil {
+		if *in.WalkInPolicy != WalkInGuardDecides && *in.WalkInPolicy != WalkInAskHost {
+			return nil, fmt.Errorf("walk-in policy must be guard_decides or ask_host")
+		}
+		meta := map[string]any{}
+		for k, v := range cur.Metadata {
+			meta[k] = v
+		}
+		meta["walk_in_policy"] = *in.WalkInPolicy
+		u.SetMetadata(meta)
 	}
 	return u.Save(ctx)
 }

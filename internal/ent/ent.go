@@ -82,6 +82,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
+	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
@@ -215,6 +216,7 @@ func checkColumn(t, c string) error {
 			vendorcontract.Table:      vendorcontract.ValidColumn,
 			vendordocument.Table:      vendordocument.ValidColumn,
 			vendorpersonnel.Table:     vendorpersonnel.ValidColumn,
+			visitor.Table:             visitor.ValidColumn,
 			visitorpass.Table:         visitorpass.ValidColumn,
 			workorder.Table:           workorder.ValidColumn,
 			workorderevent.Table:      workorderevent.ValidColumn,

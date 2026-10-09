@@ -64,6 +64,8 @@ const (
 	FieldStatus = "status"
 	// FieldNotes holds the string denoting the notes field in the database.
 	FieldNotes = "notes"
+	// FieldVisitorID holds the string denoting the visitor_id field in the database.
+	FieldVisitorID = "visitor_id"
 	// Table holds the table name of the visitorpass in the database.
 	Table = "visitor_passes"
 )
@@ -95,6 +97,7 @@ var Columns = []string{
 	FieldWorkOrderID,
 	FieldStatus,
 	FieldNotes,
+	FieldVisitorID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -334,4 +337,9 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByNotes orders the results by the notes field.
 func ByNotes(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNotes, opts...).ToFunc()
+}
+
+// ByVisitorID orders the results by the visitor_id field.
+func ByVisitorID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVisitorID, opts...).ToFunc()
 }

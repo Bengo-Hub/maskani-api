@@ -117,6 +117,10 @@ func New(d Deps) http.Handler {
 		gr.Get("/sync", h.DeviceSync)
 		gr.Get("/units", h.DeviceUnits)
 		gr.Get("/walk-ins/{id}", h.DeviceWalkIn)
+		gr.Post("/walk-ins/{id}/resolve", h.DeviceResolveWalkIn)
+		gr.Post("/walk-ins/{id}/ring", h.DeviceRingHost)
+		gr.Get("/inside", h.DeviceInside)
+		gr.Get("/visitors", h.DeviceVisitors)
 		gr.Post("/incidents", h.DeviceIncident)
 		// PIN guessing is throttled per device and per client IP (shared Redis limiter, all pods).
 		if d.Limiter != nil {
@@ -363,6 +367,7 @@ func mount(r chi.Router, d Deps) {
 		g.Use(mod(settings.ModGate))
 		g.With(perm(rbac.PermGateManage)).Post("/gate/devices", h.RegisterDevice)
 		g.With(perm(rbac.PermGateView)).Get("/gate/events", h.ListGateEvents)
+		g.With(perm(rbac.PermGateView)).Get("/gate/inside", h.GateInside)
 		g.With(perm(rbac.PermGateView)).Get("/visitor-passes", h.ListPasses)
 		g.With(perm(rbac.PermGateManage)).Post("/visitor-passes", h.StaffCreatePass)
 		g.With(perm(rbac.PermGateView)).Get("/incidents", h.ListIncidents)

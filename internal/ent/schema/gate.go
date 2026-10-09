@@ -148,6 +148,8 @@ func (VisitorPass) Fields() []ent.Field {
 		field.UUID("work_order_id", uuid.UUID{}).Optional().Nillable(),
 		field.Enum("status").Values("active", "used", "expired", "cancelled").Default("active"),
 		field.Text("notes").Optional(),
+		// The returning visitor this pass is for, so the gate recognises them on later visits.
+		field.UUID("visitor_id", uuid.UUID{}).Optional().Nillable(),
 	}
 }
 
@@ -159,6 +161,40 @@ func (VisitorPass) Indexes() []ent.Index {
 		index.Fields("tenant_id", "host_party_id"),
 		index.Fields("tenant_id", "property_id", "created_at", "id"),
 		index.Fields("tenant_id", "created_at", "id"),
+	}
+}
+
+// Visitor is someone (or a car) who comes to an estate more than once. Passes and gate events link
+// here, so a returning visitor is recognised by phone, ID number or number plate instead of being
+// recorded afresh each visit. ID numbers are kept only as a keyed hash and the last three digits.
+type Visitor struct{ ent.Schema }
+
+func (Visitor) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
+
+func (Visitor) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("property_id", uuid.UUID{}),
+		field.String("name").NotEmpty(),
+		field.String("phone").Optional().Comment("normalised digits"),
+		field.String("id_number_hash").Optional().Sensitive(),
+		field.String("id_number_hint").Optional().Comment("last three characters"),
+		field.String("vehicle_plate").Optional().Comment("the plate last seen, upper case without spaces"),
+		field.Strings("vehicle_plates").Optional(),
+		field.String("company").Optional(),
+		field.Int("visits").Default(0),
+		field.Time("last_visit_at").Optional().Nillable(),
+		field.UUID("last_host_unit_id", uuid.UUID{}).Optional().Nillable(),
+		field.Enum("status").Values("active", "banned").Default("active"),
+		field.Text("notes").Optional(),
+	}
+}
+
+func (Visitor) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("tenant_id", "property_id", "phone"),
+		index.Fields("tenant_id", "property_id", "id_number_hash"),
+		index.Fields("tenant_id", "property_id", "vehicle_plate"),
+		index.Fields("tenant_id", "property_id", "last_visit_at"),
 	}
 }
 
@@ -185,7 +221,15 @@ func (GateEvent) Fields() []ent.Field {
 		field.UUID("guard_personnel_id", uuid.UUID{}).Optional().Nillable(),
 		field.Enum("decision").Values("pending", "approved", "declined", "timeout", "none").Default("none"),
 		field.Time("decided_at").Optional().Nillable(),
+		// Who settled a walk-in: the host, the guard (override) or the timeout.
+		field.String("decided_by").Optional(),
 		field.Text("notes").Optional(),
+		// The returning visitor the event belongs to.
+		field.UUID("visitor_id", uuid.UUID{}).Optional().Nillable(),
+		// On an entry (or an admitted walk-in): when that person left. Null means still inside.
+		field.Time("exited_at").Optional().Nillable(),
+		// On an exit: the entry it closes, so one entry has at most one exit.
+		field.UUID("entry_event_id", uuid.UUID{}).Optional().Nillable(),
 	}
 }
 
@@ -193,6 +237,9 @@ func (GateEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "device_id", "client_event_id").Unique(),
 		index.Fields("tenant_id", "property_id", "occurred_at"),
+		// Who is inside now: entries without an exit at a property.
+		index.Fields("tenant_id", "property_id", "exited_at", "occurred_at"),
+		index.Fields("tenant_id", "visitor_id", "occurred_at"),
 		// The gate log pages by (created_at DESC, id DESC) per property.
 		index.Fields("tenant_id", "property_id", "created_at", "id"),
 		// The 90-day retention purge scans every tenant by age.

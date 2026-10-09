@@ -135,9 +135,29 @@ func DecidedAt(v time.Time) predicate.GateEvent {
 	return predicate.GateEvent(sql.FieldEQ(FieldDecidedAt, v))
 }
 
+// DecidedBy applies equality check predicate on the "decided_by" field. It's identical to DecidedByEQ.
+func DecidedBy(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldDecidedBy, v))
+}
+
 // Notes applies equality check predicate on the "notes" field. It's identical to NotesEQ.
 func Notes(v string) predicate.GateEvent {
 	return predicate.GateEvent(sql.FieldEQ(FieldNotes, v))
+}
+
+// VisitorID applies equality check predicate on the "visitor_id" field. It's identical to VisitorIDEQ.
+func VisitorID(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldVisitorID, v))
+}
+
+// ExitedAt applies equality check predicate on the "exited_at" field. It's identical to ExitedAtEQ.
+func ExitedAt(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldExitedAt, v))
+}
+
+// EntryEventID applies equality check predicate on the "entry_event_id" field. It's identical to EntryEventIDEQ.
+func EntryEventID(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldEntryEventID, v))
 }
 
 // TenantIDEQ applies the EQ predicate on the "tenant_id" field.
@@ -950,6 +970,81 @@ func DecidedAtNotNil() predicate.GateEvent {
 	return predicate.GateEvent(sql.FieldNotNull(FieldDecidedAt))
 }
 
+// DecidedByEQ applies the EQ predicate on the "decided_by" field.
+func DecidedByEQ(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldDecidedBy, v))
+}
+
+// DecidedByNEQ applies the NEQ predicate on the "decided_by" field.
+func DecidedByNEQ(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNEQ(FieldDecidedBy, v))
+}
+
+// DecidedByIn applies the In predicate on the "decided_by" field.
+func DecidedByIn(vs ...string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIn(FieldDecidedBy, vs...))
+}
+
+// DecidedByNotIn applies the NotIn predicate on the "decided_by" field.
+func DecidedByNotIn(vs ...string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotIn(FieldDecidedBy, vs...))
+}
+
+// DecidedByGT applies the GT predicate on the "decided_by" field.
+func DecidedByGT(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGT(FieldDecidedBy, v))
+}
+
+// DecidedByGTE applies the GTE predicate on the "decided_by" field.
+func DecidedByGTE(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGTE(FieldDecidedBy, v))
+}
+
+// DecidedByLT applies the LT predicate on the "decided_by" field.
+func DecidedByLT(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLT(FieldDecidedBy, v))
+}
+
+// DecidedByLTE applies the LTE predicate on the "decided_by" field.
+func DecidedByLTE(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLTE(FieldDecidedBy, v))
+}
+
+// DecidedByContains applies the Contains predicate on the "decided_by" field.
+func DecidedByContains(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldContains(FieldDecidedBy, v))
+}
+
+// DecidedByHasPrefix applies the HasPrefix predicate on the "decided_by" field.
+func DecidedByHasPrefix(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldHasPrefix(FieldDecidedBy, v))
+}
+
+// DecidedByHasSuffix applies the HasSuffix predicate on the "decided_by" field.
+func DecidedByHasSuffix(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldHasSuffix(FieldDecidedBy, v))
+}
+
+// DecidedByIsNil applies the IsNil predicate on the "decided_by" field.
+func DecidedByIsNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIsNull(FieldDecidedBy))
+}
+
+// DecidedByNotNil applies the NotNil predicate on the "decided_by" field.
+func DecidedByNotNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotNull(FieldDecidedBy))
+}
+
+// DecidedByEqualFold applies the EqualFold predicate on the "decided_by" field.
+func DecidedByEqualFold(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEqualFold(FieldDecidedBy, v))
+}
+
+// DecidedByContainsFold applies the ContainsFold predicate on the "decided_by" field.
+func DecidedByContainsFold(v string) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldContainsFold(FieldDecidedBy, v))
+}
+
 // NotesEQ applies the EQ predicate on the "notes" field.
 func NotesEQ(v string) predicate.GateEvent {
 	return predicate.GateEvent(sql.FieldEQ(FieldNotes, v))
@@ -1023,6 +1118,156 @@ func NotesEqualFold(v string) predicate.GateEvent {
 // NotesContainsFold applies the ContainsFold predicate on the "notes" field.
 func NotesContainsFold(v string) predicate.GateEvent {
 	return predicate.GateEvent(sql.FieldContainsFold(FieldNotes, v))
+}
+
+// VisitorIDEQ applies the EQ predicate on the "visitor_id" field.
+func VisitorIDEQ(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldVisitorID, v))
+}
+
+// VisitorIDNEQ applies the NEQ predicate on the "visitor_id" field.
+func VisitorIDNEQ(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNEQ(FieldVisitorID, v))
+}
+
+// VisitorIDIn applies the In predicate on the "visitor_id" field.
+func VisitorIDIn(vs ...uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIn(FieldVisitorID, vs...))
+}
+
+// VisitorIDNotIn applies the NotIn predicate on the "visitor_id" field.
+func VisitorIDNotIn(vs ...uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotIn(FieldVisitorID, vs...))
+}
+
+// VisitorIDGT applies the GT predicate on the "visitor_id" field.
+func VisitorIDGT(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGT(FieldVisitorID, v))
+}
+
+// VisitorIDGTE applies the GTE predicate on the "visitor_id" field.
+func VisitorIDGTE(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGTE(FieldVisitorID, v))
+}
+
+// VisitorIDLT applies the LT predicate on the "visitor_id" field.
+func VisitorIDLT(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLT(FieldVisitorID, v))
+}
+
+// VisitorIDLTE applies the LTE predicate on the "visitor_id" field.
+func VisitorIDLTE(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLTE(FieldVisitorID, v))
+}
+
+// VisitorIDIsNil applies the IsNil predicate on the "visitor_id" field.
+func VisitorIDIsNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIsNull(FieldVisitorID))
+}
+
+// VisitorIDNotNil applies the NotNil predicate on the "visitor_id" field.
+func VisitorIDNotNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotNull(FieldVisitorID))
+}
+
+// ExitedAtEQ applies the EQ predicate on the "exited_at" field.
+func ExitedAtEQ(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldExitedAt, v))
+}
+
+// ExitedAtNEQ applies the NEQ predicate on the "exited_at" field.
+func ExitedAtNEQ(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNEQ(FieldExitedAt, v))
+}
+
+// ExitedAtIn applies the In predicate on the "exited_at" field.
+func ExitedAtIn(vs ...time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIn(FieldExitedAt, vs...))
+}
+
+// ExitedAtNotIn applies the NotIn predicate on the "exited_at" field.
+func ExitedAtNotIn(vs ...time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotIn(FieldExitedAt, vs...))
+}
+
+// ExitedAtGT applies the GT predicate on the "exited_at" field.
+func ExitedAtGT(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGT(FieldExitedAt, v))
+}
+
+// ExitedAtGTE applies the GTE predicate on the "exited_at" field.
+func ExitedAtGTE(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGTE(FieldExitedAt, v))
+}
+
+// ExitedAtLT applies the LT predicate on the "exited_at" field.
+func ExitedAtLT(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLT(FieldExitedAt, v))
+}
+
+// ExitedAtLTE applies the LTE predicate on the "exited_at" field.
+func ExitedAtLTE(v time.Time) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLTE(FieldExitedAt, v))
+}
+
+// ExitedAtIsNil applies the IsNil predicate on the "exited_at" field.
+func ExitedAtIsNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIsNull(FieldExitedAt))
+}
+
+// ExitedAtNotNil applies the NotNil predicate on the "exited_at" field.
+func ExitedAtNotNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotNull(FieldExitedAt))
+}
+
+// EntryEventIDEQ applies the EQ predicate on the "entry_event_id" field.
+func EntryEventIDEQ(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldEQ(FieldEntryEventID, v))
+}
+
+// EntryEventIDNEQ applies the NEQ predicate on the "entry_event_id" field.
+func EntryEventIDNEQ(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNEQ(FieldEntryEventID, v))
+}
+
+// EntryEventIDIn applies the In predicate on the "entry_event_id" field.
+func EntryEventIDIn(vs ...uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIn(FieldEntryEventID, vs...))
+}
+
+// EntryEventIDNotIn applies the NotIn predicate on the "entry_event_id" field.
+func EntryEventIDNotIn(vs ...uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotIn(FieldEntryEventID, vs...))
+}
+
+// EntryEventIDGT applies the GT predicate on the "entry_event_id" field.
+func EntryEventIDGT(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGT(FieldEntryEventID, v))
+}
+
+// EntryEventIDGTE applies the GTE predicate on the "entry_event_id" field.
+func EntryEventIDGTE(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldGTE(FieldEntryEventID, v))
+}
+
+// EntryEventIDLT applies the LT predicate on the "entry_event_id" field.
+func EntryEventIDLT(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLT(FieldEntryEventID, v))
+}
+
+// EntryEventIDLTE applies the LTE predicate on the "entry_event_id" field.
+func EntryEventIDLTE(v uuid.UUID) predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldLTE(FieldEntryEventID, v))
+}
+
+// EntryEventIDIsNil applies the IsNil predicate on the "entry_event_id" field.
+func EntryEventIDIsNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldIsNull(FieldEntryEventID))
+}
+
+// EntryEventIDNotNil applies the NotNil predicate on the "entry_event_id" field.
+func EntryEventIDNotNil() predicate.GateEvent {
+	return predicate.GateEvent(sql.FieldNotNull(FieldEntryEventID))
 }
 
 // And groups predicates with the AND operator between them.

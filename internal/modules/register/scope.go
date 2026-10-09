@@ -3,6 +3,7 @@ package register
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -12,11 +13,20 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/meter"
 	"github.com/bengobox/maskani-api/internal/ent/meterreading"
 	"github.com/bengobox/maskani-api/internal/ent/notice"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/property"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 )
+
+// ActiveLink is a unit link that holds now: active, and not past an end date already reached (a
+// future end date keeps it active until that day). The portal's access and the gate's host lookup
+// both use it.
+func ActiveLink() predicate.UnitParty {
+	return unitparty.And(unitparty.StatusEQ(unitparty.StatusActive),
+		unitparty.Or(unitparty.EndDateIsNil(), unitparty.EndDateGT(time.Now())))
+}
 
 // Record names a kind of record whose property decides who may act on it.
 type Record string

@@ -394,6 +394,26 @@ func (_u *VisitorPassUpdate) ClearNotes() *VisitorPassUpdate {
 	return _u
 }
 
+// SetVisitorID sets the "visitor_id" field.
+func (_u *VisitorPassUpdate) SetVisitorID(v uuid.UUID) *VisitorPassUpdate {
+	_u.mutation.SetVisitorID(v)
+	return _u
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_u *VisitorPassUpdate) SetNillableVisitorID(v *uuid.UUID) *VisitorPassUpdate {
+	if v != nil {
+		_u.SetVisitorID(*v)
+	}
+	return _u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (_u *VisitorPassUpdate) ClearVisitorID() *VisitorPassUpdate {
+	_u.mutation.ClearVisitorID()
+	return _u
+}
+
 // Mutation returns the VisitorPassMutation object of the builder.
 func (_u *VisitorPassUpdate) Mutation() *VisitorPassMutation {
 	return _u.mutation
@@ -593,6 +613,12 @@ func (_u *VisitorPassUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(visitorpass.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.VisitorID(); ok {
+		_spec.SetField(visitorpass.FieldVisitorID, field.TypeUUID, value)
+	}
+	if _u.mutation.VisitorIDCleared() {
+		_spec.ClearField(visitorpass.FieldVisitorID, field.TypeUUID)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -980,6 +1006,26 @@ func (_u *VisitorPassUpdateOne) ClearNotes() *VisitorPassUpdateOne {
 	return _u
 }
 
+// SetVisitorID sets the "visitor_id" field.
+func (_u *VisitorPassUpdateOne) SetVisitorID(v uuid.UUID) *VisitorPassUpdateOne {
+	_u.mutation.SetVisitorID(v)
+	return _u
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_u *VisitorPassUpdateOne) SetNillableVisitorID(v *uuid.UUID) *VisitorPassUpdateOne {
+	if v != nil {
+		_u.SetVisitorID(*v)
+	}
+	return _u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (_u *VisitorPassUpdateOne) ClearVisitorID() *VisitorPassUpdateOne {
+	_u.mutation.ClearVisitorID()
+	return _u
+}
+
 // Mutation returns the VisitorPassMutation object of the builder.
 func (_u *VisitorPassUpdateOne) Mutation() *VisitorPassMutation {
 	return _u.mutation
@@ -1209,6 +1255,12 @@ func (_u *VisitorPassUpdateOne) sqlSave(ctx context.Context) (_node *VisitorPass
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(visitorpass.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.VisitorID(); ok {
+		_spec.SetField(visitorpass.FieldVisitorID, field.TypeUUID, value)
+	}
+	if _u.mutation.VisitorIDCleared() {
+		_spec.ClearField(visitorpass.FieldVisitorID, field.TypeUUID)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	_node = &VisitorPass{config: _u.config}

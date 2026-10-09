@@ -216,6 +216,9 @@ type VendorDocument func(*sql.Selector)
 // VendorPersonnel is the predicate function for vendorpersonnel builders.
 type VendorPersonnel func(*sql.Selector)
 
+// Visitor is the predicate function for visitor builders.
+type Visitor func(*sql.Selector)
+
 // VisitorPass is the predicate function for visitorpass builders.
 type VisitorPass func(*sql.Selector)
 

@@ -54,8 +54,16 @@ const (
 	FieldDecision = "decision"
 	// FieldDecidedAt holds the string denoting the decided_at field in the database.
 	FieldDecidedAt = "decided_at"
+	// FieldDecidedBy holds the string denoting the decided_by field in the database.
+	FieldDecidedBy = "decided_by"
 	// FieldNotes holds the string denoting the notes field in the database.
 	FieldNotes = "notes"
+	// FieldVisitorID holds the string denoting the visitor_id field in the database.
+	FieldVisitorID = "visitor_id"
+	// FieldExitedAt holds the string denoting the exited_at field in the database.
+	FieldExitedAt = "exited_at"
+	// FieldEntryEventID holds the string denoting the entry_event_id field in the database.
+	FieldEntryEventID = "entry_event_id"
 	// Table holds the table name of the gateevent in the database.
 	Table = "gate_events"
 )
@@ -82,7 +90,11 @@ var Columns = []string{
 	FieldGuardPersonnelID,
 	FieldDecision,
 	FieldDecidedAt,
+	FieldDecidedBy,
 	FieldNotes,
+	FieldVisitorID,
+	FieldExitedAt,
+	FieldEntryEventID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -273,7 +285,27 @@ func ByDecidedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDecidedAt, opts...).ToFunc()
 }
 
+// ByDecidedBy orders the results by the decided_by field.
+func ByDecidedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDecidedBy, opts...).ToFunc()
+}
+
 // ByNotes orders the results by the notes field.
 func ByNotes(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNotes, opts...).ToFunc()
+}
+
+// ByVisitorID orders the results by the visitor_id field.
+func ByVisitorID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVisitorID, opts...).ToFunc()
+}
+
+// ByExitedAt orders the results by the exited_at field.
+func ByExitedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExitedAt, opts...).ToFunc()
+}
+
+// ByEntryEventID orders the results by the entry_event_id field.
+func ByEntryEventID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEntryEventID, opts...).ToFunc()
 }

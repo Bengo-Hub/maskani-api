@@ -66,7 +66,9 @@ type VisitorPass struct {
 	// Status holds the value of the "status" field.
 	Status visitorpass.Status `json:"status,omitempty"`
 	// Notes holds the value of the "notes" field.
-	Notes        string `json:"notes,omitempty"`
+	Notes string `json:"notes,omitempty"`
+	// VisitorID holds the value of the "visitor_id" field.
+	VisitorID    *uuid.UUID `json:"visitor_id,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -75,7 +77,7 @@ func (*VisitorPass) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case visitorpass.FieldUnitID, visitorpass.FieldHostPartyID, visitorpass.FieldCreatedByID, visitorpass.FieldWorkOrderID:
+		case visitorpass.FieldUnitID, visitorpass.FieldHostPartyID, visitorpass.FieldCreatedByID, visitorpass.FieldWorkOrderID, visitorpass.FieldVisitorID:
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case visitorpass.FieldMetadata, visitorpass.FieldRecurrence:
 			values[i] = new([]byte)
@@ -260,6 +262,13 @@ func (_m *VisitorPass) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Notes = value.String
 			}
+		case visitorpass.FieldVisitorID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field visitor_id", values[i])
+			} else if value.Valid {
+				_m.VisitorID = new(uuid.UUID)
+				*_m.VisitorID = *value.S.(*uuid.UUID)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -373,6 +382,11 @@ func (_m *VisitorPass) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("notes=")
 	builder.WriteString(_m.Notes)
+	builder.WriteString(", ")
+	if v := _m.VisitorID; v != nil {
+		builder.WriteString("visitor_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

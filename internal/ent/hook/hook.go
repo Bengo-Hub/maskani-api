@@ -849,6 +849,18 @@ func (f VendorPersonnelFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VendorPersonnelMutation", m)
 }
 
+// The VisitorFunc type is an adapter to allow the use of ordinary
+// function as Visitor mutator.
+type VisitorFunc func(context.Context, *ent.VisitorMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VisitorFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VisitorMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VisitorMutation", m)
+}
+
 // The VisitorPassFunc type is an adapter to allow the use of ordinary
 // function as VisitorPass mutator.
 type VisitorPassFunc func(context.Context, *ent.VisitorPassMutation) (ent.Value, error)

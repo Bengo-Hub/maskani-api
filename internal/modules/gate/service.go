@@ -27,6 +27,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
+	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -152,6 +153,18 @@ func (s *Service) CreatePass(ctx context.Context, createdByKind string, createdB
 	if !to.After(from) || to.Sub(from) > 91*24*time.Hour {
 		return nil, httpx.Invalid("validity must be after the start and at most 90 days")
 	}
+	// The unit must be at the pass's property (the gate shows unit and block from it).
+	if in.UnitID != nil {
+		if ok, err := s.client.Unit.Query().Where(unit.ID(*in.UnitID), unit.PropertyID(in.PropertyID)).Exist(ctx); err != nil || !ok {
+			return nil, httpx.Invalid("the unit is not at this property")
+		}
+	}
+	// A returning visitor is recognised now, so the gate shows their history when the code is used.
+	var visitorID *uuid.UUID
+	if v, err := s.ResolveVisitor(ctx, in.PropertyID, VisitorDetails{Name: in.VisitorName, Phone: in.VisitorPhone,
+		Plate: in.VehiclePlate, HostUnit: in.UnitID}); err == nil && v != nil {
+		visitorID = &v.ID
+	}
 	maxEntries := in.MaxEntries
 	if maxEntries <= 0 {
 		maxEntries = 1
@@ -187,7 +200,7 @@ func (s *Service) CreatePass(ctx context.Context, createdByKind string, createdB
 		SetVisitorName(strings.TrimSpace(in.VisitorName)).SetVisitorPhone(secure.NormalizePhone(in.VisitorPhone)).
 		SetVehiclePlate(strings.ToUpper(strings.ReplaceAll(in.VehiclePlate, " ", ""))).
 		SetCodeHash(hash).SetCodeHint(code[4:]).SetQrTokenHash(s.box.Hash("qr:" + qr)).
-		SetValidFrom(from).SetValidTo(to).SetMaxEntries(maxEntries).SetNotes(in.Notes)
+		SetValidFrom(from).SetValidTo(to).SetMaxEntries(maxEntries).SetNotes(in.Notes).SetNillableVisitorID(visitorID)
 	if in.UnitID != nil {
 		c.SetUnitID(*in.UnitID)
 	}
@@ -232,12 +245,16 @@ func (s *Service) CancelHostPass(ctx context.Context, id uuid.UUID, hostParties 
 	return nil
 }
 
-// VerifyResult is what the tablet shows.
+// VerifyResult is what the tablet shows: the pass, where the visitor is going and who they are
+// visiting, and the returning visitor's history (a banned visitor is flagged for the guard).
 type VerifyResult struct {
 	Valid    bool             `json:"valid"`
 	Reason   string           `json:"reason,omitempty"`
 	Pass     *ent.VisitorPass `json:"pass,omitempty"`
 	UnitCode string           `json:"unit_code,omitempty"`
+	Block    string           `json:"block,omitempty"`
+	HostName string           `json:"host_name,omitempty"`
+	Visitor  *VisitorMatch    `json:"visitor,omitempty"`
 }
 
 // Verify checks a 6-digit code or QR token at the device's property.
@@ -260,8 +277,20 @@ func (s *Service) Verify(ctx context.Context, d *ent.GateDevice, code, qr string
 	}
 	res := &VerifyResult{Pass: p}
 	if p.UnitID != nil {
-		if u, err := s.client.Unit.Query().Where(unit.ID(*p.UnitID)).Only(ctx); err == nil {
-			res.UnitCode = u.Code
+		info := s.unitCodes(ctx, func(add func(uuid.UUID)) { add(*p.UnitID) })[*p.UnitID]
+		res.UnitCode, res.Block = info.code, info.block
+	}
+	if p.HostPartyID != nil {
+		if h, err := s.client.Party.Query().Where(party.ID(*p.HostPartyID)).Select(party.FieldDisplayName).Only(ctx); err == nil {
+			res.HostName = h.DisplayName
+		}
+	} else if p.UnitID != nil {
+		res.HostName = s.unitHosts(ctx, []uuid.UUID{*p.UnitID})[*p.UnitID].Name
+	}
+	if p.VisitorID != nil {
+		if v, err := s.client.Visitor.Get(ctx, *p.VisitorID); err == nil {
+			res.Visitor = &VisitorMatch{ID: v.ID, Name: v.Name, Plate: v.VehiclePlate, Visits: v.Visits, LastAt: v.LastVisitAt,
+				Banned: v.Status == "banned", Notes: v.Notes}
 		}
 	}
 	now := time.Now()
@@ -323,6 +352,12 @@ type EventInput struct {
 	Offline       bool       `json:"offline"`
 	GuardID       *uuid.UUID `json:"guard_personnel_id"`
 	Notes         string     `json:"notes"`
+	// IDNumber is the visitor's ID as seen at the gate; only its keyed hash is kept, on the visitor.
+	IDNumber string `json:"id_number"`
+	// An exit names the entry it closes: the server id, or the tablet's own id for an entry still
+	// in the same offline batch. An exit that closes nothing is not recorded.
+	EntryEventID       *uuid.UUID `json:"entry_event_id"`
+	EntryClientEventID string     `json:"entry_client_event_id"`
 }
 
 // Record stores events idempotently on (device, client_event_id). Entries against a pass consume it
@@ -353,8 +388,13 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 	for _, k := range known {
 		stored[k] = true
 	}
+	// Passes the batch refers to, read once: an entry by pass takes the pass's unit, visitor and
+	// name, so the log always says who came and for which unit.
+	passes := s.batchPasses(ctx, batch)
+
 	rows := make([]*ent.GateEventCreate, 0, len(ids))
 	fresh := make([]string, 0, len(ids))
+	var exits []EventInput
 	for _, in := range batch {
 		if in.ClientEventID == "" || in.Kind == "" || stored[in.ClientEventID] {
 			continue
@@ -363,16 +403,35 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		if in.OccurredAt.IsZero() || in.OccurredAt.After(time.Now().Add(5*time.Minute)) {
 			in.OccurredAt = time.Now()
 		}
+		if in.Kind == string(gateevent.KindExit) {
+			exits = append(exits, in) // after the entries, so an exit can close an entry from the same batch
+			continue
+		}
 		c := s.client.GateEvent.Create().SetPropertyID(d.PropertyID).SetDeviceID(d.ID).SetKind(gateevent.Kind(in.Kind)).
-			SetClientEventID(in.ClientEventID).SetVisitorName(in.VisitorName).SetVisitorPhone(secure.NormalizePhone(in.VisitorPhone)).
-			SetVehiclePlate(strings.ToUpper(strings.ReplaceAll(in.VehiclePlate, " ", ""))).SetIDSighted(in.IDSighted).
+			SetClientEventID(in.ClientEventID).SetVisitorPhone(secure.NormalizePhone(in.VisitorPhone)).
+			SetVehiclePlate(normPlate(in.VehiclePlate)).SetIDSighted(in.IDSighted).
 			SetOccurredAt(in.OccurredAt).SetOffline(in.Offline).SetNotes(in.Notes)
+		name, hostUnit := strings.TrimSpace(in.VisitorName), in.HostUnitID
+		var visitorID *uuid.UUID
 		if in.PassID != nil {
 			c.SetPassID(*in.PassID)
+			if p := passes[*in.PassID]; p != nil {
+				if name == "" {
+					name = p.VisitorName
+				}
+				if hostUnit == nil {
+					hostUnit = p.UnitID
+				}
+				visitorID = p.VisitorID
+			}
 		}
-		if in.HostUnitID != nil {
-			c.SetHostUnitID(*in.HostUnitID)
+		if visitorID == nil && (in.Kind == string(gateevent.KindEntry) || in.Kind == string(gateevent.KindWalkInRequest)) {
+			if v, err := s.ResolveVisitor(ctx, d.PropertyID, VisitorDetails{Name: name, Phone: in.VisitorPhone,
+				IDNumber: in.IDNumber, Plate: in.VehiclePlate, HostUnit: hostUnit, Visit: true}); err == nil && v != nil {
+				visitorID = &v.ID
+			}
 		}
+		c.SetVisitorName(name).SetNillableHostUnitID(hostUnit).SetNillableVisitorID(visitorID)
 		if in.GuardID != nil {
 			c.SetGuardPersonnelID(*in.GuardID)
 		}
@@ -382,14 +441,21 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		rows = append(rows, c)
 		fresh = append(fresh, in.ClientEventID)
 	}
-	if len(rows) == 0 {
-		return 0, nil
+	if len(rows) > 0 {
+		// A second replay racing this one hits the (tenant, device, client_event_id) key and is skipped.
+		if err := s.client.GateEvent.CreateBulk(rows...).
+			OnConflictColumns(gateevent.FieldTenantID, gateevent.FieldDeviceID, gateevent.FieldClientEventID).
+			DoNothing().Exec(ctx); err != nil {
+			return 0, err
+		}
 	}
-	// A second replay racing this one hits the (tenant, device, client_event_id) key and is skipped.
-	if err := s.client.GateEvent.CreateBulk(rows...).
-		OnConflictColumns(gateevent.FieldTenantID, gateevent.FieldDeviceID, gateevent.FieldClientEventID).
-		DoNothing().Exec(ctx); err != nil {
-		return 0, err
+	for _, in := range exits {
+		if id, ok := s.recordExit(ctx, d, in); ok {
+			fresh = append(fresh, id)
+		}
+	}
+	if len(fresh) == 0 {
+		return 0, nil
 	}
 	evs, err := s.client.GateEvent.Query().Where(gateevent.DeviceID(d.ID), gateevent.ClientEventIDIn(fresh...)).All(ctx)
 	if err != nil {
@@ -399,7 +465,7 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 	look := s.arrivalLookups(ctx, evs)
 	for _, ev := range evs {
 		switch {
-		case ev.Kind == gateevent.KindEntry && ev.PassID != nil:
+		case ev.Kind == gateevent.KindEntry && (ev.PassID != nil || ev.HostUnitID != nil):
 			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.VisitorArrived, look.payload(ev))
 			s.emit(ctx, realtime.GateEvent, ev)
 		case ev.Kind == gateevent.KindWalkInRequest:
@@ -410,6 +476,77 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		}
 	}
 	return len(evs), nil
+}
+
+// batchPasses reads the passes a batch of events refers to.
+func (s *Service) batchPasses(ctx context.Context, batch []EventInput) map[uuid.UUID]*ent.VisitorPass {
+	out := map[uuid.UUID]*ent.VisitorPass{}
+	var ids []uuid.UUID
+	for _, in := range batch {
+		if in.PassID != nil {
+			ids = append(ids, *in.PassID)
+		}
+	}
+	if len(ids) == 0 {
+		return out
+	}
+	if ps, err := s.client.VisitorPass.Query().Where(visitorpass.IDIn(ids...)).All(ctx); err == nil {
+		for _, p := range ps {
+			out[p.ID] = p
+		}
+	}
+	return out
+}
+
+// recordExit closes one entry and stores the exit with the leaver's details. The entry is the one
+// named (by server id or the tablet's own id), else the latest person inside with the same number
+// plate or name. An exit that closes nothing (a double tap, a replay, nobody named) is dropped.
+func (s *Service) recordExit(ctx context.Context, d *ent.GateDevice, in EventInput) (string, bool) {
+	entryID := in.EntryEventID
+	if entryID == nil && in.EntryClientEventID != "" {
+		if e, err := s.client.GateEvent.Query().Where(gateevent.DeviceID(d.ID), gateevent.ClientEventID(in.EntryClientEventID)).
+			Only(ctx); err == nil {
+			entryID = &e.ID
+		}
+	}
+	if entryID == nil {
+		plate, name := normPlate(in.VehiclePlate), strings.TrimSpace(in.VisitorName)
+		if plate == "" && name == "" {
+			return "", false
+		}
+		inside, err := s.Inside(ctx, d.PropertyID)
+		if err != nil {
+			return "", false
+		}
+		for _, p := range inside {
+			if (plate != "" && p.Plate == plate) || (plate == "" && strings.EqualFold(p.Name, name)) {
+				id := p.EventID
+				entryID = &id
+				break
+			}
+		}
+		if entryID == nil {
+			return "", false
+		}
+	}
+	entry, ok, err := s.claimExit(ctx, d.PropertyID, *entryID, in.OccurredAt)
+	if err != nil || !ok {
+		return "", false
+	}
+	c := s.client.GateEvent.Create().SetPropertyID(d.PropertyID).SetDeviceID(d.ID).SetKind(gateevent.KindExit).
+		SetClientEventID(in.ClientEventID).SetOccurredAt(in.OccurredAt).SetOffline(in.Offline).SetNotes(in.Notes).
+		SetEntryEventID(entry.ID).SetVisitorName(entry.VisitorName).SetVisitorPhone(entry.VisitorPhone).
+		SetVehiclePlate(entry.VehiclePlate).SetNillableHostUnitID(entry.HostUnitID).SetNillablePassID(entry.PassID).
+		SetNillableVisitorID(entry.VisitorID)
+	if in.GuardID != nil {
+		c.SetGuardPersonnelID(*in.GuardID)
+	}
+	if err := c.OnConflictColumns(gateevent.FieldTenantID, gateevent.FieldDeviceID, gateevent.FieldClientEventID).
+		DoNothing().Exec(ctx); err != nil {
+		s.log.Warn("exit not stored", zap.Error(err))
+		return "", false
+	}
+	return in.ClientEventID, true
 }
 
 // consumePasses counts entries against their passes: one increment per distinct pass, then one
@@ -436,11 +573,13 @@ func (s *Service) consumePasses(ctx context.Context, evs []*ent.GateEvent) {
 		SetStatus(visitorpass.StatusUsed).Exec(ctx)
 }
 
-// arrivalInfo holds the units, passes and hosts a batch's host messages need, read once.
+// arrivalInfo holds the units, passes and hosts a batch's host messages need, read once. unitHosts
+// answers for walk-ins and units without a pass host: the resident who decides for the unit.
 type arrivalInfo struct {
-	units  map[uuid.UUID]*ent.Unit
-	passes map[uuid.UUID]*ent.VisitorPass
-	hosts  map[uuid.UUID]*ent.Party
+	units     map[uuid.UUID]*ent.Unit
+	passes    map[uuid.UUID]*ent.VisitorPass
+	hosts     map[uuid.UUID]*ent.Party
+	unitHosts map[uuid.UUID]HostContact
 }
 
 func (s *Service) arrivalLookups(ctx context.Context, evs []*ent.GateEvent) arrivalInfo {
@@ -478,6 +617,20 @@ func (s *Service) arrivalLookups(ctx context.Context, evs []*ent.GateEvent) arri
 			}
 		}
 	}
+	// Units whose event has no pass host (walk-ins, entries by unit) get their resident host.
+	var noHost []uuid.UUID
+	for _, ev := range evs {
+		if ev.HostUnitID == nil {
+			continue
+		}
+		if ev.PassID != nil {
+			if p := info.passes[*ev.PassID]; p != nil && p.HostPartyID != nil {
+				continue
+			}
+		}
+		noHost = append(noHost, *ev.HostUnitID)
+	}
+	info.unitHosts = s.unitHosts(ctx, noHost)
 	return info
 }
 
@@ -496,6 +649,19 @@ func (a arrivalInfo) payload(ev *ent.GateEvent) map[string]any {
 			out["host_party_id"] = *p.HostPartyID
 			if h := a.hosts[*p.HostPartyID]; h != nil {
 				out["host_phone"], out["host_name"], out["host_email"] = h.Phone, h.DisplayName, h.Email
+				if h.AuthUserID != nil {
+					out["host_user_id"] = *h.AuthUserID
+				}
+			}
+			return out
+		}
+	}
+	if ev.HostUnitID != nil {
+		if h, ok := a.unitHosts[*ev.HostUnitID]; ok {
+			out["host_party_id"], out["host_phone"], out["host_name"], out["host_email"] = h.PartyID, h.Phone, h.Name, h.Email
+			// notifications-api sends the push to this user's registered devices.
+			if h.UserID != nil {
+				out["host_user_id"] = *h.UserID
 			}
 		}
 	}
@@ -555,11 +721,13 @@ func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (
 	return ev, nil
 }
 
-// SyncPayload is what a tablet caches for offline operation.
+// SyncPayload is what a tablet caches for offline operation. WalkInPolicy tells it whether the guard
+// may let a walk-in in (guard_decides, the default) or must wait for the host (ask_host).
 type SyncPayload struct {
-	ServerTime time.Time     `json:"server_time"`
-	Passes     []CachedPass  `json:"passes"`
-	Badges     []CachedBadge `json:"badges"`
+	ServerTime   time.Time     `json:"server_time"`
+	Passes       []CachedPass  `json:"passes"`
+	Badges       []CachedBadge `json:"badges"`
+	WalkInPolicy string        `json:"walk_in_policy"`
 }
 
 // CachedBadge is an active badge deployed to the device's property, with the holder's name. The
@@ -650,7 +818,10 @@ func (s *Service) Sync(ctx context.Context, d *ent.GateDevice) (*SyncPayload, er
 	if err != nil {
 		return nil, err
 	}
-	out := &SyncPayload{ServerTime: now}
+	out := &SyncPayload{ServerTime: now, WalkInPolicy: settings.WalkInGuardDecides}
+	if st, err := s.client.TenantSetting.Query().First(ctx); err == nil {
+		out.WalkInPolicy = settings.WalkInPolicy(st)
+	}
 	salted := func(enc any) string {
 		s2, _ := enc.(string)
 		plain, err := s.box.Decrypt(s2)
@@ -687,15 +858,62 @@ func (s *Service) Sync(ctx context.Context, d *ent.GateDevice) (*SyncPayload, er
 	return out, nil
 }
 
-// ListEvents returns a keyset page of gate events for a property.
-func (s *Service) ListEvents(ctx context.Context, propertyID uuid.UUID, p page.Params) (page.Result[*ent.GateEvent], error) {
-	rows, err := s.client.GateEvent.Query().Where(gateevent.PropertyID(propertyID)).
-		Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
-	if err != nil {
-		return page.Result[*ent.GateEvent]{}, err
-	}
-	return page.Build(rows, p.Limit, func(e *ent.GateEvent) (uuid.UUID, time.Time) { return e.ID, e.CreatedAt }), nil
+// EventView is a gate log row with the unit, block and guard spelled out.
+type EventView struct {
+	*ent.GateEvent
+	UnitCode  string `json:"unit_code,omitempty"`
+	Block     string `json:"block,omitempty"`
+	GuardName string `json:"guard_name,omitempty"`
 }
+
+// ListEvents returns a keyset page of gate events for a property, optionally one kind, with the
+// unit, block and guard read in two extra queries for the whole page.
+func (s *Service) ListEvents(ctx context.Context, propertyID uuid.UUID, kind string, p page.Params) (page.Result[EventView], error) {
+	q := s.client.GateEvent.Query().Where(gateevent.PropertyID(propertyID))
+	if kind != "" {
+		q = q.Where(gateevent.KindEQ(gateevent.Kind(kind)))
+	}
+	rows, err := q.Where(p.Predicate()).Modify(page.Order()).Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[EventView]{}, err
+	}
+	codes := s.unitCodes(ctx, func(add func(uuid.UUID)) {
+		for _, r := range rows {
+			if r.HostUnitID != nil {
+				add(*r.HostUnitID)
+			}
+		}
+	})
+	var guardIDs []uuid.UUID
+	for _, r := range rows {
+		if r.GuardPersonnelID != nil {
+			guardIDs = append(guardIDs, *r.GuardPersonnelID)
+		}
+	}
+	guards := map[uuid.UUID]string{}
+	if len(guardIDs) > 0 {
+		if ps, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.IDIn(guardIDs...)).
+			Select(vendorpersonnel.FieldID, vendorpersonnel.FieldFullName).All(ctx); err == nil {
+			for _, g := range ps {
+				guards[g.ID] = g.FullName
+			}
+		}
+	}
+	views := make([]EventView, len(rows))
+	for i, r := range rows {
+		views[i] = EventView{GateEvent: r}
+		if r.HostUnitID != nil {
+			views[i].UnitCode, views[i].Block = codes[*r.HostUnitID].code, codes[*r.HostUnitID].block
+		}
+		if r.GuardPersonnelID != nil {
+			views[i].GuardName = guards[*r.GuardPersonnelID]
+		}
+	}
+	return page.Build(views, p.Limit, func(e EventView) (uuid.UUID, time.Time) { return e.ID, e.CreatedAt }), nil
+}
+
+// ValidEventKind reports whether s is a gate event kind (for list filters).
+func ValidEventKind(s string) bool { return gateevent.KindValidator(gateevent.Kind(s)) == nil }
 
 // ScopeFilter narrows a staff list to one property or the caller's properties.
 type ScopeFilter struct {

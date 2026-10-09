@@ -75,6 +75,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
+	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
@@ -2454,6 +2455,37 @@ func init() {
 	vendorpersonnelDescID := vendorpersonnelMixinFields0[0].Descriptor()
 	// vendorpersonnel.DefaultID holds the default value on creation for the id field.
 	vendorpersonnel.DefaultID = vendorpersonnelDescID.Default.(func() uuid.UUID)
+	visitorMixin := schema.Visitor{}.Mixin()
+	visitorMixinHooks0 := visitorMixin[0].Hooks()
+	visitor.Hooks[0] = visitorMixinHooks0[0]
+	visitorMixinInters0 := visitorMixin[0].Interceptors()
+	visitor.Interceptors[0] = visitorMixinInters0[0]
+	visitorMixinFields0 := visitorMixin[0].Fields()
+	_ = visitorMixinFields0
+	visitorFields := schema.Visitor{}.Fields()
+	_ = visitorFields
+	// visitorDescCreatedAt is the schema descriptor for created_at field.
+	visitorDescCreatedAt := visitorMixinFields0[2].Descriptor()
+	// visitor.DefaultCreatedAt holds the default value on creation for the created_at field.
+	visitor.DefaultCreatedAt = visitorDescCreatedAt.Default.(func() time.Time)
+	// visitorDescUpdatedAt is the schema descriptor for updated_at field.
+	visitorDescUpdatedAt := visitorMixinFields0[3].Descriptor()
+	// visitor.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	visitor.DefaultUpdatedAt = visitorDescUpdatedAt.Default.(func() time.Time)
+	// visitor.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	visitor.UpdateDefaultUpdatedAt = visitorDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// visitorDescName is the schema descriptor for name field.
+	visitorDescName := visitorFields[1].Descriptor()
+	// visitor.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	visitor.NameValidator = visitorDescName.Validators[0].(func(string) error)
+	// visitorDescVisits is the schema descriptor for visits field.
+	visitorDescVisits := visitorFields[8].Descriptor()
+	// visitor.DefaultVisits holds the default value on creation for the visits field.
+	visitor.DefaultVisits = visitorDescVisits.Default.(int)
+	// visitorDescID is the schema descriptor for id field.
+	visitorDescID := visitorMixinFields0[0].Descriptor()
+	// visitor.DefaultID holds the default value on creation for the id field.
+	visitor.DefaultID = visitorDescID.Default.(func() uuid.UUID)
 	visitorpassMixin := schema.VisitorPass{}.Mixin()
 	visitorpassMixinHooks0 := visitorpassMixin[0].Hooks()
 	visitorpass.Hooks[0] = visitorpassMixinHooks0[0]

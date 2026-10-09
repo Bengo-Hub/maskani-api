@@ -306,6 +306,26 @@ func (_u *GateEventUpdate) ClearDecidedAt() *GateEventUpdate {
 	return _u
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (_u *GateEventUpdate) SetDecidedBy(v string) *GateEventUpdate {
+	_u.mutation.SetDecidedBy(v)
+	return _u
+}
+
+// SetNillableDecidedBy sets the "decided_by" field if the given value is not nil.
+func (_u *GateEventUpdate) SetNillableDecidedBy(v *string) *GateEventUpdate {
+	if v != nil {
+		_u.SetDecidedBy(*v)
+	}
+	return _u
+}
+
+// ClearDecidedBy clears the value of the "decided_by" field.
+func (_u *GateEventUpdate) ClearDecidedBy() *GateEventUpdate {
+	_u.mutation.ClearDecidedBy()
+	return _u
+}
+
 // SetNotes sets the "notes" field.
 func (_u *GateEventUpdate) SetNotes(v string) *GateEventUpdate {
 	_u.mutation.SetNotes(v)
@@ -323,6 +343,66 @@ func (_u *GateEventUpdate) SetNillableNotes(v *string) *GateEventUpdate {
 // ClearNotes clears the value of the "notes" field.
 func (_u *GateEventUpdate) ClearNotes() *GateEventUpdate {
 	_u.mutation.ClearNotes()
+	return _u
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (_u *GateEventUpdate) SetVisitorID(v uuid.UUID) *GateEventUpdate {
+	_u.mutation.SetVisitorID(v)
+	return _u
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_u *GateEventUpdate) SetNillableVisitorID(v *uuid.UUID) *GateEventUpdate {
+	if v != nil {
+		_u.SetVisitorID(*v)
+	}
+	return _u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (_u *GateEventUpdate) ClearVisitorID() *GateEventUpdate {
+	_u.mutation.ClearVisitorID()
+	return _u
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (_u *GateEventUpdate) SetExitedAt(v time.Time) *GateEventUpdate {
+	_u.mutation.SetExitedAt(v)
+	return _u
+}
+
+// SetNillableExitedAt sets the "exited_at" field if the given value is not nil.
+func (_u *GateEventUpdate) SetNillableExitedAt(v *time.Time) *GateEventUpdate {
+	if v != nil {
+		_u.SetExitedAt(*v)
+	}
+	return _u
+}
+
+// ClearExitedAt clears the value of the "exited_at" field.
+func (_u *GateEventUpdate) ClearExitedAt() *GateEventUpdate {
+	_u.mutation.ClearExitedAt()
+	return _u
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (_u *GateEventUpdate) SetEntryEventID(v uuid.UUID) *GateEventUpdate {
+	_u.mutation.SetEntryEventID(v)
+	return _u
+}
+
+// SetNillableEntryEventID sets the "entry_event_id" field if the given value is not nil.
+func (_u *GateEventUpdate) SetNillableEntryEventID(v *uuid.UUID) *GateEventUpdate {
+	if v != nil {
+		_u.SetEntryEventID(*v)
+	}
+	return _u
+}
+
+// ClearEntryEventID clears the value of the "entry_event_id" field.
+func (_u *GateEventUpdate) ClearEntryEventID() *GateEventUpdate {
+	_u.mutation.ClearEntryEventID()
 	return _u
 }
 
@@ -489,11 +569,35 @@ func (_u *GateEventUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.DecidedAtCleared() {
 		_spec.ClearField(gateevent.FieldDecidedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.DecidedBy(); ok {
+		_spec.SetField(gateevent.FieldDecidedBy, field.TypeString, value)
+	}
+	if _u.mutation.DecidedByCleared() {
+		_spec.ClearField(gateevent.FieldDecidedBy, field.TypeString)
+	}
 	if value, ok := _u.mutation.Notes(); ok {
 		_spec.SetField(gateevent.FieldNotes, field.TypeString, value)
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(gateevent.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.VisitorID(); ok {
+		_spec.SetField(gateevent.FieldVisitorID, field.TypeUUID, value)
+	}
+	if _u.mutation.VisitorIDCleared() {
+		_spec.ClearField(gateevent.FieldVisitorID, field.TypeUUID)
+	}
+	if value, ok := _u.mutation.ExitedAt(); ok {
+		_spec.SetField(gateevent.FieldExitedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExitedAtCleared() {
+		_spec.ClearField(gateevent.FieldExitedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.EntryEventID(); ok {
+		_spec.SetField(gateevent.FieldEntryEventID, field.TypeUUID, value)
+	}
+	if _u.mutation.EntryEventIDCleared() {
+		_spec.ClearField(gateevent.FieldEntryEventID, field.TypeUUID)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -793,6 +897,26 @@ func (_u *GateEventUpdateOne) ClearDecidedAt() *GateEventUpdateOne {
 	return _u
 }
 
+// SetDecidedBy sets the "decided_by" field.
+func (_u *GateEventUpdateOne) SetDecidedBy(v string) *GateEventUpdateOne {
+	_u.mutation.SetDecidedBy(v)
+	return _u
+}
+
+// SetNillableDecidedBy sets the "decided_by" field if the given value is not nil.
+func (_u *GateEventUpdateOne) SetNillableDecidedBy(v *string) *GateEventUpdateOne {
+	if v != nil {
+		_u.SetDecidedBy(*v)
+	}
+	return _u
+}
+
+// ClearDecidedBy clears the value of the "decided_by" field.
+func (_u *GateEventUpdateOne) ClearDecidedBy() *GateEventUpdateOne {
+	_u.mutation.ClearDecidedBy()
+	return _u
+}
+
 // SetNotes sets the "notes" field.
 func (_u *GateEventUpdateOne) SetNotes(v string) *GateEventUpdateOne {
 	_u.mutation.SetNotes(v)
@@ -810,6 +934,66 @@ func (_u *GateEventUpdateOne) SetNillableNotes(v *string) *GateEventUpdateOne {
 // ClearNotes clears the value of the "notes" field.
 func (_u *GateEventUpdateOne) ClearNotes() *GateEventUpdateOne {
 	_u.mutation.ClearNotes()
+	return _u
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (_u *GateEventUpdateOne) SetVisitorID(v uuid.UUID) *GateEventUpdateOne {
+	_u.mutation.SetVisitorID(v)
+	return _u
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_u *GateEventUpdateOne) SetNillableVisitorID(v *uuid.UUID) *GateEventUpdateOne {
+	if v != nil {
+		_u.SetVisitorID(*v)
+	}
+	return _u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (_u *GateEventUpdateOne) ClearVisitorID() *GateEventUpdateOne {
+	_u.mutation.ClearVisitorID()
+	return _u
+}
+
+// SetExitedAt sets the "exited_at" field.
+func (_u *GateEventUpdateOne) SetExitedAt(v time.Time) *GateEventUpdateOne {
+	_u.mutation.SetExitedAt(v)
+	return _u
+}
+
+// SetNillableExitedAt sets the "exited_at" field if the given value is not nil.
+func (_u *GateEventUpdateOne) SetNillableExitedAt(v *time.Time) *GateEventUpdateOne {
+	if v != nil {
+		_u.SetExitedAt(*v)
+	}
+	return _u
+}
+
+// ClearExitedAt clears the value of the "exited_at" field.
+func (_u *GateEventUpdateOne) ClearExitedAt() *GateEventUpdateOne {
+	_u.mutation.ClearExitedAt()
+	return _u
+}
+
+// SetEntryEventID sets the "entry_event_id" field.
+func (_u *GateEventUpdateOne) SetEntryEventID(v uuid.UUID) *GateEventUpdateOne {
+	_u.mutation.SetEntryEventID(v)
+	return _u
+}
+
+// SetNillableEntryEventID sets the "entry_event_id" field if the given value is not nil.
+func (_u *GateEventUpdateOne) SetNillableEntryEventID(v *uuid.UUID) *GateEventUpdateOne {
+	if v != nil {
+		_u.SetEntryEventID(*v)
+	}
+	return _u
+}
+
+// ClearEntryEventID clears the value of the "entry_event_id" field.
+func (_u *GateEventUpdateOne) ClearEntryEventID() *GateEventUpdateOne {
+	_u.mutation.ClearEntryEventID()
 	return _u
 }
 
@@ -1006,11 +1190,35 @@ func (_u *GateEventUpdateOne) sqlSave(ctx context.Context) (_node *GateEvent, er
 	if _u.mutation.DecidedAtCleared() {
 		_spec.ClearField(gateevent.FieldDecidedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.DecidedBy(); ok {
+		_spec.SetField(gateevent.FieldDecidedBy, field.TypeString, value)
+	}
+	if _u.mutation.DecidedByCleared() {
+		_spec.ClearField(gateevent.FieldDecidedBy, field.TypeString)
+	}
 	if value, ok := _u.mutation.Notes(); ok {
 		_spec.SetField(gateevent.FieldNotes, field.TypeString, value)
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(gateevent.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.VisitorID(); ok {
+		_spec.SetField(gateevent.FieldVisitorID, field.TypeUUID, value)
+	}
+	if _u.mutation.VisitorIDCleared() {
+		_spec.ClearField(gateevent.FieldVisitorID, field.TypeUUID)
+	}
+	if value, ok := _u.mutation.ExitedAt(); ok {
+		_spec.SetField(gateevent.FieldExitedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExitedAtCleared() {
+		_spec.ClearField(gateevent.FieldExitedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.EntryEventID(); ok {
+		_spec.SetField(gateevent.FieldEntryEventID, field.TypeUUID, value)
+	}
+	if _u.mutation.EntryEventIDCleared() {
+		_spec.ClearField(gateevent.FieldEntryEventID, field.TypeUUID)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	_node = &GateEvent{config: _u.config}

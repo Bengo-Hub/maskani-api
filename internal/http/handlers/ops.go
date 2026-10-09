@@ -410,12 +410,35 @@ func (h *H) ListGateEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	res, err := h.Gate.ListEvents(r.Context(), *pid, page.Parse(r))
+	kind := r.URL.Query().Get("kind")
+	if kind != "" && !gate.ValidEventKind(kind) {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "unknown event kind")
+		return
+	}
+	res, err := h.Gate.ListEvents(r.Context(), *pid, kind, page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, res)
+}
+
+// GateInside is GET /gate/inside?property_id=: who is inside now (staff view of the gate).
+func (h *H) GateInside(w http.ResponseWriter, r *http.Request) {
+	pid := httpx.QueryUUID(r, "property_id")
+	if pid == nil {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
+		return
+	}
+	if !requireProperty(w, r, *pid) {
+		return
+	}
+	rows, err := h.Gate.Inside(r.Context(), *pid)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
 // ReportIncident is POST /incidents.

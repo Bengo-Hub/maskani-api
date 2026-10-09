@@ -296,6 +296,20 @@ func (_c *VisitorPassCreate) SetNillableNotes(v *string) *VisitorPassCreate {
 	return _c
 }
 
+// SetVisitorID sets the "visitor_id" field.
+func (_c *VisitorPassCreate) SetVisitorID(v uuid.UUID) *VisitorPassCreate {
+	_c.mutation.SetVisitorID(v)
+	return _c
+}
+
+// SetNillableVisitorID sets the "visitor_id" field if the given value is not nil.
+func (_c *VisitorPassCreate) SetNillableVisitorID(v *uuid.UUID) *VisitorPassCreate {
+	if v != nil {
+		_c.SetVisitorID(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *VisitorPassCreate) SetID(v uuid.UUID) *VisitorPassCreate {
 	_c.mutation.SetID(v)
@@ -588,6 +602,10 @@ func (_c *VisitorPassCreate) createSpec() (*VisitorPass, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Notes(); ok {
 		_spec.SetField(visitorpass.FieldNotes, field.TypeString, value)
 		_node.Notes = value
+	}
+	if value, ok := _c.mutation.VisitorID(); ok {
+		_spec.SetField(visitorpass.FieldVisitorID, field.TypeUUID, value)
+		_node.VisitorID = &value
 	}
 	return _node, _spec
 }
@@ -980,6 +998,24 @@ func (u *VisitorPassUpsert) UpdateNotes() *VisitorPassUpsert {
 // ClearNotes clears the value of the "notes" field.
 func (u *VisitorPassUpsert) ClearNotes() *VisitorPassUpsert {
 	u.SetNull(visitorpass.FieldNotes)
+	return u
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *VisitorPassUpsert) SetVisitorID(v uuid.UUID) *VisitorPassUpsert {
+	u.Set(visitorpass.FieldVisitorID, v)
+	return u
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *VisitorPassUpsert) UpdateVisitorID() *VisitorPassUpsert {
+	u.SetExcluded(visitorpass.FieldVisitorID)
+	return u
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *VisitorPassUpsert) ClearVisitorID() *VisitorPassUpsert {
+	u.SetNull(visitorpass.FieldVisitorID)
 	return u
 }
 
@@ -1433,6 +1469,27 @@ func (u *VisitorPassUpsertOne) UpdateNotes() *VisitorPassUpsertOne {
 func (u *VisitorPassUpsertOne) ClearNotes() *VisitorPassUpsertOne {
 	return u.Update(func(s *VisitorPassUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *VisitorPassUpsertOne) SetVisitorID(v uuid.UUID) *VisitorPassUpsertOne {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.SetVisitorID(v)
+	})
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *VisitorPassUpsertOne) UpdateVisitorID() *VisitorPassUpsertOne {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.UpdateVisitorID()
+	})
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *VisitorPassUpsertOne) ClearVisitorID() *VisitorPassUpsertOne {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.ClearVisitorID()
 	})
 }
 
@@ -2053,6 +2110,27 @@ func (u *VisitorPassUpsertBulk) UpdateNotes() *VisitorPassUpsertBulk {
 func (u *VisitorPassUpsertBulk) ClearNotes() *VisitorPassUpsertBulk {
 	return u.Update(func(s *VisitorPassUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetVisitorID sets the "visitor_id" field.
+func (u *VisitorPassUpsertBulk) SetVisitorID(v uuid.UUID) *VisitorPassUpsertBulk {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.SetVisitorID(v)
+	})
+}
+
+// UpdateVisitorID sets the "visitor_id" field to the value that was provided on create.
+func (u *VisitorPassUpsertBulk) UpdateVisitorID() *VisitorPassUpsertBulk {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.UpdateVisitorID()
+	})
+}
+
+// ClearVisitorID clears the value of the "visitor_id" field.
+func (u *VisitorPassUpsertBulk) ClearVisitorID() *VisitorPassUpsertBulk {
+	return u.Update(func(s *VisitorPassUpsert) {
+		s.ClearVisitorID()
 	})
 }
 

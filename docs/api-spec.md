@@ -186,7 +186,8 @@ Staff side (module `gate`):
 | Method and path | Purpose | Permission |
 |---|---|---|
 | POST `/gate/devices` `{property_id, name, gate_name}` | Register a tablet; returns `device_key` once | `gate.manage` |
-| GET `/gate/events?property_id=` (keyset) | Gate log | `gate.view` |
+| GET `/gate/events?property_id=&kind=` (keyset) | Gate log; each row adds `unit_code`, `block` and `guard_name`; entries carry `exited_at`, exits `entry_event_id`, walk-ins `decision` and `decided_by` (host, guard) | `gate.view` |
+| GET `/gate/inside?property_id=` | Who is inside now: entries and admitted walk-ins without an exit in the last 24 hours | `gate.view` |
 | GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes; POST returns `code` and `qr_token` once | `gate.view` / `gate.manage` |
 | GET `/incidents` (keyset; `property_id`, `open`); POST `/incidents` | Incidents | `gate.view` |
 | GET `/incidents/{id}` | One incident (incident alert deep link), property scoped | `gate.view` |
@@ -196,12 +197,16 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 
 | Method and path | Purpose |
 |---|---|
-| POST `/gate/verify` `{code}` or `{qr}` | Verify a pass at the device's property |
-| POST `/gate/events` `{events:[...]}` | Record entries, exits, denials and walk-ins (idempotent by `client_event_id`, at most 500) |
-| GET `/gate/sync` | `{device, cache: {server_time, passes: [...device-salted hashes], badges: [{id, badge_number, name, role, vendor_id, has_pin}]}}`; badges are active personnel deployed to the device's property |
+| POST `/gate/verify` `{code}` or `{qr}` | Verify a pass at the device's property: `{valid, reason, pass, unit_code, block, host_name, visitor: {name, vehicle_plate, visits, last_visit_at, banned, notes}}` |
+| POST `/gate/events` `{events:[...]}` | Record entries, exits, denials and walk-ins (idempotent by `client_event_id`, at most 500). Each event may carry `id_number` (kept only as a keyed hash on the visitor). An entry by pass takes the pass's unit, name and visitor. Entries and walk-ins link to the returning visitor matched by phone, ID number or plate (created when new). An exit names the entry it closes with `entry_event_id`, or `entry_client_event_id` for an entry in the same offline batch, or failing those the latest person inside with the same plate or name; an exit that closes nothing (a repeat tap, nobody named) is not recorded |
+| GET `/gate/sync` | `{device, cache: {server_time, passes: [...device-salted hashes], badges: [{id, badge_number, name, role, vendor_id, has_pin}], walk_in_policy}}`; badges are active personnel deployed to the device's property; `walk_in_policy` is `guard_decides` (default: the guard lets walk-ins in and the host is told) or `ask_host` (wait for the host or override) |
+| GET `/gate/inside` | Who is inside now, for the exit picker: `[{event_id, visitor_name, vehicle_plate, unit_code, block, since, pass_id, visitor_id, walk_in}]` |
+| GET `/gate/visitors?q=` | Returning visitors matching a phone (part of the number), plate (start) or name: at most 8, with masked phone, visits, last unit, banned flag |
+| POST `/gate/walk-ins/{id}/resolve` `{admit, note}` | The guard lets the walk-in in or turns them away on the walk-in's own row (one log line), at any time; a host's own answer stands. Admitting tells the host |
+| POST `/gate/walk-ins/{id}/ring` | Ring the host again: a push that pops up on their phone plus WhatsApp; at most every 30 seconds; reopens a timed-out walk-in |
 | POST `/gate/sign-on` `{badge, pin}` | Guard sign-on; `200 {guard: {id, name, badge}, signed_on_at}`; `401 invalid_credentials` for any wrong badge, PIN or a guard not deployed to this property. Rate limited per device (10 a minute) and per IP (30 a minute) |
 | GET `/gate/units` | Unit codes for the walk-in host picker |
-| GET `/gate/walk-ins/{id}` | Host decision so far; `{id}` is the event id or the `client_event_id` the tablet generated, scoped to the calling device |
+| GET `/gate/walk-ins/{id}` | Decision so far `{id, decision, decided_at, decided_by, rings}`; `{id}` is the event id or the `client_event_id` the tablet generated, scoped to the calling device |
 | POST `/gate/incidents` | Incident from the gate |
 
 ## Communication (module `communication`)
