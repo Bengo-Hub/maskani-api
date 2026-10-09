@@ -22,7 +22,7 @@ Routes marked **planned (sprint N)** are designed but not built yet; everything 
 
 | Method and path | Purpose | Access |
 |---|---|---|
-| GET `/auth/me` | User, roles, permissions, `all_properties`, `property_ids`, `party_ids`, `is_staff`, `is_portal_user`, `bypass` (true for platform owners, superusers and S2S: the API lets them through every permission and module gate, so the UI shows all navigation), enabled `modules`, `settings` | Any signed-in user |
+| GET `/auth/me` | User, roles, permissions, `all_properties`, `property_ids`, `party_ids`, `is_staff`, `is_portal_user`, `bypass` (true for platform owners, superusers and S2S: the API lets them through every permission and module gate, so the UI shows all navigation), enabled `modules`, `property_modules` (staff only: property id to module list, for each property whose use case or switches narrow the tenant set; other properties use `modules`), `settings` | Any signed-in user |
 | GET `/stream` | Server-sent change hints (see below) | Any signed-in user; filtered by access |
 
 ### GET /stream
@@ -72,7 +72,7 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET, POST `/properties`; GET, PATCH `/properties/{id}` | Properties (POST creates the auth-api outlet with the caller's token) | `properties.view` / `properties.manage` |
+| GET, POST `/properties`; GET, PATCH `/properties/{id}` | Properties (POST creates the auth-api outlet with the caller's token). `use_case` (a preset code) and `module_overrides` (`{module: true or false}` over the preset) decide the property's modules; changing either on PATCH needs `settings.manage` | `properties.view` / `properties.manage` |
 | POST `/properties/{id}/blocks` | Add a block | `properties.manage` |
 | GET `/properties/{id}/staff`; POST `/properties/{id}/staff` `{auth_user_id, property_role, erp_employee_id}`; DELETE `/staff-assignments/{id}` | Staff per property | `users.view` / `users.manage` |
 | GET `/units` (keyset; `property_id`, `block_id`, `sale_status`, `occupancy_status`, `q`); POST `/units`; GET, PATCH `/units/{id}` | Units with owner name and balance | `units.view` / `units.manage` |

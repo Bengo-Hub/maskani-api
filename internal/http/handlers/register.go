@@ -8,7 +8,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/register"
+	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
@@ -28,7 +30,7 @@ func (h *H) ListProperties(w http.ResponseWriter, r *http.Request) {
 // CreateProperty is POST /properties.
 func (h *H) CreateProperty(w http.ResponseWriter, r *http.Request) {
 	var in register.PropertyInput
-	if !httpx.Decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) || !checkPropertyModules(w, r, in, false) {
 		return
 	}
 	a := access(r)
@@ -61,7 +63,7 @@ func (h *H) UpdateProperty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in register.PropertyInput
-	if !httpx.Decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) || !checkPropertyModules(w, r, in, true) {
 		return
 	}
 	p, err := h.Register.UpdateProperty(r.Context(), id, in)
@@ -69,7 +71,36 @@ func (h *H) UpdateProperty(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
+	if in.UseCase != nil || in.ModuleOverrides != nil {
+		h.Settings.ForgetProperty(id)
+	}
 	httpx.JSON(w, http.StatusOK, p)
+}
+
+// checkPropertyModules guards the property's use case and module switches: they decide what the
+// property's staff see, so changing them later (change) takes settings.manage; a new property only
+// has its values checked. Only known use cases and released modules are stored.
+func checkPropertyModules(w http.ResponseWriter, r *http.Request, in register.PropertyInput, change bool) bool {
+	if in.UseCase == nil && in.ModuleOverrides == nil {
+		return true
+	}
+	if change && !access(r).Has(rbac.PermSettingsManage) {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "changing a property's use case or modules needs the settings permission")
+		return false
+	}
+	if in.UseCase != nil {
+		if _, ok := settings.Presets[*in.UseCase]; !ok {
+			httpx.Fail(w, httpx.Invalid("unknown use case"))
+			return false
+		}
+	}
+	for m := range in.ModuleOverrides {
+		if !settings.ReleasedModules[m] {
+			httpx.Fail(w, httpx.Invalid("unknown module "+m))
+			return false
+		}
+	}
+	return true
 }
 
 // CreateBlock is POST /properties/{id}/blocks.

@@ -137,6 +137,11 @@ func (h *H) Me(w http.ResponseWriter, r *http.Request) {
 		"is_staff": a.IsStaff(), "is_portal_user": len(a.PartyIDs) > 0, "bypass": a.Bypass,
 		"modules": h.Settings.ModuleList(r.Context(), a.TenantID),
 	}
+	if a.IsStaff() || a.Bypass {
+		// Properties whose use case or switches narrow the tenant's modules; any other property
+		// uses "modules" as is.
+		out["property_modules"] = h.Settings.PropertyModuleMap(r.Context(), a.TenantID)
+	}
 	if a.LocalUser != nil {
 		out["user"] = a.LocalUser
 	}

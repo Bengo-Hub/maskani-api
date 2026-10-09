@@ -115,12 +115,17 @@ A feature is available only where three conditions meet:
 
 1. The tenant's plan includes the feature (`sub_features` claim, subscriptions-api).
 2. The tenant has switched the module on (`tenant_modules`).
-3. The property's use case includes the module (`properties.use_case` preset, adjustable).
+3. The property's use case includes the module (`properties.use_case` preset, adjusted by
+   `properties.module_overrides`), the way POS scopes modules by outlet. The tenant's set is the
+   ceiling; a property only narrows it (or adds back a tenant module its preset leaves out).
 
-The resolved set is cached with the tenant profile in Redis and invalidated on change. It is applied
-in routes (403 `module_not_enabled`), jobs and consumers (skip), navigation (`/auth/me` returns
-`modules`), forms, reports and message templates. Turning a module off hides it and stops its jobs;
-data stays readable and exportable.
+The tenant set is cached per pod for 60 seconds and the property rule in a bounded LRU with the
+same expiry, dropped on the pod that saves a change. It is applied in routes (403
+`module_not_enabled`, or `module_not_enabled_for_property` when the request names a property in
+its `property_id` query or JSON body; reads answer with `X-Module-Read-Only: plan`, `disabled` or
+`property`), jobs and consumers (skip), navigation (`/auth/me` returns `modules` and
+`property_modules`), forms, reports and message templates. Turning a module off hides it and stops
+its jobs; data stays readable and exportable.
 
 | Module code | Depends on | Release |
 |---|---|---|
