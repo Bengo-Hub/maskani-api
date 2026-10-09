@@ -25,6 +25,8 @@ type Service struct {
 	collections *collections.Service
 	analytics   *analytics.Service
 	loc         *time.Location
+	store       Storage
+	num         Numberer
 }
 
 // NewService creates the documents service.

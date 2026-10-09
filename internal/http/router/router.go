@@ -93,6 +93,14 @@ func New(d Deps) http.Handler {
 		}
 	})
 
+	// Public document check: the code printed on a document; IP limited against guessing.
+	r.Route("/api/v1/public/documents", func(pr chi.Router) {
+		if d.Limiter != nil {
+			pr.Use(d.Limiter.Middleware(ratelimit.IPKey, 30, time.Minute))
+		}
+		pr.Get("/verify/{code}", h.VerifyDocument)
+	})
+
 	// Internal reads for sibling services (internal service key, no user token): the estate
 	// residents notifications-api pages through when it sends a notice broadcast.
 	r.Route("/api/v1/internal", func(ir chi.Router) {
@@ -239,6 +247,13 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
 	r.With(perm(rbac.PermSettingsView)).Get("/document-sequences", h.ListSequences)
 	r.With(perm(rbac.PermSettingsManage)).Put("/document-sequences/{kind}", h.SaveSequence)
+	// Documents: templates (documents.manage approves), issuing and the files of issued ones.
+	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Get("/document-templates", h.DocumentTemplates)
+	r.With(perm(rbac.PermDocumentsManage)).Put("/document-templates/{kind}", h.SaveDocumentTemplate)
+	r.With(perm(rbac.PermDocumentsManage)).Post("/document-templates/{kind}/approve", h.ApproveDocumentTemplate)
+	r.With(perm(rbac.PermDocumentsIssue, rbac.PermDocumentsManage), export).Post("/documents", h.IssueDocument)
+	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Get("/documents", h.ListDocuments)
+	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage), export).Get("/documents/{id}/file", h.DocumentFile)
 	r.Get("/catalogues/{kind}", h.Catalogue)
 	// Settings managers edit any list; the people who use a list may add to it (CatalogueManagePerms).
 	r.Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
@@ -412,5 +427,7 @@ func mount(r chi.Router, d Deps) {
 		m.Get("/notices", h.MyNotices)
 		m.Post("/terms/accept", h.MyAcceptTerms)
 		m.Post("/walk-ins/{id}/decide", h.MyDecideWalkIn)
+		m.Get("/documents", h.MyDocuments)
+		m.With(export).Get("/documents/{id}/file", h.MyDocumentFile)
 	})
 }

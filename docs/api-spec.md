@@ -221,7 +221,12 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 | Method and path | Purpose | Permission |
 |---|---|---|
 | GET `/notices` (keyset; `property_id`, `status`); POST `/notices`; POST `/notices/{id}/send`; GET `/notices/{id}/deliveries` | Notices by audience over WhatsApp and email | lists and deliveries `notices.view` or `notices.manage`; write and send `notices.manage` |
-| `/templates`, `/documents/...` | Templates, generated documents, signatures | planned (sprint 5) |
+| GET `/document-templates` | Per kind (clearance_certificate, demand_letter, payment_plan, offer_letter) the template in use (the estate's approved version, else the Codevertex starter, version 0) and any draft, with `merge_fields` and `inputs`; `kinds` lists them all | `documents.view`, `.issue` or `.manage` |
+| PUT `/document-templates/{kind}` `{name, body}`; POST `/document-templates/{kind}/approve` `{version}` | Save new wording as a draft (unknown `{{field}}`s refused); approving puts it in use and retires the version it replaces | `documents.manage` |
+| POST `/documents` `{kind, entity_id, values}` | Issue from the template in use about a unit account or sale contract at a property in scope: numbered from the `document` sequence, rendered as a branded PDF with signature lines, stored with its SHA-256 and a 10-character verification code (printed with the verify link). `values` carries the kind's inputs (payment plan: instalments, instalment_amount, first_due) | `documents.issue` or `.manage` |
+| GET `/documents?unit_id=` or `?entity_type=&entity_id=`; GET `/documents/{id}/file` | Issued documents, newest first, within the caller's properties; the file download is logged in `document_access_logs` | `documents.view`, `.issue` or `.manage` |
+| GET `/me/documents`; GET `/me/documents/{id}/file` | Portal: documents addressed to the signed-in owner or resident | portal user |
+| GET `/api/v1/public/documents/verify/{code}` | Public check of a printed code: number, title, status, issue date, issuer (property name) and file hash, nothing personal; 30 a minute per IP | none |
 
 ## Reports
 
