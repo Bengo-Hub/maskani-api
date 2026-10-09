@@ -17,6 +17,7 @@ envelope first and are idempotent on event ID.
 | `maskani.sale_contract.activated`, `.defaulted`, `.fully_paid` | Contract state changes | contract, unit, buyer | notifications, dashboard |
 | `maskani.unit.handed_over` | Handover completed | unit, owner, date | estate billing start, welcome message |
 | `maskani.work_order.created`, `.assigned`, `.completed`, `.sla_breached` | Works lifecycle | number, priority, unit, assignee, due | notifications to requester, assignee, manager |
+| `maskani.work_order.created` with `source: resident` | A resident request from the portal | adds `unit_code`, `requested_by`, `category`, `description` (280 characters), `property`, `responders` `[{user_id, name, email, phone, role}]`: up to 10 active staff assigned to the property as caretaker or property manager, plus security for a security request | notifications-api sends each responder an email, the `maskani_resident_request_v1_btn` WhatsApp and a push that opens the work order; with no responders, the estate contact |
 | `maskani.pass.created` | Visitor pass issued | pass_id, visitor_name, visitor_phone, code, valid_from, valid_to | notifications: gate code to the visitor on WhatsApp |
 | `maskani.party.invited` | Portal invitation | party_id, name, phone, email, tenant_slug, portal_url | notifications: invite by email and WhatsApp (Open Portal button) |
 | `maskani.visitor.arrived` | Entry logged against a pass or walk-in | event_id, visitor_name, unit_code, host_name, host_phone, host_email, vehicle_plate | notifications to host |

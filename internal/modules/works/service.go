@@ -127,7 +127,12 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 		return nil, err
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
-	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, wo.ID.String(), events.WorkOrderCreated, s.payload(wo)); err != nil {
+	created := s.payload(wo)
+	if src == workorder.SourceResident {
+		// A resident's request reaches the property's caretaker and manager by email, WhatsApp and push.
+		s.residentDetails(ctx, wo, created)
+	}
+	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, wo.ID.String(), events.WorkOrderCreated, created); err != nil {
 		_ = tx.Rollback()
 		return nil, err
 	}
