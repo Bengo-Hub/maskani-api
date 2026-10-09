@@ -83,7 +83,7 @@ func TestSeededEstate(t *testing.T) {
 	// Keyset lists over the seeded data, limited to the property scope.
 	scope := []uuid.UUID{prop.ID}
 	p := page.Params{Limit: 2}
-	seq := sequence.NewAllocator(client)
+	seq := sequence.NewAllocator(client, loc)
 	salesSvc := sales.NewService(client, tc, accounts.NewService(client, tc, log), seq, loc, log)
 	res, err := salesSvc.ListReservations(tctx, nil, scope, false, "", p)
 	if err != nil || len(res.Data) != 1 || res.Data[0].UnitCode != "A16" {

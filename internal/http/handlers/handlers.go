@@ -24,6 +24,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
+	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
@@ -48,6 +49,7 @@ type H struct {
 	Market      *market.Service
 	Imports     *imports.Service
 	Docs        *docs.Service
+	Sequences   *sequence.Allocator
 	PortalURL   string
 	Media       *Media
 	// RT is the realtime hub behind GET /stream (nil disables live updates).

@@ -161,7 +161,7 @@ func New(ctx context.Context) (*App, error) {
 	tc := treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, log)
 	ac := authapi.NewClient(cfg.Auth.APIURL, cfg.Auth.APIKey, log)
 	nt := notify.NewClient(cfg.Services.NotificationsURL, cfg.Auth.APIKey, log)
-	seq := sequence.NewAllocator(orm)
+	seq := sequence.NewAllocator(orm, loc)
 	accSvc := accounts.NewService(orm, tc, log)
 	regSvc := register.NewService(orm, ac, accSvc, box, log)
 	billSvc := billing.NewService(orm, tc, accSvc, loc, log)
@@ -214,7 +214,7 @@ func New(ctx context.Context) (*App, error) {
 	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, reportSvc, loc)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 

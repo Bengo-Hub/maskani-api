@@ -58,6 +58,7 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 |---|---|---|
 | GET `/settings`; PUT `/settings` | Tenant settings (type, billing day, due day, reading window, quiet hours, allocation order, terms versions, support contacts) | `settings.view` / `settings.manage` |
 | GET `/settings/modules`; PUT `/settings/modules` `{modules:[...]}` or `{preset}` | Module switches, presets, dependencies | `settings.view` / `settings.manage` |
+| GET `/document-sequences`; PUT `/document-sequences/{kind}` `{prefix, format, pad_width, reset_period, next_value}` | Numbering per kind (sale_contract, work_order, incident, document) with the next number; format tokens `{prefix} {seq} {yy} {yyyy} {mm}`; `reset_period` none, yearly or monthly, and a restarting series must show its year (and month) so numbers never repeat; `next_value` continues an existing series | `settings.view` / `settings.manage` |
 | GET `/catalogues/{kind}` | Platform defaults merged with tenant overrides | signed-in staff |
 | PUT `/catalogues/{kind}/{code}` `{name, active, attrs}` | Tenant override or custom entry | `settings.manage` |
 | GET `/users?kind=`; GET `/roles`; PUT `/users/{id}/roles` `{roles}` | Users and roles | `users.view` / `users.manage` |

@@ -161,7 +161,7 @@ func main() {
 	tc := treasury.NewClient(tURL, cfg.Auth.APIKey, zl)
 	ac := authapi.NewClient(aURL, cfg.Auth.APIKey, zl)
 	nt := notify.NewClient(nURL, cfg.Auth.APIKey, zl)
-	seq := sequence.NewAllocator(client)
+	seq := sequence.NewAllocator(client, loc)
 	acc := accounts.NewService(client, tc, zl)
 
 	s := &seeder{dry: *dry, ctx: tenantguard.With(ctx, t.ID), client: client, box: box, loc: loc, log: zl,

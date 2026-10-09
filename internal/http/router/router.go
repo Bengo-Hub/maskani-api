@@ -233,6 +233,8 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings", h.UpdateSettings)
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
+	r.With(perm(rbac.PermSettingsView)).Get("/document-sequences", h.ListSequences)
+	r.With(perm(rbac.PermSettingsManage)).Put("/document-sequences/{kind}", h.SaveSequence)
 	r.Get("/catalogues/{kind}", h.Catalogue)
 	// Settings managers edit any list; the people who use a list may add to it (CatalogueManagePerms).
 	r.Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
