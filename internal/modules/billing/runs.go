@@ -255,7 +255,7 @@ func (s *Service) Issue(ctx context.Context, actor uuid.UUID, in IssueInput) (*e
 	}
 	run, err := tx.BillingRun.Create().SetPropertyID(in.PropertyID).SetFundID(f.ID).SetPeriod(in.Period).
 		SetInvoiceDate(invoiceDate).SetDueDate(dueDate).SetUnitCount(pv.Units).SetLineCount(pv.Billable).
-		SetTotalAmount(pv.Total).SetSkippedCount(pv.Skipped).SetStartedBy(actor).
+		SetTotalAmount(pv.Total).SetSkippedCount(pv.Skipped).SetNillableStartedBy(startedBy(actor)).
 		SetStatus(billingrun.StatusIssuing).Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()

@@ -79,6 +79,19 @@ func New(d Deps) *Runner {
 			_, err := d.Sales.ExpireReservations(sys(ctx))
 			return err
 		}},
+		// Billing schedules: reading reminders before the billing day, then the run (or a wait for
+		// missing readings, or a "ready" note where the schedule only reminds).
+		{"maskani:billing-schedules", time.Hour, func(ctx context.Context) error {
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "billing")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			n, err := d.Billing.RunSchedules(ctx, on)
+			if n > 0 {
+				log.Info("scheduled billing runs started", zap.Int("runs", n))
+			}
+			return err
+		}},
 		{"maskani:instalment-invoicing", time.Hour, func(ctx context.Context) error {
 			on, err := d.Settings.TenantsWithModule(sys(ctx), "sales")
 			if err != nil || len(on) == 0 {

@@ -113,6 +113,9 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/charge-types/{id}/rates` | Dated rate by scope; issued invoices never change | `billing.manage` |
 | POST `/billing-runs/preview` `{property_id, fund, period}` | Compute a run without issuing | `billing.run` |
 | POST `/billing-runs` | Issue a run (one per property, fund and period) | `billing.run` |
+| GET `/billing-schedule?property_id=` | The property's schedule `{enabled, fund, mode (auto or remind), missing_readings (wait or skip), remind_days_before, approved, sent}` with its next run: `billing_day`, `period`, `billing_date`, `stage` (off, scheduled, collecting_readings, waiting_for_readings, ready_to_run, due, issued), `metered`, `missing_count`, `missing` (up to 200 unread meters with unit codes), `run_id`, `run_status`, `approved_by`. A billing day after the reading window bills the same month; an earlier one bills the month before | `billing.view` |
+| PUT `/billing-schedule` `{property_id, enabled, fund, mode, missing_readings, remind_days_before}` | Save the schedule (kept in the property metadata). An hourly job reminds reading takers before the day, then runs the bill (auto), says it is ready (remind), or waits for missing readings and reminds daily (wait) | `billing.manage` |
+| POST `/billing-schedule/approve` `{property_id, period}` | Run the period now without the readings still missing (those units get no metered line); the approval is kept on the schedule | `billing.run` |
 | GET `/billing-runs` (keyset; `property_id`) | Runs | `billing.view` |
 | GET `/billing-runs/{id}` | Run with `counts: {pending, issued, failed, skipped, total}` | `billing.view` |
 | GET `/billing-runs/{id}/lines?status=&cursor=&limit=`; POST `/billing-runs/{id}/retry` | Lines as a keyset page in unit code order (cursor on unit code then id), optionally one status; retry failed lines | `billing.view` / `billing.run` |

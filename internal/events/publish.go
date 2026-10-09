@@ -19,8 +19,12 @@ const AggregateType = "maskani"
 
 // Event types (subject = maskani.{type}). See docs/events.md.
 const (
-	UnitAccountCreated     = "unit_account.created"
-	BillingRunCompleted    = "billing_run.completed"
+	UnitAccountCreated  = "unit_account.created"
+	BillingRunCompleted = "billing_run.completed"
+	// Billing schedule: readings still missing before (or on) the billing day, and a run ready to
+	// start where the schedule only reminds.
+	BillingReadingsMissing = "billing.readings_missing"
+	BillingRunReady        = "billing.run_ready"
 	BillIssued             = "bill.issued"
 	PaymentApplied         = "payment.applied"
 	InstalmentDue          = "instalment.due"
