@@ -121,4 +121,3 @@ func (s *Service) PropertyModuleMap(ctx context.Context, tenantID uuid.UUID) map
 func (s *Service) ForgetProperty(propertyID uuid.UUID) {
 	propertyModuleCache.Delete(propertyID)
 }
-
