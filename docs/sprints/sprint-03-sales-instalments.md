@@ -47,9 +47,11 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
 ### Gaps found by the 2026-10-09 audit
 Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
 
-- [ ] Property scope on Reserve, CreateContract, GetContract, ActivateContract, ReleaseMilestone and AssignSuspense (FR-13, wave 1a)
-- [ ] Instalment invoicing without N+1: contracts, accounts and funds preloaded by id set, treasury by-reference lookups batched, schedule rows written with `CreateBulk`, reservation expiry as one set-based update (NFR-05, wave 1b)
-- [ ] Progress sync pages through the whole treasury ledger (no 500 cap) and updates instalments in bulk; index `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (wave 1b)
+- [x] Property scope on Reserve, CreateContract, GetContract, ActivateContract, ReleaseMilestone and AssignSuspense (FR-13, `15375db`)
+- [x] Instalment invoicing loads contracts, accounts and funds for the batch in three queries, each invoice's instalment and contract total commit together; schedules written with `CreateBulk`; reservation expiry in set-based batches (NFR-05, `b8be252`)
+- [x] Progress sync reads all instalments in one query and keeps the mirrored amount for instalments older than the 500-invoice ledger page instead of resetting them to zero (bug fix, `b8be252`)
+- [ ] Indexes `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (wave 1b, index migration)
+- [x] Portal purchase plans in one instalment query (`b8be252`)
 - [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
 - [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
 - [ ] Overpayment reduces the next instalment, read from the ledger's unapplied amount, unless the buyer asks for early completion (SRDD 9.3, wave 2.6)

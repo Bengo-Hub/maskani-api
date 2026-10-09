@@ -59,12 +59,13 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [ ] Adjustments and credit notes through treasury under `ApprovalRule` thresholds; bill queries with a finance queue and portal submission (FR-29, FR-30, wave 2.5)
 - [ ] Meter replacement route with closing and opening readings; batch bulk and borehole readings (FR-27, wave 2.7)
 - [ ] Arrears search and minimum balance filtered in SQL, not over loaded pages; suspense total from the API (wave 1c)
-- [ ] Water balance and arrears read from the replica with a 60 second cache invalidated across pods (wave 1b)
-- [ ] Billing issue and retry run as resumable work claimed per run id, never a bare goroutine that a pod restart leaves stuck in "issuing" (NFR-06, wave 1b)
-- [ ] Billing and C2B registration N+1 removed: accounts preloaded, by-reference checks batched, partial index on unregistered accounts (NFR-05, wave 1b)
-- [ ] Payment consumer dedupe and its side effects in one transaction, `daily_stats` keyed by payment day (NFR-08, wave 1b)
-- [ ] `billing_run_lines(tenant_id, treasury_invoice_id)` index for the payment consumer lookup (wave 1b)
-- [ ] Treasury error bodies summarised before they are stored in `last_error` (wave 1a)
+- [x] Water balance and arrears read from the replica with a 60 second cache invalidated across pods (`bf20a0d`)
+- [x] Billing issue and retry run under a per-run fleet lease, mark themselves alive per batch, and a two-minute job resumes runs a stopped pod left in "issuing" (NFR-06, `bf20a0d`)
+- [x] Billing run accounts read once per batch of 500 instead of once per line (`bf20a0d`)
+- [ ] C2B route registration batched with a partial index on unregistered accounts (wave 1b, index migration)
+- [x] Payment consumer: consumed-event row, daily collection and receipt event in one transaction; collections counted on the payment's own day (NFR-08, `15375db`)
+- [ ] `billing_run_lines(tenant_id, treasury_invoice_id)` index for the payment consumer lookup (wave 1b, index migration)
+- [x] Treasury and auth-api errors keep only the service's own message before they are stored or returned (`15375db`)
 
 ## Acceptance
 

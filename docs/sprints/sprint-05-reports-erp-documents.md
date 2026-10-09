@@ -40,12 +40,14 @@ API state as of 2026-10-08.
 Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
 
 - [ ] Correction: the dashboard ageing summary exists, but there is no standalone arrears ageing report with 0 to 30, 31 to 60, 61 to 90 and over 90 bands and last payment date (SRDD 19, wave 2.3)
-- [ ] `daily_stats` writes only `collected` and `payments_count`, uses `time.Now()` instead of the payment time, and can double count on redelivery. Fix: write it in the consumer transaction keyed by payment day, add the nightly rebuild of all metrics (wave 1b)
-- [ ] `weeklySQL` casts `daily_stats.day` and defeats its index (wave 1b)
+- [x] `daily_stats`: collections written in the consumer transaction on the payment's day (`15375db`); nightly rebuild of every other metric for every tenant in one statement each (`bf20a0d`)
+- [x] `weeklySQL` compares `daily_stats.day` directly (`bf20a0d`)
+- [x] Sales position cached 60 seconds (`bf20a0d`)
 - [ ] Reports suite: collections by month, charge type and block; payment channel; 24-month instalment receivables; handover and title tracker; water trend; maintenance performance; vendor scorecard; security summary; every figure links to its records (FR-66, wave 2.3)
 - [ ] Exports `?format=pdf|csv|xlsx` on every report through the copied docs engine (FR-66, wave 2.1)
-- [ ] Notice recipients paged by keyset in 500s instead of 20,000 loaded in memory; deliveries list paged (wave 1b)
-- [ ] Property scope on notice create, send and deliveries and on enquiry update (wave 1a)
+- [x] Notice direct-send fallback pages recipients in 500s and resumes a send a stopped pod left half done (`b8be252`); deliveries list paging still open
+- [x] Property scope on notice create (estate-wide needs every property), send and deliveries and on enquiry update (`15375db`)
+- [x] Broadcast completion applied once with its notice.published event (`15375db`)
 - [ ] `AuditLog` written by one helper from money, contract, configuration, role and access changes (FR-67, wave 2.4)
 - [ ] Privacy requests with OTP identity, deadline, export and anonymisation, statutory records kept; retention purge jobs (FR-67, NFR-10, wave 2.4)
 - [ ] Documents: templates with merge fields, versions and approval; generation with reference and verification code; OTP acceptance; wet-signed upload; access log; public verify route (FR-46 to FR-49, wave 2.1)

@@ -50,10 +50,12 @@ API state as of 2026-10-08. The console and portal screens are in maskani-ui spr
 ### Gaps found by the 2026-10-09 audit
 Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
 
-- [ ] Property scope on EndLink, UpdateParty, InviteParty, RemoveStaff; ListParties scoped by linked units; CreateParty never returns a party from another property (FR-13, wave 1a)
-- [ ] `SetUserRoles` refuses roles above the actor's own; a property-limited admin can only invite staff into their own properties (FR-13, wave 1a)
-- [ ] Portal `OwnsAccount` follows bill-to and role: an occupant reads and pays only the accounts assigned to them, and access ends at the link's `end_date` (FR-14, wave 1a)
-- [ ] Media upload needs a permission or portal session, is rate limited and capped in bytes and pixels; signing checks the record scope; `MediaSigningSecret` required in production (NFR-09, wave 1a)
+- [x] Property scope on EndLink, UpdateParty, InviteParty, RemoveStaff; ListParties scoped by linked units; CreateParty returns only id and name for a party the caller cannot see (FR-13, `15375db`)
+- [x] Nobody grants or writes a role with permissions they do not hold; a property-limited admin invites only into their own properties (FR-13, `15375db`)
+- [x] Portal `OwnsAccount` follows bill-to and role: an occupant reads and pays only estate accounts assigned to them, never the purchase account, and links stop at their `end_date` (FR-14, `15375db`)
+- [x] Media upload needs a staff or portal session (portal users only their kinds), per-user rate limits, image dimensions checked before decoding; signing limited to the caller's kinds; signing key derived from the field key instead of the internal service key (NFR-09, `15375db`)
+- [x] EndLink keeps a link active until a future end date (`15375db`)
+- [x] Phone numbers validated with the fleet's httpware `contact` rules, stored form unchanged (`b8be252`)
 - [ ] Custom field definitions with validation of `custom_fields` on write, filters and exports (FR-07, wave 2.11)
 - [ ] Layered configuration: property overrides read by the module check (FR-07, FR-08, wave 2.11)
 - [ ] Module switched off keeps its data readable and exportable; only writes and jobs stop (FR-09, wave 1b)
