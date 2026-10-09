@@ -565,6 +565,25 @@ func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
+// RoleSummary is GET /reports/role-summary?property_id=: what each kind of staff acts on today.
+// Open to all staff; the screen shows only the panels the caller's role uses.
+func (h *H) RoleSummary(w http.ResponseWriter, r *http.Request) {
+	if !access(r).IsStaff() {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "staff only")
+		return
+	}
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	v, err := h.Reports.Roles(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties})
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
+}
+
 // Arrears is GET /reports/arrears?property_id= (keyset page, largest balance first).
 func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	f, ok := scopeFilter(w, r)

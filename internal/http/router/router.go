@@ -368,6 +368,7 @@ func mount(r chi.Router, d Deps) {
 	})
 	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/insights", h.Insights)
+	r.Get("/reports/role-summary", h.RoleSummary) // any staff; panels filtered by role on screen
 
 	// Portal: scoped by the caller's own unit links.
 	r.Route("/me", func(m chi.Router) {
