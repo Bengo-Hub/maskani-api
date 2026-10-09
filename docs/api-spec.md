@@ -138,7 +138,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | Method and path | Purpose | Permission |
 |---|---|---|
 | GET `/price-lists?property_id=`; POST `/price-lists` | Price lists with items | `sales.view` / `sales.manage` |
-| GET `/availability?property_id=` | Units with sale status and current price | `sales.view` |
+| GET `/availability?property_id=&status=` | The sales board: `{groups:[{name, available, units:[...]}]}`, grouped by block (phase when a unit has no block), blocks in their set order and units in natural code order; each unit carries only the tile fields (code, type, bedrooms, size, sale status, active price, fee, deposit). Not paged: it shows a whole property and is bounded by its unit count. `status` narrows to one sale status | `sales.view` |
 | GET `/reservations` (keyset; `property_id`, `status`) | Reservations plus `unit_code`, `property_id`, `buyer_name` | `sales.view` |
 | POST `/reservations` `{unit_id, party_id, days}` | Reserve, open the sales account, invoice the fee | `sales.manage` |
 | GET `/sale-contracts` (keyset; `property_id`, `status`); POST `/sale-contracts`; GET `/sale-contracts/{id}` | Contracts; GET one returns the active schedule, `next_due` and `balance` | `sales.view` / `sales.manage` |

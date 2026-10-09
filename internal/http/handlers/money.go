@@ -371,7 +371,7 @@ func (h *H) ListPriceLists(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
-// Availability is GET /availability?property_id=.
+// Availability is GET /availability?property_id=&status=: the sales board grouped by block.
 func (h *H) Availability(w http.ResponseWriter, r *http.Request) {
 	pid := httpx.QueryUUID(r, "property_id")
 	if pid == nil || !requireProperty(w, r, *pid) {
@@ -380,12 +380,17 @@ func (h *H) Availability(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	rows, err := h.Sales.Availability(r.Context(), *pid)
+	status := r.URL.Query().Get("status")
+	if status != "" && !sales.ValidSaleStatus(status) {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "unknown sale status")
+		return
+	}
+	groups, err := h.Sales.Availability(r.Context(), *pid, status)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, map[string]any{"groups": groups})
 }
 
 // Reserve is POST /reservations.

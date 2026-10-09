@@ -126,36 +126,7 @@ func (s *Service) ListPriceLists(ctx context.Context, propertyID uuid.UUID) ([]*
 		Order(ent.Desc(pricelist.FieldEffectiveFrom)).Limit(100).All(ctx)
 }
 
-// Availability is a unit with its current price.
-type Availability struct {
-	*ent.Unit
-	Price          *decimal.Decimal `json:"price,omitempty"`
-	ReservationFee *decimal.Decimal `json:"reservation_fee,omitempty"`
-	DepositPct     float64          `json:"deposit_pct,omitempty"`
-	PriceItemID    *uuid.UUID       `json:"price_list_item_id,omitempty"`
-}
-
-// Availability returns the property's units with sale status and the active price.
-func (s *Service) Availability(ctx context.Context, propertyID uuid.UUID) ([]Availability, error) {
-	units, err := s.client.Unit.Query().Where(unit.PropertyID(propertyID), unit.StatusEQ(unit.StatusActive),
-		unit.SaleStatusNEQ(unit.SaleStatusNotForSale)).WithBlock().Order(ent.Asc(unit.FieldCode)).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	items, err := s.activeItems(ctx, propertyID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Availability, len(units))
-	for i, u := range units {
-		out[i] = Availability{Unit: u}
-		if it := pickItem(items, u); it != nil {
-			out[i].Price, out[i].ReservationFee, out[i].DepositPct, out[i].PriceItemID = &it.Price, &it.ReservationFee, it.DepositPct, &it.ID
-		}
-	}
-	return out, nil
-}
-
+// activeItems are the items of the property's active price lists.
 func (s *Service) activeItems(ctx context.Context, propertyID uuid.UUID) ([]*ent.PriceListItem, error) {
 	return s.client.PriceListItem.Query().Where(pricelistitem.HasPriceListWith(
 		pricelist.PropertyID(propertyID), pricelist.StatusEQ(pricelist.StatusActive))).All(ctx)
