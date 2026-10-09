@@ -208,9 +208,10 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
+	importSvc := imports.NewService(orm, regSvc, log)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: imports.NewService(orm, regSvc, log), PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 
@@ -223,7 +224,7 @@ func New(ctx context.Context) (*App, error) {
 		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer,
 		InternalKey: cfg.Auth.APIKey})
 
-	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
+	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
 
 	return &App{cfg: cfg, log: log, pool: pool, cache: rdb, nc: nc, orm: orm, roOrm: roOrm, outbox: outbox,
 		consumer: consumer, notices: noticeSvc, jobs: runner,

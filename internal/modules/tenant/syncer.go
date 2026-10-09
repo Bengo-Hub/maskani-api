@@ -5,13 +5,14 @@ package tenant
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
+	serviceclient "github.com/Bengo-Hub/shared-service-client"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -21,13 +22,12 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 )
 
-var s2sHTTPClient = &http.Client{Timeout: 15 * time.Second}
-
-// driftProbeClient keeps the per-call drift check short; on timeout the local projection stands.
-var driftProbeClient = &http.Client{Timeout: 5 * time.Second}
-
 // driftCheckInterval throttles the auth-api drift probe per slug.
 const driftCheckInterval = 10 * time.Minute
+
+// slugTTL is how long a resolved slug is served from memory. Every request resolves its tenant, so
+// this removes a database read per request; a renamed or re-keyed tenant is picked up within it.
+const slugTTL = 5 * time.Minute
 
 // FirstSeenFunc runs once per pod when a tenant is first resolved, to ensure its defaults exist
 // (settings, modules, funds, charge catalogue). It must be idempotent.
@@ -39,6 +39,9 @@ type Syncer struct {
 	authURL string
 	db      *sql.DB
 	log     *zap.Logger
+	// api reads tenants and outlets; probe is the short drift check (on timeout the local row stands).
+	api, probe *serviceclient.Client
+	slugs      *sharedcache.Local[string, uuid.UUID]
 
 	onFirstSeen FirstSeenFunc
 	seenMu      sync.Mutex
@@ -53,8 +56,18 @@ func NewSyncer(client *ent.Client, authURL string, db *sql.DB, log *zap.Logger) 
 	if log == nil {
 		log = zap.NewNop()
 	}
-	return &Syncer{client: client, authURL: strings.TrimRight(authURL, "/"), db: db, log: log.Named("tenant-sync")}
+	authURL = strings.TrimRight(authURL, "/")
+	log = log.Named("tenant-sync")
+	cfg := serviceclient.DefaultConfig(authURL, "auth-api", log)
+	cfg.Timeout = 15 * time.Second
+	pcfg := serviceclient.DefaultConfig(authURL, "auth-api", log)
+	pcfg.Timeout = 5 * time.Second
+	return &Syncer{client: client, authURL: authURL, db: db, log: log, api: serviceclient.New(cfg),
+		probe: serviceclient.New(pcfg), slugs: sharedcache.NewLocal[string, uuid.UUID](5000, slugTTL)}
 }
+
+// Forget drops a slug from memory (a tenant event changed it).
+func (s *Syncer) Forget(slug string) { s.slugs.Delete(slug) }
 
 // OnFirstSeen registers the defaults initialiser.
 func (s *Syncer) OnFirstSeen(fn FirstSeenFunc) { s.onFirstSeen = fn }
@@ -94,9 +107,21 @@ func (s *Syncer) firstSeen(ctx context.Context, id uuid.UUID, slug string) {
 }
 
 func (s *Syncer) syncTenantID(ctx context.Context, slug string) (uuid.UUID, error) {
+	// Served from memory between drift probes: the hot path of every request.
+	if id, ok := s.slugs.Get(slug); ok && !s.driftDue(slug) {
+		return id, nil
+	}
+	id, err := s.resolveTenantID(ctx, slug)
+	if err == nil && id != uuid.Nil {
+		s.slugs.Set(slug, id)
+	}
+	return id, err
+}
+
+func (s *Syncer) resolveTenantID(ctx context.Context, slug string) (uuid.UUID, error) {
 	local, localErr := s.client.Tenant.Query().Where(enttenant.SlugEQ(slug)).Only(ctx)
 	hasLocal := localErr == nil && local != nil
-	endpoint := s.authURL + "/api/v1/tenants/by-slug/" + slug
+	endpoint := "/api/v1/tenants/by-slug/" + slug
 
 	// auth-api owns the UUID. A tenant deleted and recreated upstream gets a new one, so the cached
 	// row is confirmed periodically and re-keyed when it drifted.
@@ -138,26 +163,30 @@ func (s *Syncer) syncTenantID(ctx context.Context, slug string) (uuid.UUID, erro
 }
 
 func (s *Syncer) fetchTenant(ctx context.Context, endpoint string) (*authAPITenant, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := s2sHTTPClient.Do(req)
+	resp, err := s.api.Get(ctx, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("tenant: GET %s: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("tenant: not found in auth-api")
 	}
-	if resp.StatusCode != http.StatusOK {
+	if !resp.IsSuccess() {
 		return nil, fmt.Errorf("tenant: auth-api HTTP %d", resp.StatusCode)
 	}
 	var t authAPITenant
-	if err := json.NewDecoder(resp.Body).Decode(&t); err != nil {
+	if err := resp.DecodeJSON(&t); err != nil {
 		return nil, fmt.Errorf("tenant: decode: %w", err)
 	}
 	return &t, nil
+}
+
+// driftDue reports, without claiming it, whether the slug's drift probe is due, so the in-memory
+// answer is not served past a probe.
+func (s *Syncer) driftDue(slug string) bool {
+	s.driftMu.Lock()
+	defer s.driftMu.Unlock()
+	last, ok := s.lastDriftScan[slug]
+	return !ok || time.Since(last) >= driftCheckInterval
 }
 
 func (s *Syncer) dueForDriftScan(slug string) bool {
@@ -174,20 +203,15 @@ func (s *Syncer) dueForDriftScan(slug string) bool {
 }
 
 func (s *Syncer) probeAuthTenantID(ctx context.Context, endpoint string) (uuid.UUID, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	resp, err := s.probe.Get(ctx, endpoint, nil)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	resp, err := driftProbeClient.Do(req)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !resp.IsSuccess() {
 		return uuid.Nil, fmt.Errorf("auth-api HTTP %d", resp.StatusCode)
 	}
 	var t authAPITenant
-	if err := json.NewDecoder(resp.Body).Decode(&t); err != nil {
+	if err := resp.DecodeJSON(&t); err != nil {
 		return uuid.Nil, err
 	}
 	return uuid.Parse(t.ID)
@@ -255,16 +279,16 @@ func (s *Syncer) adoptAuthTenantID(ctx context.Context, localID, remoteID uuid.U
 }
 
 type authOutlet struct {
-	ID       string         `json:"id"`
-	Code     string         `json:"code"`
-	Name     string         `json:"name"`
-	UseCase  string         `json:"use_case"`
+	ID      string `json:"id"`
+	Code    string `json:"code"`
+	Name    string `json:"name"`
+	UseCase string `json:"use_case"`
 	// ApplicableServices is auth-api's own list of services an outlet serves.
-	ApplicableServices []string `json:"applicable_services,omitempty"`
-	IsHQ               bool     `json:"is_hq"`
-	Status   string         `json:"status"`
-	Address  string         `json:"address,omitempty"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	ApplicableServices []string       `json:"applicable_services,omitempty"`
+	IsHQ               bool           `json:"is_hq"`
+	Status             string         `json:"status"`
+	Address            string         `json:"address,omitempty"`
+	Metadata           map[string]any `json:"metadata,omitempty"`
 }
 
 // isMaskaniOutlet is a property outlet by use case, or one auth-api lists as served by maskani-api.
@@ -283,21 +307,16 @@ func isMaskaniOutlet(o authOutlet) bool {
 // SyncOutlets pulls the tenant's outlets from auth-api and upserts the property ones (and the HQ,
 // which grants a tenant-wide view).
 func (s *Syncer) SyncOutlets(ctx context.Context, tenantID uuid.UUID, tenantSlug string) error {
-	url := s.authURL + "/api/v1/tenants/" + tenantSlug + "/outlets"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	path := "/api/v1/tenants/" + tenantSlug + "/outlets"
+	resp, err := s.api.Get(ctx, path, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("tenant: GET %s: %w", path, err)
 	}
-	resp, err := s2sHTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("tenant: GET %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !resp.IsSuccess() {
 		return fmt.Errorf("tenant: outlets HTTP %d", resp.StatusCode)
 	}
 	var items []authOutlet
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+	if err := resp.DecodeJSON(&items); err != nil {
 		return fmt.Errorf("tenant: decode outlets: %w", err)
 	}
 	for _, it := range items {

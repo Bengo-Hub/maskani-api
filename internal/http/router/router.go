@@ -161,6 +161,15 @@ func deviceKeyHash(r *http.Request) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// forgetAccess clears this pod's cached access facts once a change to staff, roles, invites or
+// unit links has run, so the next request here sees it (other pods within their 30 second TTL).
+func forgetAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		mw.ForgetAccess()
+	})
+}
+
 // userKey keys per-user limits by the signed-in user (resolved by ResolveAccess).
 func userKey(r *http.Request) string {
 	if a := mw.FromContext(r.Context()); a != nil && a.AuthUserID != uuid.Nil {
@@ -227,9 +236,9 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermUsersManage)).Post("/roles/customize", h.CustomizeRole)
 	r.With(perm(rbac.PermUsersManage)).Put("/roles/{id}", h.UpdateRole)
 	r.With(perm(rbac.PermUsersManage)).Delete("/roles/{id}", h.DeleteRole)
-	r.With(perm(rbac.PermUsersManage)).Post("/users/invite", h.InviteStaff)
-	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/roles", h.SetUserRoles)
-	r.With(perm(rbac.PermUsersManage)).Put("/users/{id}/status", h.SetUserStatus)
+	r.With(perm(rbac.PermUsersManage), forgetAccess).Post("/users/invite", h.InviteStaff)
+	r.With(perm(rbac.PermUsersManage), forgetAccess).Put("/users/{id}/roles", h.SetUserRoles)
+	r.With(perm(rbac.PermUsersManage), forgetAccess).Put("/users/{id}/status", h.SetUserStatus)
 
 	// Register.
 	r.Group(func(g chi.Router) {
@@ -240,20 +249,20 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermPropertiesManage)).Patch("/properties/{id}", h.UpdateProperty)
 		g.With(perm(rbac.PermPropertiesManage)).Post("/properties/{id}/blocks", h.CreateBlock)
 		g.With(perm(rbac.PermUsersView)).Get("/properties/{id}/staff", h.ListStaff)
-		g.With(perm(rbac.PermUsersManage)).Post("/properties/{id}/staff", h.AssignStaff)
-		g.With(perm(rbac.PermUsersManage)).Delete("/staff-assignments/{id}", h.RemoveStaff)
+		g.With(perm(rbac.PermUsersManage), forgetAccess).Post("/properties/{id}/staff", h.AssignStaff)
+		g.With(perm(rbac.PermUsersManage), forgetAccess).Delete("/staff-assignments/{id}", h.RemoveStaff)
 		g.With(perm(rbac.PermUnitsView)).Get("/units", h.ListUnits)
 		g.With(perm(rbac.PermUnitsManage)).Post("/units", h.CreateUnit)
 		g.With(perm(rbac.PermUnitsView)).Get("/units/{id}", h.GetUnit)
 		g.With(perm(rbac.PermUnitsManage)).Patch("/units/{id}", h.UpdateUnit)
-		g.With(perm(rbac.PermPartiesManage)).Post("/units/{id}/parties", h.LinkParty)
+		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/units/{id}/parties", h.LinkParty)
 		g.With(perm(rbac.PermPartiesManage)).Post("/units/{id}/vehicles", h.AddVehicle)
-		g.With(perm(rbac.PermPartiesManage)).Post("/unit-parties/{id}/end", h.EndLink)
+		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/unit-parties/{id}/end", h.EndLink)
 		g.With(perm(rbac.PermPartiesView)).Get("/parties", h.ListParties)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties", h.CreateParty)
 		g.With(perm(rbac.PermPartiesView)).Get("/parties/{id}", h.GetParty)
 		g.With(perm(rbac.PermPartiesManage)).Patch("/parties/{id}", h.UpdateParty)
-		g.With(perm(rbac.PermPartiesManage)).Post("/parties/{id}/invite", h.InviteParty)
+		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/parties/{id}/invite", h.InviteParty)
 		// CSV import of units and owners: validate first, then commit in the background.
 		g.With(perm(rbac.PermImportsRun)).Get("/imports/template", h.ImportTemplate)
 		g.With(perm(rbac.PermImportsRun)).Get("/imports", h.ListImports)

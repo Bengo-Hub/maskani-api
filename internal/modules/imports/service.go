@@ -335,6 +335,57 @@ func (s *Service) Commit(ctx context.Context, actor, jobID uuid.UUID) (*ent.Impo
 	return s.Get(ctx, job.ID)
 }
 
+// staleAfter is how long a validated import keeps its raw rows (owner phones and emails) waiting
+// for a commit; commitStuckAfter is how long a commit may go without progress before another pod
+// takes it over.
+const (
+	staleAfter       = 7 * 24 * time.Hour
+	commitStuckAfter = 15 * time.Minute
+)
+
+// Housekeep expires validated imports never committed (their raw rows are dropped) and resumes
+// commits a stopped pod left half done (system job, all tenants). Applying a row is an upsert on
+// natural keys, so a resumed commit does not duplicate what the first run wrote.
+func (s *Service) Housekeep(ctx context.Context) (expired, resumed int, err error) {
+	stale, err := s.client.ImportJob.Query().Where(importjob.StatusEQ(importjob.StatusValidated),
+		importjob.CreatedAtLT(time.Now().Add(-staleAfter))).Limit(200).All(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, j := range stale {
+		if err := s.client.ImportJob.UpdateOneID(j.ID).SetStatus(importjob.StatusFailed).SetSummary(redact(j).Summary).
+			SetErrors([]map[string]any{{"line": 0, "message": "this check expired after 7 days without a commit; upload the file again"}}).
+			Exec(tenantguard.With(ctx, j.TenantID)); err == nil {
+			expired++
+		}
+	}
+	cutoff := time.Now().Add(-commitStuckAfter)
+	stuck, err := s.client.ImportJob.Query().Where(importjob.StatusEQ(importjob.StatusCommitting),
+		importjob.UpdatedAtLT(cutoff)).Limit(20).All(ctx)
+	if err != nil {
+		return expired, 0, err
+	}
+	for _, j := range stuck {
+		// Claim by touching the row; a second pod sees the fresh time and leaves it.
+		n, err := s.client.ImportJob.Update().Where(importjob.ID(j.ID), importjob.UpdatedAtLT(cutoff)).
+			SetUpdatedAt(time.Now()).Save(tenantguard.With(ctx, j.TenantID))
+		if err != nil || n == 0 || j.PropertyID == nil {
+			continue
+		}
+		rows, err := rowsOf(j.Summary)
+		if err != nil {
+			continue
+		}
+		actor := uuid.Nil
+		if j.CreatedBy != nil {
+			actor = *j.CreatedBy
+		}
+		go s.apply(j.TenantID, actor, j.ID, *j.PropertyID, rows, j.Summary)
+		resumed++
+	}
+	return expired, resumed, nil
+}
+
 func (s *Service) apply(tenantID, actor, jobID, propertyID uuid.UUID, rows []Row, sum map[string]any) {
 	ctx, cancel := context.WithTimeout(tenantguard.With(context.Background(), tenantID), 30*time.Minute)
 	defer cancel()

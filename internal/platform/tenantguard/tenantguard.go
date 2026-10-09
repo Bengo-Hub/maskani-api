@@ -29,9 +29,11 @@ var ErrNoTenant = errors.New("tenantguard: no tenant in context")
 // ErrTenantMismatch is returned when a write carries a tenant_id other than the context tenant.
 var ErrTenantMismatch = errors.New("tenantguard: tenant mismatch")
 
-// With returns a context scoped to tenantID.
+// With returns a context scoped to tenantID. It also drops a system flag inherited from ctx: a job
+// that walks every tenant under System and then narrows to one must be guarded again for that
+// tenant, otherwise the narrowing does nothing and a missing filter reads across tenants.
 func With(ctx context.Context, tenantID uuid.UUID) context.Context {
-	return context.WithValue(ctx, tenantKey, tenantID)
+	return context.WithValue(context.WithValue(ctx, systemKey, false), tenantKey, tenantID)
 }
 
 // System returns a context that bypasses the guard. Use only in jobs, consumers and seeders that

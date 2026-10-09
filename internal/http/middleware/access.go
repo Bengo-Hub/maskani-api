@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/Bengo-Hub/httpware"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	"github.com/google/uuid"
@@ -128,7 +130,8 @@ func ResolveAccess(client *ent.Client, rbacSvc *rbac.Service, log *zap.Logger) f
 					return
 				}
 				a.AuthUserID = authUserID
-				a.PartyIDs = linkedParties(gctx, client, authUserID)
+				facts := cachedFacts(gctx, client, tenantID, authUserID)
+				a.PartyIDs = facts.parties
 				// Only property staff, admins and linked parties get a local user (see EnsureUser);
 				// anyone else in a multi-product tenant resolves to no roles and no permissions.
 				user, eerr := rbacSvc.EnsureUser(gctx, rbac.Identity{
@@ -146,7 +149,12 @@ func ResolveAccess(client *ent.Client, rbacSvc *rbac.Service, log *zap.Logger) f
 				// does not see every estate.
 				a.AllProperties = a.Bypass || containsStr(a.Roles, rbac.RoleTenantAdmin) || (user != nil && claims.CanAccessAllOutlets())
 				if !a.AllProperties && user != nil {
-					a.PropertyIDs, a.AllProperties = assignedProperties(gctx, client, tenantID, user.ID)
+					if !facts.propsLoaded {
+						facts.props, facts.allProps = assignedProperties(gctx, client, tenantID, user.ID)
+						facts.propsLoaded = true
+						accessFacts.Set(factsKey(tenantID, authUserID), facts)
+					}
+					a.PropertyIDs, a.AllProperties = facts.props, facts.allProps
 				}
 			} else {
 				a.AllProperties = true
@@ -157,6 +165,37 @@ func ResolveAccess(client *ent.Client, rbacSvc *rbac.Service, log *zap.Logger) f
 		})
 	}
 }
+
+// userFacts are the per-user lookups every request needs (party links, property assignments),
+// kept for a short time so a busy screen does not repeat them on each call.
+type userFacts struct {
+	parties     []uuid.UUID
+	props       []uuid.UUID
+	allProps    bool
+	propsLoaded bool
+}
+
+// factsTTL bounds how long another pod may serve a changed assignment; this pod drops its copy at
+// once through ForgetAccess.
+const factsTTL = 30 * time.Second
+
+var accessFacts = sharedcache.NewLocal[string, userFacts](20000, factsTTL)
+
+func factsKey(tenantID, userID uuid.UUID) string { return tenantID.String() + ":" + userID.String() }
+
+func cachedFacts(ctx context.Context, client *ent.Client, tenantID, authUserID uuid.UUID) userFacts {
+	key := factsKey(tenantID, authUserID)
+	if f, ok := accessFacts.Get(key); ok {
+		return f
+	}
+	f := userFacts{parties: linkedParties(ctx, client, authUserID)}
+	accessFacts.Set(key, f)
+	return f
+}
+
+// ForgetAccess drops this pod's cached access facts after staff assignments, invites or unit links
+// change, so the change shows on the next request here.
+func ForgetAccess() { accessFacts.Purge() }
 
 // assignedProperties returns the properties behind the user's outlet assignments. A staff user with
 // no assignments is unrestricted until an admin assigns properties (the fleet's progressive rule).

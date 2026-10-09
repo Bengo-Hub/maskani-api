@@ -17,6 +17,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
+	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
@@ -44,6 +45,7 @@ type Deps struct {
 	Loc      *time.Location
 	Accounts *accounts.Service
 	Billing  *billing.Service
+	Imports  *imports.Service
 	Sales    *sales.Service
 	Works    *works.Service
 	Gate     *gate.Service
@@ -62,6 +64,10 @@ func New(d Deps) *Runner {
 		}},
 		{"maskani:billing-resume", 2 * time.Minute, func(ctx context.Context) error {
 			_, err := d.Billing.ResumeStuck(sys(ctx))
+			return err
+		}},
+		{"maskani:imports-housekeeping", 15 * time.Minute, func(ctx context.Context) error {
+			_, _, err := d.Imports.Housekeep(sys(ctx))
 			return err
 		}},
 		{"maskani:reservation-expiry", 15 * time.Minute, func(ctx context.Context) error {
