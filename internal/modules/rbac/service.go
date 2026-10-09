@@ -45,6 +45,14 @@ func NewService(client *ent.Client, log *zap.Logger) *Service {
 
 // Seed upserts the permission catalogue and system roles with their permission sets. Idempotent.
 func (s *Service) Seed(ctx context.Context) error {
+	existing, err := s.client.MaskaniPermission.Query().Select(maskanipermission.FieldPermissionCode).Strings(ctx)
+	if err != nil {
+		return fmt.Errorf("rbac seed: %w", err)
+	}
+	had := map[string]bool{}
+	for _, c := range existing {
+		had[c] = true
+	}
 	permIDs := map[string]uuid.UUID{}
 	for _, p := range Catalogue {
 		id, err := s.client.MaskaniPermission.Create().
@@ -86,7 +94,56 @@ func (s *Service) Seed(ctx context.Context) error {
 			}
 		}
 	}
+	// A code split out of an older one reaches the estates' own role copies once, on the start
+	// that first creates it (a fresh database has no estate roles, so this is a no-op there).
+	for code, parent := range ImpliedBy {
+		if had[code] || len(had) == 0 {
+			continue
+		}
+		if err := s.grantImplied(ctx, permIDs[code], permIDs[parent]); err != nil {
+			return fmt.Errorf("rbac seed implied %s: %w", code, err)
+		}
+	}
 	return nil
+}
+
+// grantImplied gives perm to every estate role that holds parent and lacks perm.
+func (s *Service) grantImplied(ctx context.Context, perm, parent uuid.UUID) error {
+	if perm == uuid.Nil || parent == uuid.Nil {
+		return nil
+	}
+	holders, err := s.client.RolePermission.Query().Where(rolepermission.PermissionID(parent),
+		rolepermission.HasRoleWith(maskanirole.TenantIDNotNil())).Select(rolepermission.FieldRoleID).Strings(ctx)
+	if err != nil || len(holders) == 0 {
+		return err
+	}
+	ids := make([]uuid.UUID, 0, len(holders))
+	for _, h := range holders {
+		if id, err := uuid.Parse(h); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	have, err := s.client.RolePermission.Query().Where(rolepermission.PermissionID(perm), rolepermission.RoleIDIn(ids...)).
+		Select(rolepermission.FieldRoleID).Strings(ctx)
+	if err != nil {
+		return err
+	}
+	skip := map[string]bool{}
+	for _, h := range have {
+		skip[h] = true
+	}
+	bulk := make([]*ent.RolePermissionCreate, 0, len(ids))
+	for _, id := range ids {
+		if !skip[id.String()] {
+			bulk = append(bulk, s.client.RolePermission.Create().SetRoleID(id).SetPermissionID(perm))
+		}
+	}
+	if len(bulk) == 0 {
+		return nil
+	}
+	// Two pods starting together both try; the (role, permission) key keeps one row.
+	return s.client.RolePermission.CreateBulk(bulk...).
+		OnConflictColumns(rolepermission.FieldRoleID, rolepermission.FieldPermissionID).DoNothing().Exec(ctx)
 }
 
 // Identity is what the token and the request tell us about a caller.

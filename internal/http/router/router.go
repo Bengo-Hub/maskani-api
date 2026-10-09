@@ -308,7 +308,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingCollect)).Get("/collections/suspense", h.Suspense)
 		g.With(perm(rbac.PermBillingCollect)).Post("/collections/suspense/{trans_id}/assign", h.AssignSuspense)
 		g.With(perm(rbac.PermReportsView)).Get("/reports/arrears", h.Arrears)
-		g.With(perm(rbac.PermReportsView), export).Get("/reports/arrears/export", h.ArrearsExport)
+		g.With(perm(rbac.PermReportsView), perm(rbac.PermReportsExport), export).Get("/reports/arrears/export", h.ArrearsExport)
 	})
 
 	// Utilities.
@@ -321,7 +321,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters/{id}/estimate", h.EstimateReading)
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meter-readings/{id}/verify", h.VerifyReading)
 		g.With(perm(rbac.PermUtilitiesView)).Get("/water-balance", h.WaterBalance)
-		g.With(perm(rbac.PermUtilitiesView), export).Get("/water-balance/export", h.WaterBalanceExport)
+		g.With(perm(rbac.PermUtilitiesView), perm(rbac.PermReportsExport), export).Get("/water-balance/export", h.WaterBalanceExport)
 	})
 
 	// Sales.
@@ -371,9 +371,9 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermGateView)).Get("/gate/events", h.ListGateEvents)
 		g.With(perm(rbac.PermGateView)).Get("/gate/inside", h.GateInside)
 		g.With(perm(rbac.PermGateView)).Get("/visitor-passes", h.ListPasses)
-		g.With(perm(rbac.PermGateManage)).Post("/visitor-passes", h.StaffCreatePass)
+		g.With(perm(rbac.PermGatePasses, rbac.PermGateManage)).Post("/visitor-passes", h.StaffCreatePass)
 		g.With(perm(rbac.PermGateView)).Get("/visitor-passes/{id}", h.GetPass)
-		g.With(perm(rbac.PermGateManage)).Post("/visitor-passes/{id}/cancel", h.StaffCancelPass)
+		g.With(perm(rbac.PermGatePasses, rbac.PermGateManage)).Post("/visitor-passes/{id}/cancel", h.StaffCancelPass)
 		g.With(perm(rbac.PermGateView)).Get("/incidents", h.ListIncidents)
 		g.With(perm(rbac.PermGateView)).Get("/incidents/{id}", h.GetIncident)
 		g.With(perm(rbac.PermGateView)).Post("/incidents", h.ReportIncident)
@@ -382,14 +382,14 @@ func mount(r chi.Router, d Deps) {
 	// Communication and reports.
 	r.Group(func(g chi.Router) {
 		g.Use(mod(settings.ModCommunication))
-		g.With(perm(rbac.PermNoticesManage)).Get("/notices", h.ListNotices)
+		g.With(perm(rbac.PermNoticesView, rbac.PermNoticesManage)).Get("/notices", h.ListNotices)
 		g.With(perm(rbac.PermNoticesManage)).Post("/notices", h.CreateNotice)
 		g.With(perm(rbac.PermNoticesManage)).Post("/notices/{id}/send", h.SendNotice)
-		g.With(perm(rbac.PermNoticesManage)).Get("/notices/{id}/deliveries", h.NoticeDeliveries)
+		g.With(perm(rbac.PermNoticesView, rbac.PermNoticesManage)).Get("/notices/{id}/deliveries", h.NoticeDeliveries)
 	})
 	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/insights", h.Insights)
-	r.With(perm(rbac.PermReportsView), export).Get("/reports/insights/export", h.PerformanceExport)
+	r.With(perm(rbac.PermReportsView), perm(rbac.PermReportsExport), export).Get("/reports/insights/export", h.PerformanceExport)
 	r.Get("/reports/role-summary", h.RoleSummary) // any staff; panels filtered by role on screen
 
 	// Portal: scoped by the caller's own unit links.

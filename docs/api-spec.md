@@ -62,6 +62,8 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 | GET `/catalogues/{kind}` | Platform defaults merged with tenant overrides | signed-in staff |
 | PUT `/catalogues/{kind}/{code}` `{name, active, attrs}` | Tenant override or custom entry | `settings.manage` |
 | GET `/users?kind=`; GET `/roles`; PUT `/users/{id}/roles` `{roles}` | Users and roles | `users.view` / `users.manage` |
+| GET `/permissions` | The permission catalogue `{code, name, module, action}` for the role matrix. Codes are `maskani.{module}.{action}`; the split-out codes `gate.passes`, `notices.view`, `documents.view`, `documents.issue` and `reports.export` were granted once to every estate role holding the code they came from | `users.view` |
+| POST `/roles` `{code, name, description, permissions}`; POST `/roles/customize` `{code}`; PUT `/roles/{id}` `{name, description, permissions}`; DELETE `/roles/{id}` | Estate roles. A default role is changed by customising it (an estate copy that replaces it for this estate, holders moved over); deleting a copy returns its holders to the default; an estate role is deleted only when nobody holds it. The administrator role is locked to every permission. Nobody can write into a role, or grant a role with, a permission they do not hold | `users.manage` |
 | DELETE `/catalogues/{kind}/{code}` | Remove an override | planned (sprint 1) |
 | GET, POST, PUT `/settings/custom-fields` | Custom field definitions | planned (sprint 1) |
 | GET, PUT `/settings/approval-rules`, `/settings/reminders` | Approval and reminder rules | planned (sprint 2) |
@@ -133,7 +135,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/meters/{id}/readings` `{period, reading, photo_key, read_at, notes}` | Record a reading; anomaly flags returned | `utilities.read` |
 | POST `/meters/{id}/estimate` `{period}`; POST `/meter-readings/{id}/verify` `{action}` | Estimate; accept, reject or recheck | `utilities.manage` |
 | GET `/water-balance?property_id=&period=` | Supplied, billed, common and loss for six periods | `utilities.view` |
-| GET `/water-balance/export?format=pdf\|csv\|xlsx&property_id=&period=` | The same as a branded document with a loss chart | `utilities.view` |
+| GET `/water-balance/export?format=pdf\|csv\|xlsx&property_id=&period=` | The same as a branded document with a loss chart | `utilities.view` and `reports.export` |
 | PATCH `/meters/{id}`; POST `/meters/{id}/replace`; POST `/reading-rounds/{id}/close` | | planned (sprint 2) |
 
 ## Sales (module `sales`)
@@ -188,8 +190,8 @@ Staff side (module `gate`):
 | POST `/gate/devices` `{property_id, name, gate_name}` | Register a tablet; returns `device_key` once | `gate.manage` |
 | GET `/gate/events?property_id=&kind=` (keyset) | Gate log; each row adds `unit_code`, `block` and `guard_name`; entries carry `exited_at`, exits `entry_event_id`, walk-ins `decision` and `decided_by` (host, guard) | `gate.view` |
 | GET `/gate/inside?property_id=` | Who is inside now: entries and admitted walk-ins without an exit in the last 24 hours | `gate.view` |
-| GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes, each with `unit_code` and `block`; POST returns `code` and `qr_token` once, needs a `unit_id` at the property when given, and links the returning visitor | `gate.view` / `gate.manage` |
-| GET `/visitor-passes/{id}`; POST `/visitor-passes/{id}/cancel` | One pass; cancel an active pass (`409` when no longer active) | `gate.view` / `gate.manage` |
+| GET `/visitor-passes` (keyset; `property_id`, `active`); POST `/visitor-passes` | Passes, each with `unit_code` and `block`; POST returns `code` and `qr_token` once, needs a `unit_id` at the property when given, and links the returning visitor | `gate.view` / `gate.passes` or `gate.manage` |
+| GET `/visitor-passes/{id}`; POST `/visitor-passes/{id}/cancel` | One pass; cancel an active pass (`409` when no longer active) | `gate.view` / `gate.passes` or `gate.manage` |
 | GET `/gate/devices?property_id=`; POST `/gate/devices/{id}/revoke` | Tablets with `last_seen_at` and `online` (seen in 15 minutes); revoke a lost or replaced tablet's key | `gate.manage` |
 | GET `/incidents` (keyset; `property_id`, `open`); POST `/incidents` | Incidents | `gate.view` |
 | GET `/incidents/{id}` | One incident (incident alert deep link), property scoped | `gate.view` |
@@ -215,7 +217,7 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET `/notices` (keyset; `property_id`, `status`); POST `/notices`; POST `/notices/{id}/send`; GET `/notices/{id}/deliveries` | Notices by audience over WhatsApp and email | `notices.manage` |
+| GET `/notices` (keyset; `property_id`, `status`); POST `/notices`; POST `/notices/{id}/send`; GET `/notices/{id}/deliveries` | Notices by audience over WhatsApp and email | lists and deliveries `notices.view` or `notices.manage`; write and send `notices.manage` |
 | `/templates`, `/documents/...` | Templates, generated documents, signatures | planned (sprint 5) |
 
 ## Reports
@@ -225,8 +227,8 @@ Tablet side, `/api/v1/gate` with header `X-Device-Key`:
 | GET `/reports/dashboard?property_id=&period=` | See below | `reports.view` |
 | GET `/reports/insights?property_id=&period=` | Staff dashboard business view: `months` (12 months of billed, collected, collection_rate, work_opened, work_closed, contracts_signed, sales_value), `kpis` (each with `last_month` and `last_year`; outstanding, days_sales_outstanding, occupancy_pct, available_for_sale, open_work_orders, avg_resolve_hours_90d), `forecast` (12 months of instalments plus recurring), `forecast_basis` (inputs and method), `sales` (pace, months to sell out), `revenue_mix`, `blocks`, `work_by_category` | `reports.view` |
 | GET `/reports/arrears?property_id=&q=&min=` | Owing accounts, largest first (keyset); `q` matches the account reference prefix or the owner's name, `min` the smallest balance; phones masked without `billing.collect` | `reports.view` |
-| GET `/reports/arrears/export?format=&property_id=&q=&min=` | Every matching owing account (up to 10,000, the document says when cut) with the ageing chart; same phone masking | `reports.view` |
-| GET `/reports/insights/export?format=&property_id=&period=` | The performance report: KPI cards with month-on-month change, 12-month collected chart and table, cash-in forecast with its method, revenue by charge, blocks, maintenance by category, occupancy and sales | `reports.view` |
+| GET `/reports/arrears/export?format=&property_id=&q=&min=` | Every matching owing account (up to 10,000, the document says when cut) with the ageing chart; same phone masking | `reports.view` and `reports.export` |
+| GET `/reports/insights/export?format=&property_id=&period=` | The performance report: KPI cards with month-on-month change, 12-month collected chart and table, cash-in forecast with its method, revenue by charge, blocks, maintenance by category, occupancy and sales | `reports.view` and `reports.export` |
 
 All exports render on `github.com/Bengo-Hub/reports`, send `Cache-Control: private, no-store`, and share a limit of 20 per user per minute.
 | GET `/reports/collections`, `/instalment-receivables`, `/maintenance`, `/vendor-scorecard`, `/security`; CSV and PDF export | | planned (sprint 5) |

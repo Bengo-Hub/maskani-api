@@ -33,9 +33,14 @@ const (
 	PermVendorsManage    = "maskani.vendors.manage"
 	PermGateView         = "maskani.gate.view"
 	PermGateManage       = "maskani.gate.manage"
+	PermGatePasses       = "maskani.gate.passes"
+	PermNoticesView      = "maskani.notices.view"
 	PermNoticesManage    = "maskani.notices.manage"
+	PermDocumentsView    = "maskani.documents.view"
+	PermDocumentsIssue   = "maskani.documents.issue"
 	PermDocumentsManage  = "maskani.documents.manage"
 	PermReportsView      = "maskani.reports.view"
+	PermReportsExport    = "maskani.reports.export"
 	PermPrivacyManage    = "maskani.privacy.manage"
 )
 
@@ -78,10 +83,26 @@ var Catalogue = []PermissionDef{
 	{PermVendorsManage, "Manage vendors, contracts and personnel", "vendors", "manage"},
 	{PermGateView, "View gate logs, passes and incidents", "gate", "view"},
 	{PermGateManage, "Manage gate devices, posts and incidents", "gate", "manage"},
-	{PermNoticesManage, "Send notices", "notices", "manage"},
-	{PermDocumentsManage, "Manage templates and documents", "documents", "manage"},
+	{PermGatePasses, "Issue and cancel visitor passes", "gate", "passes"},
+	{PermNoticesView, "View notices and who received them", "notices", "view"},
+	{PermNoticesManage, "Write and send notices", "notices", "manage"},
+	{PermDocumentsView, "View and download issued documents", "documents", "view"},
+	{PermDocumentsIssue, "Issue documents from approved templates", "documents", "issue"},
+	{PermDocumentsManage, "Manage and approve document templates", "documents", "manage"},
 	{PermReportsView, "View reports and dashboards", "reports", "view"},
+	{PermReportsExport, "Download reports as PDF or Excel", "reports", "export"},
 	{PermPrivacyManage, "Handle data subject requests", "privacy", "manage"},
+}
+
+// ImpliedBy names, for permissions split out of an older one, the permission that used to cover
+// them. When a new code is first seeded, every role (estate copies included) holding the older
+// code gets it once, so no one loses access on upgrade; later removals by an admin stick.
+var ImpliedBy = map[string]string{
+	PermGatePasses:     PermGateManage,
+	PermNoticesView:    PermNoticesManage,
+	PermDocumentsView:  PermDocumentsManage,
+	PermDocumentsIssue: PermDocumentsManage,
+	PermReportsExport:  PermReportsView,
 }
 
 // RoleDef describes a seeded system role.
@@ -124,26 +145,28 @@ var Roles = []RoleDef{
 		PermSettingsView, PermUsersView, PermPropertiesView, PermPropertiesManage, PermUnitsView, PermUnitsManage,
 		PermPartiesView, PermPartiesManage, PermImportsRun, PermBillingView, PermUtilitiesView, PermUtilitiesManage,
 		PermUtilitiesRead, PermSalesView, PermWorksView, PermWorksManage, PermVendorsView, PermVendorsManage,
-		PermGateView, PermGateManage, PermNoticesManage, PermDocumentsManage, PermReportsView,
+		PermGateView, PermGateManage, PermGatePasses, PermNoticesView, PermNoticesManage, PermDocumentsView,
+		PermDocumentsIssue, PermDocumentsManage, PermReportsView, PermReportsExport,
 	}},
 	{RoleFinanceOfficer, "Finance officer", "Billing, collections and adjustments", false, []string{
 		PermSettingsView, PermPropertiesView, PermUnitsView, PermPartiesView, PermBillingView, PermBillingManage,
 		PermBillingRun, PermBillingCollect, PermBillingAdjust, PermUtilitiesView, PermSalesView, PermVendorsView,
-		PermReportsView,
+		PermNoticesView, PermDocumentsView, PermDocumentsIssue, PermReportsView, PermReportsExport,
 	}},
 	{RoleSalesOfficer, "Sales officer", "Price lists, reservations and sale contracts", false, []string{
 		PermPropertiesView, PermUnitsView, PermPartiesView, PermPartiesManage, PermSalesView, PermSalesManage,
-		PermBillingView, PermDocumentsManage, PermReportsView,
+		PermBillingView, PermDocumentsView, PermDocumentsIssue, PermDocumentsManage, PermReportsView, PermReportsExport,
 	}},
-	{RoleCaretaker, "Caretaker", "On-site readings, work orders and notices", false, []string{
+	{RoleCaretaker, "Caretaker", "On-site readings, work orders, resident requests and notices", false, []string{
 		PermPropertiesView, PermUnitsView, PermPartiesView, PermUtilitiesRead, PermUtilitiesView, PermWorksView,
-		PermWorksManage, PermGateView,
+		PermWorksManage, PermGateView, PermGatePasses, PermNoticesView, PermNoticesManage,
 	}},
 	{RoleSecurityManager, "Security manager", "Gate, passes, patrols and incidents", false, []string{
-		PermPropertiesView, PermUnitsView, PermGateView, PermGateManage, PermVendorsView,
+		PermPropertiesView, PermUnitsView, PermGateView, PermGateManage, PermGatePasses, PermVendorsView, PermNoticesView,
 	}},
 	{RoleViewer, "Viewer", "Read-only staff access", false, []string{
-		PermPropertiesView, PermUnitsView, PermPartiesView, PermBillingView, PermReportsView,
+		PermPropertiesView, PermUnitsView, PermPartiesView, PermBillingView, PermUtilitiesView, PermSalesView,
+		PermWorksView, PermVendorsView, PermGateView, PermNoticesView, PermDocumentsView, PermReportsView,
 	}},
 	{RoleOwner, "Owner or buyer", "Portal access to own units", true, nil},
 	{RoleOccupant, "Occupant", "Portal access to the unit they live in", true, nil},
