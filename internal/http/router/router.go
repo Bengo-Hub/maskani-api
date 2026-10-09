@@ -367,6 +367,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermNoticesManage)).Get("/notices/{id}/deliveries", h.NoticeDeliveries)
 	})
 	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
+	r.With(perm(rbac.PermReportsView)).Get("/reports/insights", h.Insights)
 
 	// Portal: scoped by the caller's own unit links.
 	r.Route("/me", func(m chi.Router) {

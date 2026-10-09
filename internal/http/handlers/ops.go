@@ -549,6 +549,22 @@ func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, d)
 }
 
+// Insights is GET /reports/insights?property_id=&period=: trends, comparisons and forecasts for
+// the staff dashboard.
+func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	v, err := h.Reports.Insights(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
+		r.URL.Query().Get("period"))
+	if err != nil {
+		httpx.Fail(w, httpx.Invalid(err.Error()))
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
+}
+
 // Arrears is GET /reports/arrears?property_id= (keyset page, largest balance first).
 func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	f, ok := scopeFilter(w, r)
