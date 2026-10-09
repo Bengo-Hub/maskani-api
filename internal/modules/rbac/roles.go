@@ -51,6 +51,24 @@ func (s *Service) EffectiveRoles(ctx context.Context, tenantID uuid.UUID, codes 
 	return out, nil
 }
 
+// RolePermissionCodes returns every permission code the given roles carry, using the estate's own
+// copy of a role where it has one. Callers use it to stop anyone granting more than they hold.
+func (s *Service) RolePermissionCodes(ctx context.Context, tenantID uuid.UUID, codes []string) ([]string, error) {
+	roles, err := s.EffectiveRoles(ctx, tenantID, codes)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(roles))
+	for _, r := range roles {
+		ids = append(ids, r.ID)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return s.client.MaskaniRole.Query().Where(maskanirole.IDIn(ids...)).QueryPermissions().
+		Unique(true).Select(maskanipermission.FieldPermissionCode).Strings(ctx)
+}
+
 // RoleView is a role as the admin screens show it: its permission codes and how many staff hold it.
 type RoleView struct {
 	ID          uuid.UUID  `json:"id"`

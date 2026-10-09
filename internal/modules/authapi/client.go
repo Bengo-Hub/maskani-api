@@ -4,6 +4,7 @@ package authapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,6 +33,27 @@ func NewClient(baseURL, apiKey string, log *zap.Logger) *Client {
 		c.sc = serviceclient.New(cfg)
 	}
 	return c
+}
+
+// errorMessage keeps only auth-api's own `message` or `error` field, trimmed. Raw bodies can echo
+// the phone or email sent, and these errors reach logs and API responses.
+func errorMessage(body []byte) string {
+	var b struct {
+		Message string `json:"message"`
+		Error   string `json:"error"`
+	}
+	msg := "unexpected response"
+	if json.Unmarshal(body, &b) == nil {
+		if b.Message != "" {
+			msg = b.Message
+		} else if b.Error != "" {
+			msg = b.Error
+		}
+	}
+	if r := []rune(msg); len(r) > 160 {
+		msg = string(r[:160])
+	}
+	return msg
 }
 
 // MemberRequest mirrors auth-api's addTenantMemberRequest. Customers are added by phone; auth-api
@@ -68,7 +90,7 @@ func (c *Client) AddMember(ctx context.Context, tenantID uuid.UUID, req MemberRe
 		return nil, fmt.Errorf("authapi: add member: %w", err)
 	}
 	if !resp.IsSuccess() {
-		return nil, fmt.Errorf("authapi: add member: status %d: %s", resp.StatusCode, string(resp.Body))
+		return nil, fmt.Errorf("authapi: add member: status %d: %s", resp.StatusCode, errorMessage(resp.Body))
 	}
 	var out MemberResult
 	if err := resp.DecodeJSON(&out); err != nil {
@@ -108,7 +130,7 @@ func (c *Client) CreateOutlet(ctx context.Context, tenantSlug, bearer string, re
 		return nil, fmt.Errorf("authapi: create outlet: %w", err)
 	}
 	if !resp.IsSuccess() {
-		return nil, fmt.Errorf("authapi: create outlet: status %d: %s", resp.StatusCode, string(resp.Body))
+		return nil, fmt.Errorf("authapi: create outlet: status %d: %s", resp.StatusCode, errorMessage(resp.Body))
 	}
 	var out Outlet
 	if err := resp.DecodeJSON(&out); err != nil {

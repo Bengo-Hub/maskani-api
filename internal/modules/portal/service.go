@@ -12,7 +12,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/notice"
 	"github.com/bengobox/maskani-api/internal/ent/party"
-	"github.com/bengobox/maskani-api/internal/ent/property"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
@@ -39,31 +39,70 @@ type MyUnit struct {
 	Accounts []*ent.UnitAccount `json:"accounts"`
 }
 
-// Units returns the caller's active unit links.
+// maxLinks bounds a caller's own links; one person never holds more units than this in an estate.
+const maxLinks = 500
+
+// activeLink is a link that grants access now: active, and not past an end date already reached
+// (a future end date keeps it active until that day).
+func activeLink() predicate.UnitParty {
+	return unitparty.And(unitparty.StatusEQ(unitparty.StatusActive),
+		unitparty.Or(unitparty.EndDateIsNil(), unitparty.EndDateGT(time.Now())))
+}
+
+// isOccupantRole is a role that lives in or works at a unit without owning it.
+func isOccupantRole(r unitparty.Role) bool {
+	return r == unitparty.RoleOccupant || r == unitparty.RoleHouseholdMember || r == unitparty.RoleDomesticStaff
+}
+
+// accountVisible applies the bill-to rule (SRDD 8.3): owners, buyers and landlords see every
+// account of the unit; an occupant sees the estate accounts only when the owner assigned them
+// charges, and never the owner's purchase (sales fund) account.
+func accountVisible(l *ent.UnitParty, a *ent.UnitAccount) bool {
+	if !isOccupantRole(l.Role) {
+		return true
+	}
+	if len(l.BillTo) == 0 {
+		return false
+	}
+	return a.Edges.Fund == nil || a.Edges.Fund.Code != "sales"
+}
+
+// Units returns the caller's active unit links with their properties and visible accounts, in three
+// queries whatever the number of units.
 func (s *Service) Units(ctx context.Context, partyIDs []uuid.UUID) ([]MyUnit, error) {
 	links, err := s.client.UnitParty.Query().
-		Where(unitparty.PartyIDIn(partyIDs...), unitparty.StatusEQ(unitparty.StatusActive)).
-		WithUnit().Order(ent.Asc(unitparty.FieldStartDate)).All(ctx)
+		Where(unitparty.PartyIDIn(partyIDs...), activeLink()).
+		WithUnit(func(q *ent.UnitQuery) { q.WithProperty() }).
+		Order(ent.Asc(unitparty.FieldStartDate)).Limit(maxLinks).All(ctx)
 	if err != nil {
 		return nil, err
+	}
+	unitIDs := make([]uuid.UUID, 0, len(links))
+	for _, l := range links {
+		unitIDs = append(unitIDs, l.UnitID)
+	}
+	accs, err := s.client.UnitAccount.Query().Where(unitaccount.UnitIDIn(unitIDs...)).WithFund().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byUnit := map[uuid.UUID][]*ent.UnitAccount{}
+	for _, a := range accs {
+		byUnit[a.UnitID] = append(byUnit[a.UnitID], a)
 	}
 	out := []MyUnit{}
 	seen := map[uuid.UUID]bool{}
 	for _, l := range links {
-		if l.Edges.Unit == nil || seen[l.UnitID] {
+		u := l.Edges.Unit
+		if u == nil || seen[l.UnitID] {
 			continue
 		}
 		seen[l.UnitID] = true
-		mu := MyUnit{Link: l, Unit: l.Edges.Unit}
-		mu.Property, _ = s.client.Property.Query().Where(property.ID(l.Edges.Unit.PropertyID)).Only(ctx)
-		q := s.client.UnitAccount.Query().Where(unitaccount.UnitID(l.UnitID)).WithFund()
-		if l.Role == unitparty.RoleOccupant || l.Role == unitparty.RoleHouseholdMember || l.Role == unitparty.RoleDomesticStaff {
-			// Occupants see the estate account only when the owner assigned them charges.
-			if len(l.BillTo) == 0 {
-				q = q.Where(unitaccount.IDIn())
+		mu := MyUnit{Link: l, Unit: u, Property: u.Edges.Property, Accounts: []*ent.UnitAccount{}}
+		for _, a := range byUnit[l.UnitID] {
+			if accountVisible(l, a) {
+				mu.Accounts = append(mu.Accounts, a)
 			}
 		}
-		mu.Accounts, _ = q.All(ctx)
 		out = append(out, mu)
 	}
 	return out, nil
@@ -75,8 +114,8 @@ func (s *Service) UnitIDs(ctx context.Context, partyIDs []uuid.UUID) ([]uuid.UUI
 		return nil, nil
 	}
 	links, err := s.client.UnitParty.Query().
-		Where(unitparty.PartyIDIn(partyIDs...), unitparty.StatusEQ(unitparty.StatusActive)).
-		Select(unitparty.FieldUnitID).Limit(500).All(ctx)
+		Where(unitparty.PartyIDIn(partyIDs...), activeLink()).
+		Select(unitparty.FieldUnitID).Limit(maxLinks).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -87,27 +126,30 @@ func (s *Service) UnitIDs(ctx context.Context, partyIDs []uuid.UUID) ([]uuid.UUI
 	return out, nil
 }
 
-// OwnsAccount checks that the caller may see and pay an account.
+// OwnsAccount checks that the caller may see and pay an account, under the same bill-to rule the
+// portal home uses: an occupant cannot open the owner's accounts by guessing an id.
 func (s *Service) OwnsAccount(ctx context.Context, partyIDs []uuid.UUID, accountID uuid.UUID) error {
-	acc, err := s.client.UnitAccount.Get(ctx, accountID)
+	acc, err := s.client.UnitAccount.Query().Where(unitaccount.ID(accountID)).WithFund().Only(ctx)
 	if err != nil {
 		return err
 	}
-	ok, err := s.client.UnitParty.Query().Where(unitparty.UnitID(acc.UnitID), unitparty.PartyIDIn(partyIDs...),
-		unitparty.StatusEQ(unitparty.StatusActive)).Exist(ctx)
+	links, err := s.client.UnitParty.Query().Where(unitparty.UnitID(acc.UnitID), unitparty.PartyIDIn(partyIDs...),
+		activeLink()).Limit(maxLinks).All(ctx)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		return httpx.Forbidden("this account is not linked to you")
+	for _, l := range links {
+		if accountVisible(l, acc) {
+			return nil
+		}
 	}
-	return nil
+	return httpx.Forbidden("this account is not linked to you")
 }
 
 // OwnsUnit checks the caller is linked to the unit.
 func (s *Service) OwnsUnit(ctx context.Context, partyIDs []uuid.UUID, unitID uuid.UUID) error {
 	ok, err := s.client.UnitParty.Query().Where(unitparty.UnitID(unitID), unitparty.PartyIDIn(partyIDs...),
-		unitparty.StatusEQ(unitparty.StatusActive)).Exist(ctx)
+		activeLink()).Exist(ctx)
 	if err != nil {
 		return err
 	}
@@ -126,7 +168,7 @@ func (s *Service) Contracts(ctx context.Context, partyIDs []uuid.UUID) ([]*ent.S
 // Notices returns recent sent notices for the properties of the caller's units.
 func (s *Service) Notices(ctx context.Context, partyIDs []uuid.UUID) ([]*ent.Notice, error) {
 	props, err := s.client.Unit.Query().Where(unit.HasPartiesWith(unitparty.PartyIDIn(partyIDs...),
-		unitparty.StatusEQ(unitparty.StatusActive))).Select(unit.FieldPropertyID).All(ctx)
+		activeLink())).Unique(true).Select(unit.FieldPropertyID).Limit(maxLinks).All(ctx)
 	if err != nil {
 		return nil, err
 	}

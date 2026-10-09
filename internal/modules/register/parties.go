@@ -14,6 +14,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuseroutlet"
 	"github.com/bengobox/maskani-api/internal/ent/party"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/events"
@@ -192,9 +193,37 @@ func (s *Service) View(p *ent.Party) PartyView {
 	return v
 }
 
-// ListParties returns a keyset page, searchable by name prefix or phone.
-func (s *Service) ListParties(ctx context.Context, q string, p page.Params) (page.Result[PartyView], error) {
+// PartyScope limits party lists and reads for property-limited staff: they see parties linked to a
+// unit in one of their properties, plus unlinked parties they created themselves (a person just
+// added and not yet linked to a unit).
+type PartyScope struct {
+	Properties    []uuid.UUID
+	AllProperties bool
+	Actor         uuid.UUID
+}
+
+func (sc PartyScope) predicate() predicate.Party {
+	return party.Or(
+		party.HasUnitLinksWith(unitparty.HasUnitWith(unit.PropertyIDIn(sc.Properties...))),
+		party.And(party.Not(party.HasUnitLinks()), party.CreatedBy(sc.Actor)),
+	)
+}
+
+// PartyVisibleTo reports whether a property-limited caller may read or change a party.
+func (s *Service) PartyVisibleTo(ctx context.Context, partyID uuid.UUID, sc PartyScope) (bool, error) {
+	if sc.AllProperties {
+		return true, nil
+	}
+	return s.client.Party.Query().Where(party.ID(partyID), sc.predicate()).Exist(ctx)
+}
+
+// ListParties returns a keyset page, searchable by name prefix or phone, limited to the caller's
+// properties unless they see every property.
+func (s *Service) ListParties(ctx context.Context, q string, sc PartyScope, p page.Params) (page.Result[PartyView], error) {
 	query := s.client.Party.Query().Where(party.StatusNEQ(party.StatusAnonymised))
+	if !sc.AllProperties {
+		query = query.Where(sc.predicate())
+	}
 	if t := strings.TrimSpace(q); t != "" {
 		if ph := secure.NormalizePhone(t); ph != "" {
 			query = query.Where(party.PhoneHash(s.box.Hash(ph)))
@@ -353,7 +382,12 @@ func (s *Service) LinkParty(ctx context.Context, unitID, actor uuid.UUID, in Lin
 
 // EndLink closes a relationship on a date (transfer, move-out).
 func (s *Service) EndLink(ctx context.Context, linkID uuid.UUID, end time.Time) (*ent.UnitParty, error) {
-	return s.client.UnitParty.UpdateOneID(linkID).SetEndDate(end).SetStatus(unitparty.StatusEnded).Save(ctx)
+	u := s.client.UnitParty.UpdateOneID(linkID).SetEndDate(end)
+	// A future end date keeps the link active until that day; the daily link job ends it then.
+	if !end.After(time.Now()) {
+		u.SetStatus(unitparty.StatusEnded)
+	}
+	return u.Save(ctx)
 }
 
 // Invite links the party to an auth-api account by phone (creating one if needed) with a portal

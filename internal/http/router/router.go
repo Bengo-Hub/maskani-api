@@ -103,8 +103,17 @@ func New(d Deps) http.Handler {
 	// Gate tablets authenticate with their device key.
 	r.Route("/api/v1/gate", func(gr chi.Router) {
 		gr.Use(h.DeviceAuth)
-		gr.Post("/verify", h.DeviceVerify)
-		gr.Post("/events", h.DeviceEvents)
+		if d.Limiter != nil {
+			// A busy gate verifies a few codes a minute; 120 per device stops code guessing from a
+			// stolen tablet key without slowing a real queue. Event batches are one call per sync.
+			gr.With(d.Limiter.MiddlewareWith(ratelimit.ValueKey("device", deviceKeyHash),
+				ratelimit.Options{Name: "gate-verify-device", Limit: 120, Window: time.Minute})).Post("/verify", h.DeviceVerify)
+			gr.With(d.Limiter.MiddlewareWith(ratelimit.ValueKey("device", deviceKeyHash),
+				ratelimit.Options{Name: "gate-events-device", Limit: 60, Window: time.Minute})).Post("/events", h.DeviceEvents)
+		} else {
+			gr.Post("/verify", h.DeviceVerify)
+			gr.Post("/events", h.DeviceEvents)
+		}
 		gr.Get("/sync", h.DeviceSync)
 		gr.Get("/units", h.DeviceUnits)
 		gr.Get("/walk-ins/{id}", h.DeviceWalkIn)
@@ -152,6 +161,14 @@ func deviceKeyHash(r *http.Request) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// userKey keys per-user limits by the signed-in user (resolved by ResolveAccess).
+func userKey(r *http.Request) string {
+	if a := mw.FromContext(r.Context()); a != nil && a.AuthUserID != uuid.Nil {
+		return a.AuthUserID.String()
+	}
+	return ""
+}
+
 // tenantSync resolves slug to the auth-api UUID when TenantV2 left the id empty (platform owners
 // visiting another tenant, S2S callers), and keeps the local projection current.
 func tenantSync(d Deps) func(http.Handler) http.Handler {
@@ -184,8 +201,16 @@ func mount(r chi.Router, d Deps) {
 	r.Get("/auth/me", h.Me)
 	// Live change hints (SSE). The router's timeout already bypasses event streams.
 	r.Get("/stream", h.Stream)
-	r.Post("/media/upload", h.Media.Upload)
-	r.Post("/media/sign", h.Media.Sign)
+	if d.Limiter != nil {
+		// Per signed-in user across every pod: uploads are heavy, signing is cheap but bulk.
+		r.With(d.Limiter.MiddlewareWith(ratelimit.ValueKey("user", userKey),
+			ratelimit.Options{Name: "media-upload-user", Limit: 30, Window: time.Minute})).Post("/media/upload", h.Media.Upload)
+		r.With(d.Limiter.MiddlewareWith(ratelimit.ValueKey("user", userKey),
+			ratelimit.Options{Name: "media-sign-user", Limit: 120, Window: time.Minute})).Post("/media/sign", h.Media.Sign)
+	} else {
+		r.Post("/media/upload", h.Media.Upload)
+		r.Post("/media/sign", h.Media.Sign)
+	}
 
 	// Settings, users, catalogues.
 	r.With(perm(rbac.PermSettingsView)).Get("/settings", h.GetSettings)

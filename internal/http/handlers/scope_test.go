@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -56,6 +57,62 @@ func TestPropertyScopeRejectsOtherProperties(t *testing.T) {
 	h.ListStaff(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("staff of another property: status %d, want 403", rec.Code)
+	}
+}
+
+// TestScopeOnWriteRoutes covers write routes that carry the property in the body: a staff user of
+// one property cannot act on another, and only all-property staff can send an estate-wide notice.
+func TestScopeOnWriteRoutes(t *testing.T) {
+	mine, other := uuid.New(), uuid.New()
+	h := &H{}
+	acc := &mw.Access{TenantID: uuid.New(), AuthUserID: uuid.New(), Perms: []string{"maskani.notices.manage", "maskani.gate.manage",
+		"maskani.users.manage"}, PropertyIDs: []uuid.UUID{mine}}
+	cases := map[string]struct {
+		fn   http.HandlerFunc
+		body string
+		want int
+	}{
+		"incident on another property": {h.ReportIncident, `{"property_id":"` + other.String() + `","category":"other","severity":"low","title":"x"}`, http.StatusForbidden},
+		"notice for another property":  {h.CreateNotice, `{"property_id":"` + other.String() + `","title":"x"}`, http.StatusForbidden},
+		"estate-wide notice":           {h.CreateNotice, `{"title":"x"}`, http.StatusForbidden},
+		"invite with no property":      {h.InviteStaff, `{"email":"a@b.co","name":"A","roles":["caretaker"]}`, http.StatusUnprocessableEntity},
+		"invite into another property": {h.InviteStaff, `{"email":"a@b.co","name":"A","roles":["caretaker"],"property_ids":["` + other.String() + `"]}`, http.StatusForbidden},
+	}
+	for name, c := range cases {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(c.body))
+		req = req.WithContext(mw.WithAccess(req.Context(), acc))
+		rec := httptest.NewRecorder()
+		c.fn(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s: status %d, want %d (%s)", name, rec.Code, c.want, rec.Body.String())
+		}
+	}
+
+	// Meters of another property, read side.
+	req := httptest.NewRequest(http.MethodGet, "/meters?property_id="+other.String(), nil)
+	req = req.WithContext(mw.WithAccess(req.Context(), acc))
+	rec := httptest.NewRecorder()
+	h.ListMeters(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("meters of another property: status %d, want 403", rec.Code)
+	}
+}
+
+// TestHoldsAllBlocksEscalation checks nobody can write a permission they lack into a role.
+func TestHoldsAllBlocksEscalation(t *testing.T) {
+	acc := &mw.Access{TenantID: uuid.New(), AuthUserID: uuid.New(), Perms: []string{"maskani.users.manage", "maskani.units.view"}}
+	req := httptest.NewRequest(http.MethodPost, "/roles", nil)
+	req = req.WithContext(mw.WithAccess(req.Context(), acc))
+	rec := httptest.NewRecorder()
+	if holdsAll(rec, req, []string{"maskani.units.view", "maskani.tenant.admin"}) {
+		t.Fatal("holdsAll allowed a permission the caller does not hold")
+	}
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d, want 403", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	if !holdsAll(rec, req, []string{"maskani.units.view"}) {
+		t.Fatal("holdsAll refused a permission the caller holds")
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
+	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -323,6 +324,9 @@ func (h *H) AssignSuspense(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.accountScope(w, r, in.AccountID) {
+		return
+	}
 	if err := h.Collections.Assign(r.Context(), chiParam(r, "trans_id"), in.AccountID); err != nil {
 		httpx.Fail(w, err)
 		return
@@ -390,6 +394,9 @@ func (h *H) Reserve(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.unitScope(w, r, in.UnitID) {
+		return
+	}
 	res, err := h.Sales.Reserve(r.Context(), actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -402,6 +409,9 @@ func (h *H) Reserve(w http.ResponseWriter, r *http.Request) {
 func (h *H) CreateContract(w http.ResponseWriter, r *http.Request) {
 	var in sales.ContractInput
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.unitScope(w, r, in.UnitID) {
 		return
 	}
 	sc, err := h.Sales.CreateContract(r.Context(), actor(r), in)
@@ -445,7 +455,7 @@ func (h *H) ListReservations(w http.ResponseWriter, r *http.Request) {
 // GetContract is GET /sale-contracts/{id}.
 func (h *H) GetContract(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.scopeOf(w, r, register.RecordContract, id) {
 		return
 	}
 	v, err := h.Sales.GetContract(r.Context(), id)
@@ -466,6 +476,9 @@ func (h *H) ActivateContract(w http.ResponseWriter, r *http.Request) {
 		SignedAt *time.Time `json:"signed_at"`
 	}
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordContract, id) {
 		return
 	}
 	at := time.Time{}
@@ -490,6 +503,9 @@ func (h *H) ReleaseMilestone(w http.ResponseWriter, r *http.Request) {
 		EvidenceKey string `json:"evidence_key"`
 	}
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordInstalment, id) {
 		return
 	}
 	v, err := h.Sales.ReleaseMilestone(r.Context(), id, actor(r), in.EvidenceKey)

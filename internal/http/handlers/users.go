@@ -21,6 +21,35 @@ func roleErr(w http.ResponseWriter, err error) {
 	httpx.Fail(w, err)
 }
 
+// holdsAll rejects the request unless the caller already holds every permission listed, so nobody
+// can hand out (or write into a role) more than they have themselves.
+func holdsAll(w http.ResponseWriter, r *http.Request, perms []string) bool {
+	a := access(r)
+	if a.Bypass {
+		return true
+	}
+	for _, p := range perms {
+		if !a.Has(p) {
+			httpx.Error(w, http.StatusForbidden, "forbidden", "you cannot grant a permission you do not hold yourself")
+			return false
+		}
+	}
+	return true
+}
+
+// canGrantRoles applies holdsAll to the permissions the given roles carry.
+func (h *H) canGrantRoles(w http.ResponseWriter, r *http.Request, codes []string) bool {
+	if access(r).Bypass {
+		return true
+	}
+	perms, err := h.RBAC.RolePermissionCodes(r.Context(), access(r).TenantID, codes)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	return holdsAll(w, r, perms)
+}
+
 // ListRoles is GET /roles: the roles this estate uses (its customised copies replace the defaults)
 // with permission codes and how many staff hold each.
 func (h *H) ListRoles(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +83,7 @@ func (h *H) CreateRole(w http.ResponseWriter, r *http.Request) {
 		Description string   `json:"description"`
 		Permissions []string `json:"permissions"`
 	}
-	if !httpx.Decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) || !holdsAll(w, r, in.Permissions) {
 		return
 	}
 	role, err := h.RBAC.CreateRole(r.Context(), access(r).TenantID, in.Code, in.Name, in.Description, in.Permissions)
@@ -92,7 +121,7 @@ func (h *H) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		Description *string  `json:"description"`
 		Permissions []string `json:"permissions"`
 	}
-	if !httpx.Decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) || !holdsAll(w, r, in.Permissions) {
 		return
 	}
 	role, err := h.RBAC.UpdateRole(r.Context(), access(r).TenantID, id, in.Name, in.Description, in.Permissions)
@@ -126,10 +155,19 @@ func (h *H) InviteStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := access(r)
+	// Someone limited to some properties can only bring staff into those properties; an invite with
+	// no properties would give the new person every property.
+	if !a.AllProperties && len(in.PropertyIDs) == 0 {
+		httpx.Fail(w, httpx.Invalid("choose at least one of your properties for this person"))
+		return
+	}
 	for _, pid := range in.PropertyIDs {
 		if !requireProperty(w, r, pid) {
 			return
 		}
+	}
+	if !h.canGrantRoles(w, r, in.Roles) {
+		return
 	}
 	// Validate the roles before creating anything in auth-api.
 	roles, err := h.RBAC.EffectiveRoles(r.Context(), a.TenantID, in.Roles)

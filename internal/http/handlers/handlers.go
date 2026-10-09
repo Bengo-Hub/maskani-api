@@ -101,6 +101,21 @@ func requireProperty(w http.ResponseWriter, r *http.Request, id uuid.UUID) bool 
 	return true
 }
 
+// scopeOf enforces property scope on a record addressed by id: it looks up the record's property
+// and rejects callers not assigned to it. Every write route keyed by a record id goes through here.
+func (h *H) scopeOf(w http.ResponseWriter, r *http.Request, kind register.Record, id uuid.UUID) bool {
+	a := access(r)
+	if a != nil && a.AllProperties {
+		return true
+	}
+	pid, err := h.Register.PropertyOf(r.Context(), kind, id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	return requireProperty(w, r, pid)
+}
+
 // Me is GET /auth/me: identity, roles, permissions, modules, assigned properties and party links.
 func (h *H) Me(w http.ResponseWriter, r *http.Request) {
 	a := access(r)
@@ -182,8 +197,12 @@ func (h *H) SetModules(w http.ResponseWriter, r *http.Request) {
 	h.GetModules(w, r)
 }
 
-// Catalogue is GET /catalogues/{kind}.
+// Catalogue is GET /catalogues/{kind}: staff, and portal users for the lists their forms use.
 func (h *H) Catalogue(w http.ResponseWriter, r *http.Request) {
+	if a := access(r); a == nil || (!a.IsStaff() && len(a.PartyIDs) == 0) {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "sign in to this estate to see its lists")
+		return
+	}
 	rows, err := h.Settings.Catalogue(r.Context(), access(r).TenantID, chiParam(r, "kind"))
 	if err != nil {
 		httpx.Fail(w, err)
@@ -238,7 +257,7 @@ func (h *H) SetUserRoles(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Roles []string `json:"roles"`
 	}
-	if !httpx.Decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) || !h.canGrantRoles(w, r, in.Roles) {
 		return
 	}
 	a := access(r)

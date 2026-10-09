@@ -178,7 +178,7 @@ func (s *Service) Reach(ctx context.Context, a Audience, after string, limit int
 		}
 		q = q.Where(party.IDGT(id))
 	}
-	rows, err := q.Order(ent.Asc(party.FieldID)).Limit(limit + 1).
+	rows, err := q.Order(ent.Asc(party.FieldID)).Limit(limit+1).
 		Select(party.FieldID, party.FieldDisplayName, party.FieldFirstName, party.FieldEmail, party.FieldPhone).All(ctx)
 	if err != nil {
 		return nil, "", err
@@ -301,12 +301,39 @@ func (s *Service) sendAsBroadcast(ctx context.Context, tenantID uuid.UUID, slug 
 	return n, nil
 }
 
+// CompletedEvent identifies the notifications event being applied, so it is applied once.
+type CompletedEvent struct {
+	ID       uuid.UUID
+	Consumer string
+	Subject  string
+}
+
 // Completed records a finished notifications-api broadcast on its notice (consumer of
-// notifications.broadcast.completed with source "maskani"). Idempotent.
-func (s *Service) Completed(ctx context.Context, tenantID, noticeID uuid.UUID, sent, target int) error {
-	n, err := s.client.Notice.Get(ctx, noticeID)
+// notifications.broadcast.completed with source "maskani"). The consumed-event row, the notice
+// update and the notice.published event commit together, so a redelivery changes nothing and never
+// publishes twice.
+func (s *Service) Completed(ctx context.Context, tenantID, noticeID uuid.UUID, sent, target int, ev CompletedEvent) (err error) {
+	tx, err := s.client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := tx.ConsumedEvent.Create().SetEventID(ev.ID).SetConsumer(ev.Consumer).SetTenantID(tenantID).
+		SetSubject(ev.Subject).Exec(tenantguard.System(ctx)); err != nil {
+		if ent.IsConstraintError(err) {
+			return nil
+		}
+		return err
+	}
+	n, err := tx.Notice.Get(ctx, noticeID)
 	if err != nil {
 		if ent.IsNotFound(err) {
+			committed = tx.Commit() == nil
 			return nil
 		}
 		return err
@@ -325,10 +352,17 @@ func (s *Service) Completed(ctx context.Context, tenantID, noticeID uuid.UUID, s
 	if n, err = u.Save(ctx); err != nil {
 		return err
 	}
-	s.emit(tenantID, n)
-	return events.Publish(ctx, s.client.OutboxEvent, tenantID, n.ID.String(), events.NoticePublished, map[string]any{
+	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, n.ID.String(), events.NoticePublished, map[string]any{
 		"notice_id": n.ID, "title": n.Title, "audience_size": target, "priority": n.Priority, "delivered": sent,
-	})
+	}); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	s.emit(tenantID, n)
+	return nil
 }
 
 func uuidStrings(ids []uuid.UUID) []string {

@@ -74,7 +74,7 @@ treasury's ledger, which repairs anything an event missed. Report queries compar
 | `meter_readings` | One per meter per month | Composite (tenant, round, status) and (tenant, meter, period) |
 | `audit_logs` | Every financial or config change | (tenant, entity_type, entity_id) and (tenant, created_at); retention per schedule |
 | `notice_deliveries` | Audience size per notice | Unique key plus (tenant, notice) |
-| `outbox_events` | Every event | Drained and pruned by the shared poller |
+| `outbox_events` | Every event | The shared poller only marks rows published. maskani's own jobs delete them in batches of 1,000: published `pass.created` rows after 15 minutes (they carry the plain gate code), other published rows after 7 days, failed rows after 30 days (`internal/jobs/outbox.go`) |
 
 ## Search
 

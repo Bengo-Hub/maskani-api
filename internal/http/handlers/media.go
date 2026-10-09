@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/jpeg"
 	_ "image/png"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,30 @@ type Media struct {
 var mediaKinds = map[string]bool{"readings": true, "works": true, "properties": true, "units": true,
 	"documents": true, "incidents": true, "vendors": true, "evidence": true}
 
+// portalMediaKinds are the uploads an owner or occupant makes from the portal: request photos and
+// their own meter reading photo.
+var portalMediaKinds = map[string]bool{"works": true, "readings": true}
+
+// maxImagePixels and maxImageSide stop decompression bombs: a small file that declares huge
+// dimensions is refused from its header, before any pixel is decoded.
+const (
+	maxImagePixels = 40_000_000
+	maxImageSide   = 12_000
+)
+
+// mayUseKind reports whether the caller may upload or sign media of a kind: staff any kind, portal
+// users only the portal kinds.
+func mayUseKind(r *http.Request, kind string) bool {
+	a := access(r)
+	if a == nil {
+		return false
+	}
+	if a.IsStaff() {
+		return mediaKinds[kind]
+	}
+	return len(a.PartyIDs) > 0 && portalMediaKinds[kind]
+}
+
 // Upload is POST /media/upload (multipart: file, kind).
 func (m *Media) Upload(w http.ResponseWriter, r *http.Request) {
 	max := int64(m.MaxMB) << 20
@@ -48,12 +73,30 @@ func (m *Media) Upload(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusUnprocessableEntity, "validation_failed", "invalid kind")
 		return
 	}
+	if !mayUseKind(r, kind) {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "you cannot upload this kind of file")
+		return
+	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "file is required")
 		return
 	}
 	defer file.Close()
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		httpx.Error(w, http.StatusUnprocessableEntity, "validation_failed", "only JPEG and PNG images are accepted")
+		return
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxImageSide || cfg.Height > maxImageSide ||
+		int64(cfg.Width)*int64(cfg.Height) > maxImagePixels {
+		httpx.Error(w, http.StatusUnprocessableEntity, "validation_failed", "the image dimensions are too large")
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "server_error", "could not read the file")
+		return
+	}
 	img, _, err := image.Decode(file)
 	if err != nil {
 		httpx.Error(w, http.StatusUnprocessableEntity, "validation_failed", "only JPEG and PNG images are accepted")
@@ -90,6 +133,9 @@ func (m *Media) sign(key string) string {
 }
 
 // Sign is POST /media/sign {keys:[...]}: signed links for keys that belong to the caller's tenant.
+// Keys end in a random UUID and reach a caller only through reads that already passed their
+// property or unit scope, so a key is the capability; portal users are further limited to the
+// kinds the portal shows.
 func (m *Media) Sign(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Keys []string `json:"keys"`
@@ -103,7 +149,11 @@ func (m *Media) Sign(w http.ResponseWriter, r *http.Request) {
 		if i >= 200 {
 			break
 		}
-		if strings.HasPrefix(k, prefix) && !strings.Contains(k, "..") {
+		if !strings.HasPrefix(k, prefix) || strings.Contains(k, "..") {
+			continue
+		}
+		kind, _, _ := strings.Cut(strings.TrimPrefix(k, prefix), "/")
+		if mayUseKind(r, kind) {
 			out[k] = m.sign(k)
 		}
 	}

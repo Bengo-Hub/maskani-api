@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -72,7 +75,7 @@ type EventsConfig struct {
 // AuthConfig validates SSO JWTs through auth-api JWKS and identifies S2S callers by API key.
 type AuthConfig struct {
 	ServiceURL          string        `envconfig:"AUTH_SERVICE_URL" default:"https://sso.codevertexafrica.com"`
-	APIURL              string        `envconfig:"AUTH_API_URL" default:"https://sso.codevertexafrica.com"`
+	APIURL              string        `envconfig:"AUTH_API_URL" default:"http://auth-api.auth.svc.cluster.local:4000"`
 	Issuer              string        `envconfig:"AUTH_ISSUER" default:"https://sso.codevertexafrica.com"`
 	Audience            string        `envconfig:"AUTH_AUDIENCE" default:"codevertex"`
 	JWKSUrl             string        `envconfig:"AUTH_JWKS_URL" default:"https://sso.codevertexafrica.com/api/v1/.well-known/jwks.json"`
@@ -82,12 +85,14 @@ type AuthConfig struct {
 	APIKey              string        `envconfig:"INTERNAL_SERVICE_KEY" default:""`
 }
 
-// ServicesConfig holds S2S base URLs of the services maskani references by ID.
+// ServicesConfig holds S2S base URLs of the services maskani references by ID. Defaults are the
+// in-cluster names: a missing variable must never send S2S traffic out through Cloudflare
+// (s2s-cloudflare-loopback-fleetwide-fix). Local runs set the variables in .env.
 type ServicesConfig struct {
-	TreasuryURL      string `envconfig:"TREASURY_SERVICE_URL" default:"https://booksapi.codevertexafrica.com"`
-	ERPURL           string `envconfig:"ERP_SERVICE_URL" default:"https://erpapi.codevertexafrica.com"`
-	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"https://notificationsapi.codevertexafrica.com"`
-	SubscriptionsURL string `envconfig:"SUBSCRIPTION_BASE_URL" default:"https://pricingapi.codevertexafrica.com"`
+	TreasuryURL      string `envconfig:"TREASURY_SERVICE_URL" default:"http://treasury-api.treasury.svc.cluster.local:4000"`
+	ERPURL           string `envconfig:"ERP_SERVICE_URL" default:"http://erp-api.erp.svc.cluster.local:80"`
+	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"http://notifications-api.notifications.svc.cluster.local:4000"`
+	SubscriptionsURL string `envconfig:"SUBSCRIPTION_BASE_URL" default:"http://subscription-api.subscriptions.svc.cluster.local:4000"`
 }
 
 type MediaConfig struct {
@@ -114,14 +119,30 @@ func Load() (*Config, error) {
 	if cfg.Postgres.ReadOnlyURL == "" {
 		cfg.Postgres.ReadOnlyURL = cfg.Postgres.URL
 	}
-	if cfg.Security.MediaSigningSecret == "" {
-		cfg.Security.MediaSigningSecret = cfg.Auth.APIKey
-	}
 	if cfg.Security.GateTokenSecret == "" {
 		cfg.Security.GateTokenSecret = cfg.Auth.APIKey
 	}
 	if cfg.Security.FieldEncryptionKey == "" && cfg.App.Env != "production" {
 		cfg.Security.FieldEncryptionKey = cfg.Auth.APIKey
 	}
+	if cfg.Security.MediaSigningSecret == "" {
+		// A key of its own, derived from the field key, so a leaked internal service key cannot
+		// mint media links. Production refuses to start with neither set.
+		if cfg.Security.FieldEncryptionKey == "" {
+			if cfg.App.Env == "production" {
+				return nil, fmt.Errorf("config: MEDIA_SIGNING_SECRET or FIELD_ENCRYPTION_KEY is required in production")
+			}
+			cfg.Security.MediaSigningSecret = cfg.Auth.APIKey
+		} else {
+			cfg.Security.MediaSigningSecret = deriveKey(cfg.Security.FieldEncryptionKey, "maskani-media-signing")
+		}
+	}
 	return &cfg, nil
+}
+
+// deriveKey returns a hex HMAC-SHA256 of label under secret: a separate key per use from one secret.
+func deriveKey(secret, label string) string {
+	m := hmac.New(sha256.New, []byte(secret))
+	m.Write([]byte(label))
+	return hex.EncodeToString(m.Sum(nil))
 }

@@ -98,14 +98,21 @@ func (c *Consumer) handle(msg *nats.Msg) {
 		_ = msg.Ack()
 		return
 	}
-	acc, err := c.apply(tctx, tenantID, accountID, p)
+	paidAt := evt.Timestamp
+	if paidAt.IsZero() {
+		paidAt = time.Now()
+	}
+	acc, applied, err := c.apply(tctx, tenantID, accountID, evt.ID, msg.Subject, paidAt, p)
 	if err != nil {
 		c.log.Warn("payment apply failed; will redeliver", zap.Error(err))
 		_ = msg.Nak()
 		return
 	}
-	_ = c.client.ConsumedEvent.Create().SetEventID(evt.ID).SetConsumer(consumerPayment).SetTenantID(tenantID).
-		SetSubject(msg.Subject).OnConflictColumns(consumedevent.FieldEventID, consumedevent.FieldConsumer).DoNothing().Exec(sys)
+	if !applied {
+		// Another replica recorded this event first; its effects are already committed.
+		_ = msg.Ack()
+		return
+	}
 	if c.OnApplied != nil {
 		c.OnApplied(tenantID)
 	}
@@ -146,31 +153,60 @@ func (c *Consumer) resolveAccount(ctx context.Context, refType string, p map[str
 	return uuid.Nil
 }
 
-func (c *Consumer) apply(ctx context.Context, tenantID, accountID uuid.UUID, p map[string]any) (*ent.UnitAccount, error) {
-	acc, err := c.client.UnitAccount.Query().Where(unitaccount.ID(accountID)).WithFund().WithUnit().Only(ctx)
+// apply reflects one payment. The balance refresh and purchase progress re-read treasury, so they
+// are safe to repeat. What must happen once (the consumed-event row, the daily collection total
+// and the receipt event) commits in one transaction; if another replica already recorded the
+// event, applied is false and nothing is written twice.
+func (c *Consumer) apply(ctx context.Context, tenantID, accountID, eventID uuid.UUID, subject string, paidAt time.Time,
+	p map[string]any) (acc *ent.UnitAccount, applied bool, err error) {
+	acc, err = c.client.UnitAccount.Query().Where(unitaccount.ID(accountID)).WithFund().WithUnit().Only(ctx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	led, err := c.svc.accounts.Refresh(ctx, acc)
 	if err != nil {
-		return nil, err
-	}
-	if amt, err := decimal.NewFromString(str(p["amount"])); err == nil && amt.IsPositive() && acc.Edges.Unit != nil {
-		if err := reports.RecordCollection(ctx, c.client, tenantID, acc.Edges.Unit.PropertyID, time.Now(), amt, c.loc); err != nil {
-			c.log.Warn("daily collection update failed", zap.Error(err))
-		}
+		return nil, false, err
 	}
 	if c.sales != nil && acc.Edges.Fund != nil && acc.Edges.Fund.Kind == "sales" {
 		if err := c.sales(ctx, acc.ID); err != nil {
 			c.log.Warn("sales progress update failed", zap.Error(err))
 		}
 	}
-	return acc, events.Publish(ctx, c.client.OutboxEvent, tenantID, acc.ID.String(), events.PaymentApplied, map[string]any{
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() {
+		if err != nil || !applied {
+			_ = tx.Rollback()
+		}
+	}()
+	// The unique key on (event_id, consumer) decides who applies the event: a second replica's insert
+	// fails on it and that replica rolls back without touching the totals.
+	if err = tx.ConsumedEvent.Create().SetEventID(eventID).SetConsumer(consumerPayment).SetTenantID(tenantID).
+		SetSubject(subject).Exec(tenantguard.System(ctx)); err != nil {
+		if ent.IsConstraintError(err) {
+			return acc, false, nil
+		}
+		return nil, false, err
+	}
+	if amt, perr := decimal.NewFromString(str(p["amount"])); perr == nil && amt.IsPositive() && acc.Edges.Unit != nil {
+		if err = reports.RecordCollection(ctx, tx.Client(), tenantID, acc.Edges.Unit.PropertyID, paidAt, amt, c.loc); err != nil {
+			return nil, false, err
+		}
+	}
+	if err = events.Publish(ctx, tx.OutboxEvent, tenantID, acc.ID.String(), events.PaymentApplied, map[string]any{
 		"account_id": acc.ID, "account_ref": acc.AccountRef, "amount": str(p["amount"]),
 		"receipt": str(p["provider_reference"]), "balance": led.Balance.StringFixed(2),
 		"phone": acc.CustomerPhone, "name": acc.CustomerName, "intent_id": str(p["intent_id"]),
 		"email": accounts.CustomerEmail(acc), "fund": fundCode(acc), "method": str(p["payment_method"]),
-	})
+	}); err != nil {
+		return nil, false, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, false, err
+	}
+	return acc, true, nil
 }
 
 func fundCode(acc *ent.UnitAccount) string {

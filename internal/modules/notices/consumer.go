@@ -52,13 +52,12 @@ func (s *Service) handleCompleted(msg *nats.Msg) {
 		_ = msg.Ack()
 		return
 	}
-	if err := s.Completed(tenantguard.With(ctx, evt.TenantID), evt.TenantID, noticeID, intOf(p["sent"]), intOf(p["target"])); err != nil {
+	ev := CompletedEvent{ID: evt.ID, Consumer: consumerCompleted, Subject: msg.Subject}
+	if err := s.Completed(tenantguard.With(ctx, evt.TenantID), evt.TenantID, noticeID, intOf(p["sent"]), intOf(p["target"]), ev); err != nil {
 		s.log.Warn("notice broadcast completion failed; will redeliver", zap.Error(err))
 		_ = msg.Nak()
 		return
 	}
-	_ = s.client.ConsumedEvent.Create().SetEventID(evt.ID).SetConsumer(consumerCompleted).SetTenantID(evt.TenantID).
-		SetSubject(msg.Subject).OnConflictColumns(consumedevent.FieldEventID, consumedevent.FieldConsumer).DoNothing().Exec(sys)
 	_ = msg.Ack()
 }
 

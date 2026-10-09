@@ -200,6 +200,9 @@ func (h *H) EndLink(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.scopeOf(w, r, register.RecordUnitParty, id) {
+		return
+	}
 	end := time.Now()
 	if in.EndDate != nil {
 		end = *in.EndDate
@@ -212,9 +215,29 @@ func (h *H) EndLink(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, l)
 }
 
-// ListParties is GET /parties.
+// partyScope is the caller's party visibility.
+func partyScope(r *http.Request) register.PartyScope {
+	a := access(r)
+	return register.PartyScope{Properties: a.PropertyIDs, AllProperties: a.AllProperties, Actor: a.AuthUserID}
+}
+
+// requireParty rejects callers who may not see a party (linked only to other properties).
+func (h *H) requireParty(w http.ResponseWriter, r *http.Request, id uuid.UUID) bool {
+	ok, err := h.Register.PartyVisibleTo(r.Context(), id, partyScope(r))
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	if !ok {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "this person is linked only to properties you are not assigned to")
+		return false
+	}
+	return true
+}
+
+// ListParties is GET /parties: limited to the caller's properties unless they see them all.
 func (h *H) ListParties(w http.ResponseWriter, r *http.Request) {
-	res, err := h.Register.ListParties(r.Context(), r.URL.Query().Get("q"), page.Parse(r))
+	res, err := h.Register.ListParties(r.Context(), r.URL.Query().Get("q"), partyScope(r), page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -239,25 +262,17 @@ func (h *H) GetParty(w http.ResponseWriter, r *http.Request) {
 
 // unitScope checks the caller may act on a unit's property.
 func (h *H) unitScope(w http.ResponseWriter, r *http.Request, unitID uuid.UUID) bool {
-	pid, err := h.Register.UnitPropertyID(r.Context(), unitID)
-	if err != nil {
-		httpx.Fail(w, err)
-		return false
-	}
-	return requireProperty(w, r, pid)
+	return h.scopeOf(w, r, register.RecordUnit, unitID)
 }
 
 // accountScope checks the caller may act on a unit account's property.
 func (h *H) accountScope(w http.ResponseWriter, r *http.Request, accountID uuid.UUID) bool {
-	pid, err := h.Register.AccountPropertyID(r.Context(), accountID)
-	if err != nil {
-		httpx.Fail(w, err)
-		return false
-	}
-	return requireProperty(w, r, pid)
+	return h.scopeOf(w, r, register.RecordAccount, accountID)
 }
 
-// CreateParty is POST /parties.
+// CreateParty is POST /parties. Parties are de-duplicated by phone across the estate, so the same
+// person can own units in two properties. When the phone matches someone the caller cannot see,
+// only the id and name come back: enough to link them to a unit, nothing else.
 func (h *H) CreateParty(w http.ResponseWriter, r *http.Request) {
 	var in register.PartyInput
 	if !httpx.Decode(w, r, &in) {
@@ -266,6 +281,15 @@ func (h *H) CreateParty(w http.ResponseWriter, r *http.Request) {
 	p, err := h.Register.CreateParty(r.Context(), actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)
+		return
+	}
+	visible, err := h.Register.PartyVisibleTo(r.Context(), p.ID, partyScope(r))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if !visible {
+		httpx.JSON(w, http.StatusOK, map[string]any{"id": p.ID, "display_name": p.DisplayName, "existing": true})
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, h.Register.View(p))
@@ -281,6 +305,9 @@ func (h *H) UpdateParty(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.requireParty(w, r, id) {
+		return
+	}
 	p, err := h.Register.UpdateParty(r.Context(), id, in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -293,6 +320,9 @@ func (h *H) UpdateParty(w http.ResponseWriter, r *http.Request) {
 func (h *H) InviteParty(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
 	if !ok {
+		return
+	}
+	if !h.requireParty(w, r, id) {
 		return
 	}
 	a := access(r)
@@ -346,7 +376,7 @@ func (h *H) AssignStaff(w http.ResponseWriter, r *http.Request) {
 // RemoveStaff is DELETE /staff-assignments/{id}.
 func (h *H) RemoveStaff(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.scopeOf(w, r, register.RecordStaff, id) {
 		return
 	}
 	if err := h.Register.RemoveStaff(r.Context(), id); err != nil {

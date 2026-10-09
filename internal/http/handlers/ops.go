@@ -8,10 +8,13 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/rbac"
+	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
 // --- Utilities ---
@@ -38,6 +41,9 @@ func (h *H) ListMeters(w http.ResponseWriter, r *http.Request) {
 	pid := httpx.QueryUUID(r, "property_id")
 	if pid == nil {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
+		return
+	}
+	if !requireProperty(w, r, *pid) {
 		return
 	}
 	rows, err := h.Utilities.ListMeters(r.Context(), *pid)
@@ -75,6 +81,9 @@ func (h *H) RecordReading(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.scopeOf(w, r, register.RecordMeter, id) {
+		return
+	}
 	rd, err := h.Utilities.Record(r.Context(), id, actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -95,6 +104,9 @@ func (h *H) VerifyReading(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !h.scopeOf(w, r, register.RecordReading, id) {
+		return
+	}
 	rd, err := h.Utilities.Verify(r.Context(), id, actor(r), in.Action)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -113,6 +125,9 @@ func (h *H) EstimateReading(w http.ResponseWriter, r *http.Request) {
 		Period string `json:"period"`
 	}
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordMeter, id) {
 		return
 	}
 	rd, err := h.Utilities.Estimate(r.Context(), id, actor(r), in.Period)
@@ -202,6 +217,9 @@ func (h *H) ActWorkOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	var in works.ActionInput
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordWorkOrder, id) {
 		return
 	}
 	wo, err := h.Works.Act(r.Context(), id, h.staffActor(r), in)
@@ -405,6 +423,9 @@ func (h *H) ReportIncident(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	if !requireProperty(w, r, in.PropertyID) {
+		return
+	}
 	inc, err := h.Gate.ReportIncident(r.Context(), "staff", actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -452,6 +473,14 @@ func (h *H) CreateNotice(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
+	// An estate-wide notice (no property) needs access to every property.
+	pid := uuid.Nil
+	if in.PropertyID != nil {
+		pid = *in.PropertyID
+	}
+	if !requireProperty(w, r, pid) {
+		return
+	}
 	n, err := h.Notices.Create(r.Context(), actor(r), access(r).TenantSlug, in)
 	if err != nil {
 		httpx.Fail(w, err)
@@ -463,7 +492,7 @@ func (h *H) CreateNotice(w http.ResponseWriter, r *http.Request) {
 // SendNotice is POST /notices/{id}/send.
 func (h *H) SendNotice(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.scopeOf(w, r, register.RecordNotice, id) {
 		return
 	}
 	n, err := h.Notices.Send(r.Context(), id, access(r).TenantSlug)
@@ -491,7 +520,7 @@ func (h *H) ListNotices(w http.ResponseWriter, r *http.Request) {
 // NoticeDeliveries is GET /notices/{id}/deliveries.
 func (h *H) NoticeDeliveries(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
-	if !ok {
+	if !ok || !h.scopeOf(w, r, register.RecordNotice, id) {
 		return
 	}
 	rows, err := h.Notices.Deliveries(r.Context(), id)
@@ -529,6 +558,12 @@ func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.Fail(w, err)
 		return
+	}
+	// The phone is for whoever follows up arrears; report viewers see it masked.
+	if !access(r).Has(rbac.PermBillingCollect, rbac.PermBillingManage) {
+		for i := range res.Data {
+			res.Data[i].Phone = secure.Mask(res.Data[i].Phone)
+		}
 	}
 	httpx.JSON(w, http.StatusOK, res)
 }
@@ -576,6 +611,9 @@ func (h *H) UpdateEnquiry(w http.ResponseWriter, r *http.Request) {
 		AssignedTo *uuid.UUID `json:"assigned_to"`
 	}
 	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordEnquiry, id) {
 		return
 	}
 	if err := h.Market.UpdateEnquiry(r.Context(), id, in.Status, in.AssignedTo); err != nil {

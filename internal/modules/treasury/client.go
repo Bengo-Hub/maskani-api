@@ -4,6 +4,7 @@ package treasury
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -98,12 +99,30 @@ type HTTPError struct {
 	Path   string
 }
 
+// Error is safe to store and show staff (it ends up in billing_run_lines.last_error): only
+// treasury's own error message, trimmed, never the raw body, which can echo customer details.
 func (e *HTTPError) Error() string {
-	b := e.Body
-	if len(b) > 300 {
-		b = b[:300]
+	return fmt.Sprintf("treasury %s: status %d: %s", e.Path, e.Status, e.Message())
+}
+
+// Message is treasury's `message` (or `error`) field, trimmed to 160 characters.
+func (e *HTTPError) Message() string {
+	var body struct {
+		Message string `json:"message"`
+		Error   string `json:"error"`
 	}
-	return fmt.Sprintf("treasury %s: status %d: %s", e.Path, e.Status, b)
+	msg := "unexpected response"
+	if json.Unmarshal([]byte(e.Body), &body) == nil {
+		if body.Message != "" {
+			msg = body.Message
+		} else if body.Error != "" {
+			msg = body.Error
+		}
+	}
+	if r := []rune(msg); len(r) > 160 {
+		msg = string(r[:160])
+	}
+	return msg
 }
 
 // IsNotFound reports a 404 from treasury.

@@ -107,10 +107,23 @@ func New(d Deps) *Runner {
 			}
 			return nil
 		}},
+		{"maskani:outbox-prune-passes", 15 * time.Minute, func(ctx context.Context) error {
+			_, err := PruneOutbox(sys(ctx), d.Client, true)
+			return err
+		}},
+		{"maskani:outbox-prune", 24 * time.Hour, func(ctx context.Context) error {
+			n, err := PruneOutbox(sys(ctx), d.Client, false)
+			if n > 0 {
+				log.Info("outbox pruned", zap.Int("rows", n))
+			}
+			return err
+		}},
 	}}
 }
 
-// Start runs until ctx ends.
+// Start runs until ctx ends. Each claimed job runs in its own goroutine with a timeout of its
+// period, so an hour-long job never holds up the five-minute ones; the period claim (shared across
+// pods) keeps one run of a job at a time.
 func (r *Runner) Start(ctx context.Context) {
 	go func() {
 		t := time.NewTicker(time.Minute)
@@ -124,13 +137,22 @@ func (r *Runner) Start(ctx context.Context) {
 					if !sharedcache.ClaimPeriod(ctx, j.Name, j.Period) {
 						continue
 					}
-					jctx, cancel := context.WithTimeout(ctx, j.Period)
-					if err := j.Run(jctx); err != nil {
-						r.log.Warn("job failed", zap.String("job", j.Name), zap.Error(err))
-					}
-					cancel()
+					go r.run(ctx, j)
 				}
 			}
 		}
 	}()
+}
+
+func (r *Runner) run(ctx context.Context, j Job) {
+	defer func() {
+		if p := recover(); p != nil {
+			r.log.Error("job panicked", zap.String("job", j.Name), zap.Any("panic", p))
+		}
+	}()
+	jctx, cancel := context.WithTimeout(ctx, j.Period)
+	defer cancel()
+	if err := j.Run(jctx); err != nil {
+		r.log.Warn("job failed", zap.String("job", j.Name), zap.Error(err))
+	}
 }
