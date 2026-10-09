@@ -7,10 +7,12 @@ import (
 	"time"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
+	"github.com/bengobox/maskani-api/internal/ent/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
@@ -95,15 +97,31 @@ func New(d Deps) *Runner {
 			if err != nil {
 				return err
 			}
+			// Tenant slugs for the whole batch in one read.
+			ids := make([]uuid.UUID, 0, len(due))
 			for _, n := range due {
-				tctx := tenantguard.With(ctx, n.TenantID)
-				slug := ""
-				if t, err := d.Client.Tenant.Get(tctx, n.TenantID); err == nil {
-					slug = t.Slug
+				ids = append(ids, n.TenantID)
+			}
+			slugs := map[uuid.UUID]string{}
+			if len(ids) > 0 {
+				if ts, err := d.Client.Tenant.Query().Where(tenant.IDIn(ids...)).All(sys(ctx)); err == nil {
+					for _, t := range ts {
+						slugs[t.ID] = t.Slug
+					}
 				}
-				if _, err := d.Notices.Send(tctx, n.ID, slug); err != nil {
+			}
+			for _, n := range due {
+				if _, err := d.Notices.Send(tenantguard.With(ctx, n.TenantID), n.ID, slugs[n.TenantID]); err != nil {
 					log.Warn("scheduled notice failed", zap.Error(err))
 				}
+			}
+			// Direct sends whose pod stopped mid-way carry on from where they were.
+			stuck, err := d.Notices.StuckDirect(sys(ctx))
+			if err != nil {
+				return err
+			}
+			for _, n := range stuck {
+				d.Notices.Resume(tenantguard.With(ctx, n.TenantID), n)
 			}
 			return nil
 		}},

@@ -44,5 +44,12 @@ or delete; `daily_stats` fills 2 of its 19 metrics. Each is picked up by a wave 
   transaction mode. It ships in wave 3 behind a flag, staging first.
 - **Partitions:** the migrate binary's live diff drops indexes and objects that Ent does not
   declare, so partitions need an Atlas exclusion and a rotation job before they ship (wave 3).
+- **Guard and vendor PINs stay on bcrypt** (2026-10-09), not the shared Argon2id password-hasher.
+  Switching would invalidate every PIN already set, or keep two verify paths. A 4 to 6 digit PIN is
+  protected by the per-device and per-IP sign-on limits, not by the hash cost, and Argon2id's
+  64 MB per verify is heavy on the gate path.
+- **Phone normalisation** goes through httpware `contact.NormalizePhone` (each country's own rules)
+  but keeps maskani's stored form, digits with the country code and no plus, because phone hashes
+  and treasury customer keys were built on it (`secure.NormalizePhone`, pinned by its test).
 - **Short stays:** supported from R2 through pos-api's hotel module (user decision 2026-10-09);
   Maskani builds no booking engine.

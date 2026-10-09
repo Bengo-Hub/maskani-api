@@ -562,7 +562,7 @@ func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	// The phone is for whoever follows up arrears; report viewers see it masked.
 	if !access(r).Has(rbac.PermBillingCollect, rbac.PermBillingManage) {
 		for i := range res.Data {
-			res.Data[i].Phone = secure.Mask(res.Data[i].Phone)
+			res.Data[i].Phone = secure.MaskPhone(res.Data[i].Phone)
 		}
 	}
 	httpx.JSON(w, http.StatusOK, res)

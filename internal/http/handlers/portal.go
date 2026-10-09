@@ -64,11 +64,10 @@ func (h *H) MyPurchase(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	out := []any{}
-	for _, c := range cs {
-		if v, err := h.Sales.GetContract(r.Context(), c.ID); err == nil {
-			out = append(out, v)
-		}
+	out, err := h.Sales.ContractViews(r.Context(), cs)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": out})
 }
@@ -124,22 +123,11 @@ func (h *H) MyCancelPass(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, err := h.Gate.ListPasses(r.Context(), nil, access(r).PartyIDs, false, 500)
-	if err != nil {
-		httpx.Fail(w, err)
+	if err := h.Gate.CancelHostPass(r.Context(), id, access(r).PartyIDs); err != nil {
+		httpx.Fail(w, err) // not found when the pass is not one of the caller's
 		return
 	}
-	for _, p := range rows {
-		if p.ID == id {
-			if err := h.Gate.CancelPass(r.Context(), id); err != nil {
-				httpx.Fail(w, err)
-				return
-			}
-			httpx.JSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
-			return
-		}
-	}
-	httpx.Error(w, http.StatusNotFound, "not_found", "pass not found")
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
 // MyRequests is GET /me/requests.

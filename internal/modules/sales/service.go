@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/reservation"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
+	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
@@ -239,23 +240,44 @@ func (s *Service) Reserve(ctx context.Context, actor uuid.UUID, in ReserveInput)
 	return res, nil
 }
 
-// ExpireReservations releases lapsed reservations (system job, all tenants).
+// ExpireReservations releases lapsed reservations (system job, all tenants): batches of 500, two
+// set-based updates per batch whatever the batch size.
 func (s *Service) ExpireReservations(ctx context.Context) (int, error) {
-	rows, err := s.client.Reservation.Query().
-		Where(reservation.StatusIn(reservation.StatusPendingPayment, reservation.StatusActive), reservation.ExpiresAtLT(time.Now())).
-		Limit(500).All(ctx)
-	if err != nil {
-		return 0, err
-	}
-	for _, r := range rows {
-		tctx := tenantguard.With(ctx, r.TenantID)
-		if err := s.client.Reservation.UpdateOneID(r.ID).SetStatus(reservation.StatusExpired).Exec(tctx); err != nil {
-			continue
+	total := 0
+	for i := 0; i < 20; i++ {
+		rows, err := s.client.Reservation.Query().
+			Where(reservation.StatusIn(reservation.StatusPendingPayment, reservation.StatusActive), reservation.ExpiresAtLT(time.Now())).
+			Select(reservation.FieldID, reservation.FieldUnitID).Limit(500).All(ctx)
+		if err != nil || len(rows) == 0 {
+			return total, err
 		}
-		_ = s.client.Unit.Update().Where(unit.ID(r.UnitID), unit.SaleStatusEQ(unit.SaleStatusReserved)).
-			SetSaleStatus(unit.SaleStatusAvailable).Exec(tctx)
+		ids := make([]uuid.UUID, len(rows))
+		units := make([]uuid.UUID, len(rows))
+		for j, r := range rows {
+			ids[j], units[j] = r.ID, r.UnitID
+		}
+		tx, err := s.client.Tx(ctx)
+		if err != nil {
+			return total, err
+		}
+		if err := tx.Reservation.Update().Where(reservation.IDIn(ids...)).SetStatus(reservation.StatusExpired).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			return total, err
+		}
+		if err := tx.Unit.Update().Where(unit.IDIn(units...), unit.SaleStatusEQ(unit.SaleStatusReserved)).
+			SetSaleStatus(unit.SaleStatusAvailable).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			return total, err
+		}
+		if err := tx.Commit(); err != nil {
+			return total, err
+		}
+		total += len(rows)
+		if len(rows) < 500 {
+			break
+		}
 	}
-	return len(rows), nil
+	return total, nil
 }
 
 // ContractInput creates a sale contract.
@@ -408,12 +430,14 @@ func (s *Service) Activate(ctx context.Context, contractID uuid.UUID, signedAt t
 		_ = tx.Rollback()
 		return nil, err
 	}
-	for _, l := range lines {
-		if err := tx.Instalment.Create().SetScheduleID(sch.ID).SetContractID(sc.ID).SetSeq(l.Seq).
-			SetKind(instalment.Kind(l.Kind)).SetDueDate(l.DueDate).SetAmount(l.Amount).SetMilestoneLabel(l.Label).Exec(ctx); err != nil {
-			_ = tx.Rollback()
-			return nil, err
-		}
+	rows := make([]*ent.InstalmentCreate, len(lines))
+	for i, l := range lines {
+		rows[i] = tx.Instalment.Create().SetScheduleID(sch.ID).SetContractID(sc.ID).SetSeq(l.Seq).
+			SetKind(instalment.Kind(l.Kind)).SetDueDate(l.DueDate).SetAmount(l.Amount).SetMilestoneLabel(l.Label)
+	}
+	if err := tx.Instalment.CreateBulk(rows...).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return nil, err
 	}
 	sc, err = tx.SaleContract.UpdateOneID(sc.ID).SetStatus(salecontract.StatusActive).SetSignedAt(signedAt).
 		SetUnitAccountID(acc.ID).Save(ctx)
@@ -458,19 +482,41 @@ func (s *Service) InvoiceDue(ctx context.Context, contractID *uuid.UUID, horizon
 		q = q.Where(instalment.ContractID(*contractID))
 	}
 	rows, err := q.Order(ent.Asc(instalment.FieldDueDate)).Limit(500).All(ctx)
+	if err != nil || len(rows) == 0 {
+		return 0, err
+	}
+	// Contracts, accounts and funds for the whole batch in three queries, not three per instalment.
+	contractIDs := make([]uuid.UUID, 0, len(rows))
+	for _, in := range rows {
+		contractIDs = append(contractIDs, in.ContractID)
+	}
+	contracts, err := s.client.SaleContract.Query().Where(salecontract.IDIn(contractIDs...)).All(ctx)
 	if err != nil {
 		return 0, err
 	}
+	byID := make(map[uuid.UUID]*ent.SaleContract, len(contracts))
+	accountIDs := make([]uuid.UUID, 0, len(contracts))
+	for _, c := range contracts {
+		byID[c.ID] = c
+		if c.UnitAccountID != nil {
+			accountIDs = append(accountIDs, *c.UnitAccountID)
+		}
+	}
+	accs, err := s.client.UnitAccount.Query().Where(unitaccount.IDIn(accountIDs...)).WithFund().All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	accByID := make(map[uuid.UUID]*ent.UnitAccount, len(accs))
+	for _, a := range accs {
+		accByID[a.ID] = a
+	}
 	done := 0
 	for _, in := range rows {
-		sc, err := s.client.SaleContract.Get(ctx, in.ContractID)
-		if err != nil || sc.UnitAccountID == nil {
+		sc := byID[in.ContractID]
+		if sc == nil || sc.UnitAccountID == nil || accByID[*sc.UnitAccountID] == nil {
 			continue
 		}
-		acc, err := s.client.UnitAccount.Get(ctx, *sc.UnitAccountID)
-		if err != nil {
-			continue
-		}
+		acc := accByID[*sc.UnitAccountID]
 		desc := fmt.Sprintf("%s %s %d, contract %s", acc.AccountRef, in.Kind, in.Seq, sc.ContractNumber)
 		if in.MilestoneLabel != "" {
 			desc = fmt.Sprintf("%s milestone: %s, contract %s", acc.AccountRef, in.MilestoneLabel, sc.ContractNumber)
@@ -484,18 +530,38 @@ func (s *Service) InvoiceDue(ctx context.Context, contractID *uuid.UUID, horizon
 			s.log.Warn("instalment invoice failed", zap.Error(err))
 			continue
 		}
-		_ = in.Update().SetStatus(instalment.StatusInvoiced).SetTreasuryInvoiceID(inv.ID).SetInvoiceNumber(inv.InvoiceNumber).Exec(ctx)
-		_ = sc.Update().AddInvoicedTotal(in.Amount).Exec(ctx)
-		done++
+		// The instalment and its contract total move together; treasury's by-reference check makes
+		// a retry after a failed write reuse the same invoice.
+		tx, err := s.client.Tx(ctx)
+		if err != nil {
+			continue
+		}
+		if err := tx.Instalment.UpdateOneID(in.ID).SetStatus(instalment.StatusInvoiced).SetTreasuryInvoiceID(inv.ID).
+			SetInvoiceNumber(inv.InvoiceNumber).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			continue
+		}
+		if err := tx.SaleContract.UpdateOneID(sc.ID).AddInvoicedTotal(in.Amount).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			continue
+		}
+		if tx.Commit() == nil {
+			done++
+		}
 	}
 	return done, nil
 }
 
+// invoice raises one treasury invoice on an account. acc must carry its fund edge (WithFund), or the
+// fund is read once here.
 func (s *Service) invoice(ctx context.Context, acc *ent.UnitAccount, refType string, refID uuid.UUID, desc string, amount decimal.Decimal, issued, due time.Time) (*treasury.Invoice, error) {
 	tenantID, _ := tenantguard.TenantID(ctx)
-	f, err := s.client.Fund.Get(ctx, acc.FundID)
-	if err != nil {
-		return nil, err
+	f := acc.Edges.Fund
+	if f == nil {
+		var err error
+		if f, err = s.client.Fund.Get(ctx, acc.FundID); err != nil {
+			return nil, err
+		}
 	}
 	amt, _ := amount.Float64()
 	req := treasury.CreateInvoiceRequest{
@@ -548,17 +614,29 @@ func (s *Service) SyncProgress(ctx context.Context, accountID uuid.UUID) error {
 	}
 	contracts, err := s.client.SaleContract.Query().Where(salecontract.UnitAccountID(acc.ID),
 		salecontract.StatusIn(salecontract.StatusActive, salecontract.StatusInDefault, salecontract.StatusFullyPaid)).All(ctx)
+	if err != nil || len(contracts) == 0 {
+		return err
+	}
+	ids := make([]uuid.UUID, len(contracts))
+	for i, sc := range contracts {
+		ids[i] = sc.ID
+	}
+	all, err := s.client.Instalment.Query().Where(instalment.ContractIDIn(ids...), instalment.TreasuryInvoiceIDNotNil()).All(ctx)
 	if err != nil {
 		return err
 	}
+	byContract := map[uuid.UUID][]*ent.Instalment{}
+	for _, in := range all {
+		byContract[in.ContractID] = append(byContract[in.ContractID], in)
+	}
 	for _, sc := range contracts {
-		ins, err := s.client.Instalment.Query().Where(instalment.ContractID(sc.ID), instalment.TreasuryInvoiceIDNotNil()).All(ctx)
-		if err != nil {
-			return err
-		}
 		total := sc.ReservationCredit
-		for _, in := range ins {
-			paid := paidByInvoice[*in.TreasuryInvoiceID]
+		for _, in := range byContract[sc.ID] {
+			paid, inLedger := paidByInvoice[*in.TreasuryInvoiceID]
+			if !inLedger {
+				// Older than the ledger page: keep what was mirrored before rather than reset it to 0.
+				paid = in.PaidAmount
+			}
 			total = total.Add(paid)
 			st := in.Status
 			switch {
@@ -609,6 +687,13 @@ func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView,
 	if err != nil {
 		return nil, err
 	}
+	return contractView(sc, ins), nil
+}
+
+func contractView(sc *ent.SaleContract, ins []*ent.Instalment) *ContractView {
+	if ins == nil {
+		ins = []*ent.Instalment{}
+	}
 	v := &ContractView{SaleContract: sc, Instalments: ins, Balance: sc.NetPrice.Sub(sc.PaidTotal)}
 	for _, in := range ins {
 		if in.Status != instalment.StatusPaid && in.Status != instalment.StatusWaived {
@@ -616,7 +701,34 @@ func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView,
 			break
 		}
 	}
-	return v, nil
+	return v
+}
+
+// ContractViews builds views for several contracts with one instalment query (the portal's
+// purchase page), instead of one per contract.
+func (s *Service) ContractViews(ctx context.Context, cs []*ent.SaleContract) ([]*ContractView, error) {
+	out := make([]*ContractView, 0, len(cs))
+	if len(cs) == 0 {
+		return out, nil
+	}
+	ids := make([]uuid.UUID, len(cs))
+	for i, c := range cs {
+		ids[i] = c.ID
+	}
+	ins, err := s.client.Instalment.Query().Where(instalment.ContractIDIn(ids...),
+		instalment.HasScheduleWith(instalmentschedule.StatusEQ(instalmentschedule.StatusActive))).
+		Order(ent.Asc(instalment.FieldSeq)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byContract := map[uuid.UUID][]*ent.Instalment{}
+	for _, in := range ins {
+		byContract[in.ContractID] = append(byContract[in.ContractID], in)
+	}
+	for _, c := range cs {
+		out = append(out, contractView(c, byContract[c.ID]))
+	}
+	return out, nil
 }
 
 // ListContracts returns a keyset page of contracts, newest first, for one property or the scope.

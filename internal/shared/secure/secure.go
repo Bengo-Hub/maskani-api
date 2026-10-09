@@ -14,6 +14,9 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+
+	"github.com/Bengo-Hub/httpware/contact"
+	"github.com/Bengo-Hub/httpware/pii"
 )
 
 // Box encrypts and hashes with keys derived from one secret.
@@ -92,28 +95,23 @@ func Mask(v string) string {
 	return strings.Repeat("*", len(v)-4) + v[len(v)-4:]
 }
 
-// NormalizePhone converts Kenyan and international formats to digits with country code
-// (0712345678, +254 712 345 678, 712345678 all become 254712345678). Returns "" when invalid.
+// NormalizePhone validates a phone with the fleet's rules (httpware contact: each country's own
+// numbering plan, local forms read as Kenyan) and returns it as digits with the country code
+// (0712345678, +254 712 345 678 and 712345678 all become 254712345678). That digits form is what
+// phone hashes and treasury customer keys were built on, so it must not change. "" when invalid.
 func NormalizePhone(p string) string {
-	var d strings.Builder
-	for _, r := range p {
-		if r >= '0' && r <= '9' {
-			d.WriteRune(r)
-		}
+	if strings.TrimSpace(p) == "" {
+		return ""
 	}
-	s := d.String()
-	switch {
-	case strings.HasPrefix(s, "254") && len(s) == 12:
-		return s
-	case strings.HasPrefix(s, "0") && len(s) == 10:
-		return "254" + s[1:]
-	case (strings.HasPrefix(s, "7") || strings.HasPrefix(s, "1")) && len(s) == 9:
-		return "254" + s
-	case len(s) >= 10 && len(s) <= 15 && !strings.HasPrefix(s, "0"):
-		return s
+	e164, err := contact.NormalizePhone(p, "KE")
+	if err != nil {
+		return ""
 	}
-	return ""
+	return strings.TrimPrefix(e164, "+")
 }
+
+// MaskPhone shows a phone with only its prefix and last digits, for lists and logs.
+func MaskPhone(p string) string { return pii.MaskPhone(p) }
 
 // RandomDigits returns n cryptographically random digits (visitor pass codes).
 func RandomDigits(n int) (string, error) {
@@ -135,38 +133,6 @@ func RandomToken(n int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-// AccountMatchKey normalises a paybill account reference for matching: upper case, separators
-// removed, leading zeros stripped from each digit run. "b 07", "B-07" and "B7" all give "B7";
-// "S-B07" gives "SB7". treasury-api applies the identical rule to BillRefNumber.
-func AccountMatchKey(ref string) string {
-	var out strings.Builder
-	var digits strings.Builder
-	flush := func() {
-		if digits.Len() == 0 {
-			return
-		}
-		ds := strings.TrimLeft(digits.String(), "0")
-		if ds == "" {
-			ds = "0"
-		}
-		out.WriteString(ds)
-		digits.Reset()
-	}
-	for _, r := range strings.ToUpper(ref) {
-		switch {
-		case r >= '0' && r <= '9':
-			digits.WriteRune(r)
-		case r >= 'A' && r <= 'Z':
-			flush()
-			out.WriteRune(r)
-		default:
-			flush()
-		}
-	}
-	flush()
-	return out.String()
 }
 
 // AccountRef builds the display reference for a unit code and fund prefix ("" + B07, "S-" + B07).

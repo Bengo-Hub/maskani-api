@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -150,11 +152,6 @@ func (s *Service) partyQuery(a Audience) *ent.PartyQuery {
 		party.HasUnitLinksWith(unitparty.RoleIn(roles...), unitparty.StatusEQ(unitparty.StatusActive), unitparty.HasUnitWith(unitPreds...)))
 }
 
-// recipients resolves the audience to parties for the direct-send fallback (bounded).
-func (s *Service) recipients(ctx context.Context, n *ent.Notice) ([]*ent.Party, error) {
-	return s.partyQuery(AudienceOf(n)).Limit(20000).All(ctx)
-}
-
 // Resident is one reachable person, as the internal reach list returns them.
 type Resident struct {
 	Key       string `json:"key"`
@@ -229,17 +226,41 @@ func (s *Service) Send(ctx context.Context, noticeID uuid.UUID, tenantSlug strin
 	} else {
 		s.log.Warn("notice broadcast hand-over failed; sending directly", zap.String("notice", n.ID.String()), zap.Error(err))
 	}
-	people, err := s.recipients(ctx, n)
+	count, err := s.partyQuery(AudienceOf(n)).Count(ctx)
 	if err != nil {
 		return nil, err
 	}
-	n, err = n.Update().SetStatus(notice.StatusSending).SetRecipientsCount(len(people)).Save(ctx)
+	meta := n.Metadata
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	meta["delivery"], meta["tenant_slug"] = "direct", tenantSlug
+	n, err = n.Update().SetStatus(notice.StatusSending).SetRecipientsCount(count).SetMetadata(meta).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	s.emit(tenantID, n)
-	go s.deliver(tenantguard.With(context.Background(), tenantID), tenantID, tenantSlug, n, people)
+	go s.deliver(tenantguard.With(context.Background(), tenantID), tenantID, tenantSlug, n)
 	return n, nil
+}
+
+// StuckDirect returns direct-send notices left in "sending" for over 10 minutes (the pod that
+// started them stopped). Delivery skips people already sent to, so resuming is safe.
+func (s *Service) StuckDirect(ctx context.Context) ([]*ent.Notice, error) {
+	return s.client.Notice.Query().Where(notice.StatusEQ(notice.StatusSending),
+		notice.UpdatedAtLT(time.Now().Add(-10*time.Minute)),
+		func(sel *sql.Selector) {
+			sel.Where(sqljson.ValueEQ(notice.FieldMetadata, "direct", sqljson.Path("delivery")))
+		}).
+		Limit(50).All(ctx)
+}
+
+// Resume continues a stuck direct send in the background (job; ctx carries the notice's tenant).
+func (s *Service) Resume(ctx context.Context, n *ent.Notice) {
+	slug, _ := n.Metadata["tenant_slug"].(string)
+	// Touch the notice so another run does not pick it up while this one works.
+	_ = s.client.Notice.UpdateOneID(n.ID).SetUpdatedAt(time.Now()).Exec(ctx)
+	go s.deliver(tenantguard.With(context.Background(), n.TenantID), n.TenantID, slug, n)
 }
 
 var linkPattern = regexp.MustCompile(`\s*\(?\bhttps?://\S+\)?`)
@@ -373,13 +394,35 @@ func uuidStrings(ids []uuid.UUID) []string {
 	return out
 }
 
-func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice, people []*ent.Party) {
-	delivered := 0
+func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice) {
+	delivered, reached := 0, 0
 	estate := s.estateName(ctx, n, slug)
 	subject := n.Title
 	if n.Priority == notice.PriorityEmergency {
 		subject = "Urgent: " + n.Title
 	}
+	// Page the audience by id in 500s: memory stays flat at any estate size. People already sent
+	// to (a resumed run) hit the delivery unique key and are skipped.
+	var after uuid.UUID
+	for {
+		page, err := s.partyQuery(AudienceOf(n)).Where(party.IDGT(after)).Order(ent.Asc(party.FieldID)).Limit(500).All(ctx)
+		if err != nil || len(page) == 0 {
+			break
+		}
+		after = page[len(page)-1].ID
+		reached += len(page)
+		delivered += s.deliverPage(ctx, tenantID, slug, n, estate, subject, page)
+		if len(page) < 500 {
+			break
+		}
+	}
+	s.finishDelivery(ctx, tenantID, n, delivered, reached)
+}
+
+// deliverPage sends one page of recipients on every active channel and returns how many sends
+// succeeded.
+func (s *Service) deliverPage(ctx context.Context, tenantID uuid.UUID, slug string, n *ent.Notice, estate, subject string, people []*ent.Party) int {
+	delivered := 0
 	for _, p := range people {
 		for _, ch := range activeChannels(n.Channels) {
 			dest := p.Phone
@@ -421,15 +464,25 @@ func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, slug string, 
 			_ = u.Exec(ctx)
 		}
 	}
+	return delivered
+}
+
+// finishDelivery records the outcome of a direct send. The delivered count is read from the
+// delivery rows, so a resumed run reports the whole send, not only its own part.
+func (s *Service) finishDelivery(ctx context.Context, tenantID uuid.UUID, n *ent.Notice, delivered, reached int) {
+	if total, err := s.client.NoticeDelivery.Query().Where(noticedelivery.NoticeID(n.ID),
+		noticedelivery.StatusEQ(noticedelivery.StatusSent)).Count(ctx); err == nil {
+		delivered = total
+	}
 	status := notice.StatusSent
-	if delivered == 0 && len(people) > 0 {
+	if delivered == 0 && reached > 0 {
 		status = notice.StatusFailed
 	}
 	if err := s.client.Notice.UpdateOneID(n.ID).SetStatus(status).SetSentAt(time.Now()).SetDeliveredCount(delivered).Exec(ctx); err == nil {
 		s.emit(tenantID, n)
 	}
 	_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, n.ID.String(), events.NoticePublished, map[string]any{
-		"notice_id": n.ID, "title": n.Title, "audience_size": len(people), "priority": n.Priority, "delivered": delivered,
+		"notice_id": n.ID, "title": n.Title, "audience_size": reached, "priority": n.Priority, "delivered": delivered,
 	})
 }
 

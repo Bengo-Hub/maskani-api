@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -18,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/gatedevice"
 	"github.com/bengobox/maskani-api/internal/ent/gateevent"
 	"github.com/bengobox/maskani-api/internal/ent/incident"
+	"github.com/bengobox/maskani-api/internal/ent/party"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
@@ -87,7 +90,11 @@ func (s *Service) Device(ctx context.Context, key string) (*ent.GateDevice, cont
 		return nil, ctx, httpx.Forbidden("unknown or revoked device")
 	}
 	tctx := tenantguard.With(ctx, d.TenantID)
-	_ = s.client.GateDevice.UpdateOneID(d.ID).SetLastSeenAt(time.Now()).SetOfflineAlerted(false).Exec(tctx)
+	// A busy tablet calls many times a minute; last-seen only needs minute precision for the
+	// 15-minute offline alert, so skip the write when it is fresh.
+	if d.LastSeenAt == nil || time.Since(*d.LastSeenAt) > time.Minute || d.OfflineAlerted {
+		_ = s.client.GateDevice.UpdateOneID(d.ID).SetLastSeenAt(time.Now()).SetOfflineAlerted(false).Exec(tctx)
+	}
 	return d, tctx, nil
 }
 
@@ -210,6 +217,21 @@ func (s *Service) CancelPass(ctx context.Context, id uuid.UUID) error {
 	return s.client.VisitorPass.UpdateOneID(id).SetStatus(visitorpass.StatusCancelled).Exec(ctx)
 }
 
+// CancelHostPass cancels a pass only when one of the host parties issued it: one conditional
+// update, and not found when the pass is someone else's.
+func (s *Service) CancelHostPass(ctx context.Context, id uuid.UUID, hostParties []uuid.UUID) error {
+	n, err := s.client.VisitorPass.Update().
+		Where(visitorpass.ID(id), visitorpass.HostPartyIDIn(hostParties...)).
+		SetStatus(visitorpass.StatusCancelled).Save(ctx)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return &ent.NotFoundError{}
+	}
+	return nil
+}
+
 // VerifyResult is what the tablet shows.
 type VerifyResult struct {
 	Valid    bool             `json:"valid"`
@@ -305,13 +327,39 @@ type EventInput struct {
 
 // Record stores events idempotently on (device, client_event_id). Entries against a pass consume it
 // and notify the host.
+//
+// A tablet replays its offline queue in one call, so the whole batch costs a fixed number of
+// queries: one to find events already stored, one bulk insert, one read back, one update per
+// distinct pass used, and one read each for the units, passes and hosts the messages need.
 func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventInput) (int, error) {
-	stored := 0
 	tenantID, _ := tenantguard.TenantID(ctx)
+	seen := map[string]bool{}
+	ids := make([]string, 0, len(batch))
 	for _, in := range batch {
-		if in.ClientEventID == "" || in.Kind == "" {
+		if in.ClientEventID != "" && in.Kind != "" && !seen[in.ClientEventID] {
+			seen[in.ClientEventID] = true
+			ids = append(ids, in.ClientEventID)
+		}
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	known, err := s.client.GateEvent.Query().Where(gateevent.DeviceID(d.ID), gateevent.ClientEventIDIn(ids...)).
+		Select(gateevent.FieldClientEventID).Strings(ctx)
+	if err != nil {
+		return 0, err
+	}
+	stored := map[string]bool{}
+	for _, k := range known {
+		stored[k] = true
+	}
+	rows := make([]*ent.GateEventCreate, 0, len(ids))
+	fresh := make([]string, 0, len(ids))
+	for _, in := range batch {
+		if in.ClientEventID == "" || in.Kind == "" || stored[in.ClientEventID] {
 			continue
 		}
+		stored[in.ClientEventID] = true
 		if in.OccurredAt.IsZero() || in.OccurredAt.After(time.Now().Add(5*time.Minute)) {
 			in.OccurredAt = time.Now()
 		}
@@ -331,58 +379,133 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		if in.Kind == string(gateevent.KindWalkInRequest) {
 			c.SetDecision(gateevent.DecisionPending)
 		}
-		ev, err := c.Save(ctx)
-		if ent.IsConstraintError(err) {
-			continue
-		}
-		if err != nil {
-			return stored, err
-		}
-		stored++
-		if ev.Kind == gateevent.KindEntry && in.PassID != nil {
-			s.consume(ctx, *in.PassID)
-			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.VisitorArrived, s.arrival(ctx, ev))
-		}
-		if ev.Kind == gateevent.KindWalkInRequest {
-			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.WalkInRequested, s.arrival(ctx, ev))
+		rows = append(rows, c)
+		fresh = append(fresh, in.ClientEventID)
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	// A second replay racing this one hits the (tenant, device, client_event_id) key and is skipped.
+	if err := s.client.GateEvent.CreateBulk(rows...).
+		OnConflictColumns(gateevent.FieldTenantID, gateevent.FieldDeviceID, gateevent.FieldClientEventID).
+		DoNothing().Exec(ctx); err != nil {
+		return 0, err
+	}
+	evs, err := s.client.GateEvent.Query().Where(gateevent.DeviceID(d.ID), gateevent.ClientEventIDIn(fresh...)).All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	s.consumePasses(ctx, evs)
+	look := s.arrivalLookups(ctx, evs)
+	for _, ev := range evs {
+		switch {
+		case ev.Kind == gateevent.KindEntry && ev.PassID != nil:
+			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.VisitorArrived, look.payload(ev))
+			s.emit(ctx, realtime.GateEvent, ev)
+		case ev.Kind == gateevent.KindWalkInRequest:
+			_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.WalkInRequested, look.payload(ev))
 			s.emit(ctx, realtime.WalkInRequested, ev)
-		} else {
+		default:
 			s.emit(ctx, realtime.GateEvent, ev)
 		}
 	}
-	return stored, nil
+	return len(evs), nil
 }
 
-func (s *Service) consume(ctx context.Context, passID uuid.UUID) {
-	p, err := s.client.VisitorPass.Get(ctx, passID)
-	if err != nil {
+// consumePasses counts entries against their passes: one increment per distinct pass, then one
+// statement marks every pass that reached its entry limit as used.
+func (s *Service) consumePasses(ctx context.Context, evs []*ent.GateEvent) {
+	uses := map[uuid.UUID]int{}
+	for _, ev := range evs {
+		if ev.Kind == gateevent.KindEntry && ev.PassID != nil {
+			uses[*ev.PassID]++
+		}
+	}
+	if len(uses) == 0 {
 		return
 	}
-	u := p.Update().AddEntriesUsed(1)
-	if p.MaxEntries > 0 && p.EntriesUsed+1 >= p.MaxEntries {
-		u.SetStatus(visitorpass.StatusUsed)
+	ids := make([]uuid.UUID, 0, len(uses))
+	for id, n := range uses {
+		ids = append(ids, id)
+		_ = s.client.VisitorPass.UpdateOneID(id).AddEntriesUsed(n).Exec(ctx)
 	}
-	_ = u.Exec(ctx)
+	_ = s.client.VisitorPass.Update().Where(visitorpass.IDIn(ids...), visitorpass.MaxEntriesGT(0),
+		func(sel *sql.Selector) {
+			sel.Where(sql.ColumnsGTE(sel.C(visitorpass.FieldEntriesUsed), sel.C(visitorpass.FieldMaxEntries)))
+		}).
+		SetStatus(visitorpass.StatusUsed).Exec(ctx)
 }
 
-func (s *Service) arrival(ctx context.Context, ev *ent.GateEvent) map[string]any {
+// arrivalInfo holds the units, passes and hosts a batch's host messages need, read once.
+type arrivalInfo struct {
+	units  map[uuid.UUID]*ent.Unit
+	passes map[uuid.UUID]*ent.VisitorPass
+	hosts  map[uuid.UUID]*ent.Party
+}
+
+func (s *Service) arrivalLookups(ctx context.Context, evs []*ent.GateEvent) arrivalInfo {
+	info := arrivalInfo{units: map[uuid.UUID]*ent.Unit{}, passes: map[uuid.UUID]*ent.VisitorPass{}, hosts: map[uuid.UUID]*ent.Party{}}
+	var unitIDs, passIDs, hostIDs []uuid.UUID
+	for _, ev := range evs {
+		if ev.HostUnitID != nil {
+			unitIDs = append(unitIDs, *ev.HostUnitID)
+		}
+		if ev.PassID != nil {
+			passIDs = append(passIDs, *ev.PassID)
+		}
+	}
+	if len(unitIDs) > 0 {
+		if us, err := s.client.Unit.Query().Where(unit.IDIn(unitIDs...)).All(ctx); err == nil {
+			for _, u := range us {
+				info.units[u.ID] = u
+			}
+		}
+	}
+	if len(passIDs) > 0 {
+		if ps, err := s.client.VisitorPass.Query().Where(visitorpass.IDIn(passIDs...)).All(ctx); err == nil {
+			for _, p := range ps {
+				info.passes[p.ID] = p
+				if p.HostPartyID != nil {
+					hostIDs = append(hostIDs, *p.HostPartyID)
+				}
+			}
+		}
+	}
+	if len(hostIDs) > 0 {
+		if hs, err := s.client.Party.Query().Where(party.IDIn(hostIDs...)).All(ctx); err == nil {
+			for _, h := range hs {
+				info.hosts[h.ID] = h
+			}
+		}
+	}
+	return info
+}
+
+// payload is the host message data for one event (notifications needs the host's contact).
+func (a arrivalInfo) payload(ev *ent.GateEvent) map[string]any {
 	out := map[string]any{"event_id": ev.ID, "visitor_name": ev.VisitorName, "occurred_at": ev.OccurredAt,
 		"property_id": ev.PropertyID, "kind": ev.Kind, "vehicle_plate": ev.VehiclePlate}
 	if ev.HostUnitID != nil {
 		out["host_unit_id"] = *ev.HostUnitID
-		if u, err := s.client.Unit.Get(ctx, *ev.HostUnitID); err == nil {
+		if u := a.units[*ev.HostUnitID]; u != nil {
 			out["unit_code"] = u.Code
 		}
 	}
 	if ev.PassID != nil {
-		if p, err := s.client.VisitorPass.Get(ctx, *ev.PassID); err == nil && p.HostPartyID != nil {
+		if p := a.passes[*ev.PassID]; p != nil && p.HostPartyID != nil {
 			out["host_party_id"] = *p.HostPartyID
-			if h, err := s.client.Party.Get(ctx, *p.HostPartyID); err == nil {
+			if h := a.hosts[*p.HostPartyID]; h != nil {
 				out["host_phone"], out["host_name"], out["host_email"] = h.Phone, h.DisplayName, h.Email
 			}
 		}
 	}
 	return out
+}
+
+// arrival builds the host message data for a single event (walk-in decisions outside a batch).
+func (s *Service) arrival(ctx context.Context, ev *ent.GateEvent) map[string]any {
+	evs := []*ent.GateEvent{ev}
+	return s.arrivalLookups(ctx, evs).payload(ev)
 }
 
 // Event returns one gate event.
@@ -543,16 +666,18 @@ func (s *Service) Sync(ctx context.Context, d *ent.GateDevice) (*SyncPayload, er
 			UnitID: p.UnitID, ValidFrom: p.ValidFrom, ValidTo: p.ValidTo, Recurrence: p.Recurrence,
 			MaxEntries: p.MaxEntries, EntriesUsed: p.EntriesUsed})
 	}
-	people, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.StatusEQ(vendorpersonnel.StatusActive)).
+	// Only people deployed to this gate's property, filtered in SQL (JSON containment), so a tenant
+	// with many sites never ships every guard to every tablet.
+	people, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.StatusEQ(vendorpersonnel.StatusActive),
+		func(sel *sql.Selector) {
+			sel.Where(sqljson.ValueContains(vendorpersonnel.FieldPropertyIds, d.PropertyID.String()))
+		}).
 		Order(ent.Asc(vendorpersonnel.FieldBadgeNumber)).Limit(2000).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out.Badges = []CachedBadge{}
 	for _, p := range people {
-		if !deployedTo(p.PropertyIds, d.PropertyID) {
-			continue
-		}
 		out.Badges = append(out.Badges, CachedBadge{ID: p.ID, BadgeNumber: p.BadgeNumber, Name: p.FullName, Role: p.Role,
 			VendorID: p.VendorID, HasPIN: p.PinHash != ""})
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/enquiry"
 	"github.com/bengobox/maskani-api/internal/ent/pricelist"
-	"github.com/bengobox/maskani-api/internal/ent/pricelistitem"
 	"github.com/bengobox/maskani-api/internal/ent/property"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
@@ -74,7 +73,8 @@ type PublicEstate struct {
 	FromPrice   *decimal.Decimal `json:"from_price,omitempty"`
 }
 
-// Estates lists published estates (system read: public endpoint, filtered to published only).
+// Estates lists published estates (system read: public endpoint, filtered to published only). The
+// whole list costs three queries however many estates are published.
 func (s *Service) Estates(ctx context.Context) ([]PublicEstate, error) {
 	sys := tenantguard.System(ctx)
 	props, err := s.client.Property.Query().Where(property.Published(true), property.StatusEQ(property.StatusActive)).
@@ -82,14 +82,7 @@ func (s *Service) Estates(ctx context.Context) ([]PublicEstate, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]PublicEstate, 0, len(props))
-	for _, p := range props {
-		e, err := s.estate(sys, p, false)
-		if err == nil {
-			out = append(out, *e)
-		}
-	}
-	return out, nil
+	return s.estates(sys, props, false)
 }
 
 // Estate returns one published estate by its public slug, with units for sale.
@@ -99,32 +92,82 @@ func (s *Service) Estate(ctx context.Context, slug string) (*PublicEstate, error
 	if err != nil {
 		return nil, err
 	}
-	return s.estate(sys, p, true)
+	out, err := s.estates(sys, []*ent.Property{p}, true)
+	if err != nil {
+		return nil, err
+	}
+	return &out[0], nil
 }
 
-func (s *Service) estate(ctx context.Context, p *ent.Property, withUnits bool) (*PublicEstate, error) {
-	// The description may be editor HTML; the public site gets readable plain text.
-	e := &PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name, Description: richtext.PlainText(p.Description),
-		Area: p.Area, Town: p.Town, County: p.County, Latitude: p.Latitude, Longitude: p.Longitude,
-		Amenities: p.Amenities, Photos: p.Photos, Verified: true}
-	units, err := s.client.Unit.Query().Where(unit.TenantID(p.TenantID), unit.PropertyID(p.ID), unit.StatusEQ(unit.StatusActive),
-		unit.SaleStatusIn(unit.SaleStatusAvailable, unit.SaleStatusReserved)).Order(ent.Asc(unit.FieldCode)).Limit(1000).All(ctx)
+// prices finds a unit's price item: one set for the unit itself wins over one for its type.
+type prices struct {
+	byUnit map[uuid.UUID]*ent.PriceListItem
+	byType map[string]*ent.PriceListItem
+}
+
+func (p prices) find(u *ent.Unit) *ent.PriceListItem {
+	if it := p.byUnit[u.ID]; it != nil {
+		return it
+	}
+	return p.byType[u.UnitType]
+}
+
+// estates builds the public view of several properties from two queries: every unit for sale
+// across them, and every active price list with its items. Listing pages (withUnits false) read
+// only available units and the columns the from-price needs.
+func (s *Service) estates(ctx context.Context, props []*ent.Property, withUnits bool) ([]PublicEstate, error) {
+	ids := make([]uuid.UUID, len(props))
+	for i, p := range props {
+		ids[i] = p.ID
+	}
+	uq := s.client.Unit.Query().Where(unit.PropertyIDIn(ids...), unit.StatusEQ(unit.StatusActive))
+	if withUnits {
+		uq = uq.Where(unit.SaleStatusIn(unit.SaleStatusAvailable, unit.SaleStatusReserved)).Order(ent.Asc(unit.FieldCode)).Limit(1000)
+	} else {
+		uq = uq.Where(unit.SaleStatusEQ(unit.SaleStatusAvailable)).
+			Select(unit.FieldID, unit.FieldPropertyID, unit.FieldUnitType, unit.FieldSaleStatus).Limit(20000)
+	}
+	units, err := uq.All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.client.PriceListItem.Query().Where(pricelistitem.TenantID(p.TenantID),
-		pricelistitem.HasPriceListWith(pricelist.PropertyID(p.ID), pricelist.StatusEQ(pricelist.StatusActive))).All(ctx)
+	lists, err := s.client.PriceList.Query().Where(pricelist.PropertyIDIn(ids...), pricelist.StatusEQ(pricelist.StatusActive)).
+		WithItems().All(ctx)
 	if err != nil {
 		return nil, err
+	}
+	byProp := map[uuid.UUID]prices{}
+	for _, l := range lists {
+		pr, ok := byProp[l.PropertyID]
+		if !ok {
+			pr = prices{byUnit: map[uuid.UUID]*ent.PriceListItem{}, byType: map[string]*ent.PriceListItem{}}
+			byProp[l.PropertyID] = pr
+		}
+		for _, it := range l.Edges.Items {
+			if it.UnitID != nil {
+				pr.byUnit[*it.UnitID] = it
+			} else if _, seen := pr.byType[it.UnitType]; !seen {
+				pr.byType[it.UnitType] = it
+			}
+		}
+	}
+	out := make([]PublicEstate, len(props))
+	index := make(map[uuid.UUID]int, len(props))
+	for i, p := range props {
+		// The description may be editor HTML; the public site gets readable plain text.
+		out[i] = PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name,
+			Description: richtext.PlainText(p.Description), Area: p.Area, Town: p.Town, County: p.County,
+			Latitude: p.Latitude, Longitude: p.Longitude, Amenities: p.Amenities, Photos: p.Photos, Verified: true,
+			Units: []PublicUnit{}}
+		index[p.ID] = i
 	}
 	for _, u := range units {
+		e := &out[index[u.PropertyID]]
 		pu := PublicUnit{ID: u.ID, Code: u.Code, UnitType: u.UnitType, Bedrooms: u.Bedrooms, Bathrooms: u.Bathrooms,
 			SizeSqm: u.SizeSqm, Floor: u.Floor, Status: string(u.SaleStatus), Features: u.Features, Photos: u.Photos}
-		for _, it := range items {
-			if (it.UnitID != nil && *it.UnitID == u.ID) || (it.UnitID == nil && it.UnitType == u.UnitType && pu.Price == nil) {
-				price, fee := it.Price, it.ReservationFee
-				pu.Price, pu.ReservationFee, pu.DepositPct, pu.MaxTermMonths = &price, &fee, it.DepositPct, it.MaxTermMonths
-			}
+		if it := byProp[u.PropertyID].find(u); it != nil {
+			price, fee := it.Price, it.ReservationFee
+			pu.Price, pu.ReservationFee, pu.DepositPct, pu.MaxTermMonths = &price, &fee, it.DepositPct, it.MaxTermMonths
 		}
 		if u.SaleStatus == unit.SaleStatusAvailable {
 			e.Available++
@@ -137,10 +180,7 @@ func (s *Service) estate(ctx context.Context, p *ent.Property, withUnits bool) (
 			e.Units = append(e.Units, pu)
 		}
 	}
-	if e.Units == nil {
-		e.Units = []PublicUnit{}
-	}
-	return e, nil
+	return out, nil
 }
 
 // EnquiryInput is a public enquiry.

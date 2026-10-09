@@ -2,22 +2,13 @@ package secure
 
 import "testing"
 
-func TestAccountMatchKey(t *testing.T) {
-	cases := map[string]string{
-		"B07": "B7", "b 07": "B7", "B-07": "B7", "B7": "B7", "b7 ": "B7",
-		"S-B07": "SB7", "s b 07": "SB7", "A101": "A101", "A-0101": "A101", "007": "7", "B00": "B0",
-	}
-	for in, want := range cases {
-		if got := AccountMatchKey(in); got != want {
-			t.Errorf("AccountMatchKey(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
+// TestNormalizePhone pins the stored digits form: phone hashes and treasury customer keys were built
+// on it, so every valid number must normalise exactly as before.
 func TestNormalizePhone(t *testing.T) {
 	cases := map[string]string{
 		"0712345678": "254712345678", "+254 712 345 678": "254712345678", "712345678": "254712345678",
-		"254112345678": "254112345678", "12": "",
+		"254112345678": "254112345678", "0110 123 456": "254110123456", "+44 7911 123456": "447911123456",
+		"12": "", "": "", "not a phone": "",
 	}
 	for in, want := range cases {
 		if got := NormalizePhone(in); got != want {
