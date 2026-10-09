@@ -463,10 +463,10 @@ type ArrearsRow struct {
 
 // Arrears returns a keyset page of owing accounts, largest balance first, for one property or the
 // caller's properties. Pages are cached for 60 seconds like the dashboard.
-func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.DecimalParams) (page.Result[ArrearsRow], error) {
+func (s *Service) Arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, f ArrearsFilter, p page.DecimalParams) (page.Result[ArrearsRow], error) {
 	sc := Scope{PropertyID: propertyID, IDs: scope, All: all}
-	key := fmt.Sprintf("arrears:%s:%d:%t:%s:%s", sc.key(), p.Limit, p.HasAfter, p.AfterID, p.AfterVal)
-	v, err := s.cached(ctx, key, func() (any, error) { return s.arrears(ctx, propertyID, scope, all, p) })
+	key := fmt.Sprintf("arrears:%s:%s:%s:%d:%t:%s:%s", sc.key(), f.Q, f.Min, p.Limit, p.HasAfter, p.AfterID, p.AfterVal)
+	v, err := s.cached(ctx, key, func() (any, error) { return s.arrears(ctx, propertyID, scope, all, f, p) })
 	if err != nil {
 		return page.Result[ArrearsRow]{}, err
 	}
@@ -484,8 +484,22 @@ func (s *Service) WaterBalance(ctx context.Context, propertyID uuid.UUID, period
 	return v.([]utilities.BalancePoint), nil
 }
 
-func (s *Service) arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, p page.DecimalParams) (page.Result[ArrearsRow], error) {
+// ArrearsFilter narrows the arrears list in SQL, so a search finds accounts beyond the loaded page.
+type ArrearsFilter struct {
+	// Q matches the start of the account reference (B07, S-B07) or any part of the customer name.
+	Q string
+	// Min keeps balances at or above this amount.
+	Min decimal.Decimal
+}
+
+func (s *Service) arrears(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, f ArrearsFilter, p page.DecimalParams) (page.Result[ArrearsRow], error) {
 	q := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero), unitaccount.StatusEQ(unitaccount.StatusActive))
+	if f.Min.IsPositive() {
+		q = q.Where(unitaccount.BalanceGTE(f.Min))
+	}
+	if t := strings.TrimSpace(f.Q); t != "" {
+		q = q.Where(unitaccount.Or(unitaccount.AccountRefHasPrefix(strings.ToUpper(t)), unitaccount.CustomerNameContainsFold(t)))
+	}
 	if propertyID != nil {
 		q = q.Where(unitaccount.HasUnitWith(unit.PropertyID(*propertyID)))
 	} else if !all {

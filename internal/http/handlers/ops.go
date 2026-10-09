@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
@@ -554,7 +555,13 @@ func (h *H) Arrears(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := h.Reports.Arrears(r.Context(), f.PropertyID, f.Scope, f.AllProperties, page.ParseDecimal(r))
+	af := reports.ArrearsFilter{Q: r.URL.Query().Get("q")}
+	if v := r.URL.Query().Get("min"); v != "" {
+		if d, err := decimal.NewFromString(v); err == nil {
+			af.Min = d
+		}
+	}
+	res, err := h.Reports.Arrears(r.Context(), f.PropertyID, f.Scope, f.AllProperties, af, page.ParseDecimal(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

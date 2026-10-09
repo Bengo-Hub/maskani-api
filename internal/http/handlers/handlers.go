@@ -240,7 +240,7 @@ func (h *H) UpsertCatalogue(w http.ResponseWriter, r *http.Request) {
 
 // ListUsers is GET /users?kind=.
 func (h *H) ListUsers(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.RBAC.ListUsers(r.Context(), access(r).TenantID, r.URL.Query().Get("kind"), intQuery(r, "limit", 200))
+	rows, err := h.RBAC.ListUsers(r.Context(), access(r).TenantID, r.URL.Query().Get("kind"), r.URL.Query().Get("q"), intQuery(r, "limit", 200))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

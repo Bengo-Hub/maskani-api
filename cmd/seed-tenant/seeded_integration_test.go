@@ -98,7 +98,7 @@ func TestSeededEstate(t *testing.T) {
 	if err != nil || len(more.Data) != 1 || more.Data[0].ID == cs.Data[0].ID {
 		t.Fatalf("contracts second page: %+v %v", more, err)
 	}
-	if _, err := rep.Arrears(tctx, nil, scope, false, page.DecimalParams{Limit: 5}); err != nil {
+	if _, err := rep.Arrears(tctx, nil, scope, false, reports.ArrearsFilter{}, page.DecimalParams{Limit: 5}); err != nil {
 		t.Fatalf("arrears: %v", err)
 	}
 	ws := works.NewService(client, seq, log)

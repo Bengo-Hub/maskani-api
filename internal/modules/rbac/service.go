@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -348,7 +349,7 @@ type UserView struct {
 }
 
 // ListUsers returns the tenant's users of a kind with their roles. Bounded by limit.
-func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind string, limit int) ([]UserView, error) {
+func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind, search string, limit int) ([]UserView, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
@@ -358,6 +359,9 @@ func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind string
 		maskaniuser.Or(maskaniuser.HasRoleAssignments(), maskaniuser.KindNEQ(maskaniuser.KindStaff)))
 	if kind != "" {
 		q = q.Where(maskaniuser.KindEQ(maskaniuser.Kind(kind)))
+	}
+	if t := strings.TrimSpace(search); t != "" {
+		q = q.Where(maskaniuser.Or(maskaniuser.NameContainsFold(t), maskaniuser.EmailContainsFold(t)))
 	}
 	users, err := q.WithRoleAssignments(func(a *ent.UserRoleAssignmentQuery) { a.WithRole() }).
 		Order(ent.Asc(maskaniuser.FieldName)).Limit(limit).All(ctx)
