@@ -823,8 +823,11 @@ func (s *Service) PurgeOld(ctx context.Context) (int, error) {
 }
 
 // OfflineDevices flags tablets silent for over 15 minutes (system job) and returns them once.
-func (s *Service) OfflineDevices(ctx context.Context) ([]*ent.GateDevice, error) {
-	rows, err := s.client.GateDevice.Query().Where(gatedevice.StatusEQ(gatedevice.StatusActive),
+func (s *Service) OfflineDevices(ctx context.Context, tenants []uuid.UUID) ([]*ent.GateDevice, error) {
+	if len(tenants) == 0 {
+		return nil, nil
+	}
+	rows, err := s.client.GateDevice.Query().Where(gatedevice.TenantIDIn(tenants...), gatedevice.StatusEQ(gatedevice.StatusActive),
 		gatedevice.OfflineAlerted(false), gatedevice.LastSeenAtLT(time.Now().Add(-15*time.Minute))).Limit(200).All(ctx)
 	if err != nil {
 		return nil, err

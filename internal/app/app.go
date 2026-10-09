@@ -224,7 +224,7 @@ func New(ctx context.Context) (*App, error) {
 		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer,
 		InternalKey: cfg.Auth.APIKey})
 
-	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Log: log})
+	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Settings: settingsSvc, Log: log})
 
 	return &App{cfg: cfg, log: log, pool: pool, cache: rdb, nc: nc, orm: orm, roOrm: roOrm, outbox: outbox,
 		consumer: consumer, notices: noticeSvc, jobs: runner,

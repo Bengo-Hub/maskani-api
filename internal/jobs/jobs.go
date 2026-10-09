@@ -21,6 +21,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
+	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
@@ -50,10 +51,14 @@ type Deps struct {
 	Works    *works.Service
 	Gate     *gate.Service
 	Notices  *notices.Service
+	Settings *settings.Service
 	Log      *zap.Logger
 }
 
 // New builds the runner with the standard maskani jobs (docs/architecture.md, background jobs).
+// Jobs that alert, send or invoice for one module run only for tenants with that module switched
+// on (FR-09: a switched-off module is read only). Housekeeping that keeps data true (expiring
+// holds, resuming runs and sends already under way, retention, pruning) runs for every tenant.
 func New(d Deps) *Runner {
 	log := d.Log.Named("jobs")
 	sys := func(ctx context.Context) context.Context { return tenantguard.System(ctx) }
@@ -75,17 +80,22 @@ func New(d Deps) *Runner {
 			return err
 		}},
 		{"maskani:instalment-invoicing", time.Hour, func(ctx context.Context) error {
-			tenants, err := d.Client.SaleContract.Query().Where(salecontract.StatusIn(salecontract.StatusActive, salecontract.StatusInDefault)).
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "sales")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			tenants, err := d.Client.SaleContract.Query().Where(salecontract.TenantIDIn(on...),
+				salecontract.StatusIn(salecontract.StatusActive, salecontract.StatusInDefault)).
 				Unique(true).Select(salecontract.FieldTenantID).All(sys(ctx))
 			if err != nil {
 				return err
 			}
-			seen := map[string]bool{}
+			seen := map[uuid.UUID]bool{}
 			for _, t := range tenants {
-				if seen[t.TenantID.String()] {
+				if seen[t.TenantID] {
 					continue
 				}
-				seen[t.TenantID.String()] = true
+				seen[t.TenantID] = true
 				if _, err := d.Sales.InvoiceDue(tenantguard.With(ctx, t.TenantID), nil, time.Now().AddDate(0, 0, 7)); err != nil {
 					log.Warn("instalment invoicing failed", zap.String("tenant", t.TenantID.String()), zap.Error(err))
 				}
@@ -93,11 +103,19 @@ func New(d Deps) *Runner {
 			return nil
 		}},
 		{"maskani:sla-breaches", 5 * time.Minute, func(ctx context.Context) error {
-			_, err := d.Works.FlagBreaches(sys(ctx))
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "maintenance")
+			if err != nil {
+				return err
+			}
+			_, err = d.Works.FlagBreaches(sys(ctx), on)
 			return err
 		}},
 		{"maskani:vendor-doc-expiry", 24 * time.Hour, func(ctx context.Context) error {
-			_, err := d.Works.AlertExpiring(sys(ctx))
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
+			if err != nil {
+				return err
+			}
+			_, err = d.Works.AlertExpiring(sys(ctx), on)
 			return err
 		}},
 		{"maskani:gate-retention", 24 * time.Hour, func(ctx context.Context) error {
@@ -105,11 +123,20 @@ func New(d Deps) *Runner {
 			return err
 		}},
 		{"maskani:gate-offline", 5 * time.Minute, func(ctx context.Context) error {
-			_, err := d.Gate.OfflineDevices(sys(ctx))
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "gate")
+			if err != nil {
+				return err
+			}
+			_, err = d.Gate.OfflineDevices(sys(ctx), on)
 			return err
 		}},
 		{"maskani:scheduled-notices", 5 * time.Minute, func(ctx context.Context) error {
-			due, err := d.Notices.DueScheduled(sys(ctx))
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "communication")
+			if err != nil {
+				return err
+			}
+			// Scheduled notices wait while communication is off; sends already under way finish below.
+			due, err := d.Notices.DueScheduled(sys(ctx), on)
 			if err != nil {
 				return err
 			}

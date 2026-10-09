@@ -350,9 +350,12 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*ent.WorkOrder, error)
 
 // FlagBreaches marks open work orders past their resolution time and publishes one event each
 // (system job; bounded batch).
-func (s *Service) FlagBreaches(ctx context.Context) (int, error) {
+func (s *Service) FlagBreaches(ctx context.Context, tenants []uuid.UUID) (int, error) {
+	if len(tenants) == 0 {
+		return 0, nil
+	}
 	rows, err := s.client.WorkOrder.Query().
-		Where(workorder.SLABreached(false), workorder.ResolutionDueAtLT(time.Now()),
+		Where(workorder.TenantIDIn(tenants...), workorder.SLABreached(false), workorder.ResolutionDueAtLT(time.Now()),
 			workorder.StatusNotIn(workorder.StatusCompleted, workorder.StatusConfirmed, workorder.StatusClosed, workorder.StatusCancelled)).
 		Limit(500).All(ctx)
 	if err != nil {
@@ -478,10 +481,13 @@ func (s *Service) AddDocument(ctx context.Context, vendorID uuid.UUID, in Docume
 }
 
 // AlertExpiring publishes expiry alerts at 30, 14 and 7 days (system job), once per threshold.
-func (s *Service) AlertExpiring(ctx context.Context) (int, error) {
+func (s *Service) AlertExpiring(ctx context.Context, tenants []uuid.UUID) (int, error) {
+	if len(tenants) == 0 {
+		return 0, nil
+	}
 	now := time.Now()
 	docs, err := s.client.VendorDocument.Query().
-		Where(vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(now.AddDate(0, 0, 31))).
+		Where(vendordocument.TenantIDIn(tenants...), vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(now.AddDate(0, 0, 31))).
 		WithVendor().Limit(1000).All(ctx)
 	if err != nil {
 		return 0, err

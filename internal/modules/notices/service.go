@@ -511,8 +511,12 @@ func (s *Service) Deliveries(ctx context.Context, noticeID uuid.UUID) ([]*ent.No
 }
 
 // DueScheduled returns scheduled notices whose time has come (system job).
-func (s *Service) DueScheduled(ctx context.Context) ([]*ent.Notice, error) {
-	return s.client.Notice.Query().Where(notice.StatusEQ(notice.StatusScheduled), notice.ScheduledAtLTE(time.Now())).Limit(100).All(ctx)
+func (s *Service) DueScheduled(ctx context.Context, tenants []uuid.UUID) ([]*ent.Notice, error) {
+	if len(tenants) == 0 {
+		return nil, nil
+	}
+	return s.client.Notice.Query().Where(notice.TenantIDIn(tenants...), notice.StatusEQ(notice.StatusScheduled),
+		notice.ScheduledAtLTE(time.Now())).Limit(100).All(ctx)
 }
 
 // activeChannels keeps the channels notifications can deliver (WhatsApp and email), defaulting to

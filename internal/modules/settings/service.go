@@ -238,6 +238,33 @@ func (s *Service) ApplyPreset(ctx context.Context, tenantID uuid.UUID, preset st
 	return s.SetModules(ctx, tenantID, Presets[preset], actor)
 }
 
+// TenantsWithModule returns the tenants that have any of these modules switched on, for background
+// jobs: a switched-off module is read only (FR-09), so its alerts, sends and invoicing stop with it.
+// ctx must be a system context. Plan coverage is not checked here; it lives in each user's token.
+func (s *Service) TenantsWithModule(ctx context.Context, modules ...string) ([]uuid.UUID, error) {
+	released := make([]string, 0, len(modules))
+	for _, m := range modules {
+		if ReleasedModules[m] {
+			released = append(released, m)
+		}
+	}
+	if len(released) == 0 {
+		return nil, nil
+	}
+	var rows []struct {
+		TenantID uuid.UUID `json:"tenant_id"`
+	}
+	if err := s.client.TenantModule.Query().Where(tenantmodule.ModuleIn(released...), tenantmodule.Enabled(true)).
+		Unique(true).Select(tenantmodule.FieldTenantID).Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.TenantID
+	}
+	return ids, nil
+}
+
 // Modules returns the tenant's enabled, released modules (cached).
 func (s *Service) Modules(ctx context.Context, tenantID uuid.UUID) (map[string]bool, error) {
 	s.mu.RLock()

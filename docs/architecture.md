@@ -166,18 +166,29 @@ and a payment to one account reference can only settle that account's invoices.
 All jobs run once per fleet per period through `cache.ClaimPeriod` / `RunOnce`. Session advisory
 locks are never used through PgBouncer.
 
-| Job | Period | Action |
-|---|---|---|
-| Reservation expiry | 15 min | Release lapsed reservations, unit back to available |
-| Instalment invoicing | daily 06:00 EAT | Raise treasury invoices for instalments due within the lead window |
-| Reminders | daily 08:00 EAT | Bill and instalment reminders per schedule, quiet hours respected |
-| SLA timers | 5 min | Flag work orders past response or resolution targets |
-| Vendor document expiry | daily | Alert manager and vendor at 30, 14 and 7 days |
-| Gate device heartbeat | 5 min | Alert when a tablet is offline over 15 minutes |
-| Gate event retention | daily | Purge gate events older than 90 days in batches |
-| Daily stats rebuild | nightly 02:00 EAT | Rebuild `daily_stats` for the previous day per property |
+Defined in `internal/jobs/jobs.go`; each claimed job runs in its own goroutine with a timeout of its
+period and panic recovery.
 
-Each job skips tenants and properties whose module is off.
+| Job | Period | Runs for | Action |
+|---|---|---|---|
+| `c2b-routes` | 5 min | all tenants | Register paybill routes for new unit accounts with treasury |
+| `billing-resume` | 2 min | all tenants | Carry on billing runs a pod stopped mid-issue |
+| `imports-housekeeping` | 15 min | all tenants | Expire unchecked imports after 7 days, resume stuck commits |
+| `reservation-expiry` | 15 min | all tenants | Release lapsed reservations, unit back to available |
+| `instalment-invoicing` | hourly | sales on | Raise treasury invoices for instalments due within 7 days |
+| `sla-breaches` | 5 min | maintenance on | Flag work orders past their resolution target and publish the breach |
+| `vendor-doc-expiry` | daily | providers or maintenance on | Alert at 30, 14 and 7 days and on expiry |
+| `gate-offline` | 5 min | gate on | Alert once when a tablet has not been seen for 15 minutes |
+| `gate-retention` | daily | all tenants | Purge gate events past retention in batches |
+| `scheduled-notices` | 5 min | communication on (new sends) | Send notices whose time has come; direct sends a pod left mid-way resume for every tenant |
+| `daily-stats-rebuild` | daily | all tenants | Rebuild yesterday's `daily_stats` from source tables |
+| `outbox-prune-passes`, `outbox-prune` | 15 min, daily | all tenants | Drop published visitor pass events after 15 minutes, other published rows after 7 days, failed after 30 |
+
+A switched-off module is read only (FR-09), so jobs that alert, send or invoice for it skip that
+tenant (`settings.TenantsWithModule`, filtered inside each query so a skipped tenant's rows never
+crowd out others under the batch limit). Housekeeping that keeps data true, finishes work already
+under way, or enforces retention runs for every tenant. Plan coverage is not checked by jobs; it
+lives in each user's token. Bill and instalment reminders arrive with the arrears ladder (wave 2.2).
 
 ## Events
 
