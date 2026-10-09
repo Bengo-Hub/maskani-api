@@ -181,6 +181,26 @@ func (s *Service) Notices(ctx context.Context, partyIDs []uuid.UUID) ([]*ent.Not
 		notice.SentAtGT(time.Now().AddDate(0, -3, 0))).Order(ent.Desc(notice.FieldSentAt)).Limit(50).All(ctx)
 }
 
+// AcceptedTerms returns the oldest terms version accepted across the caller's parties ("" when one
+// of them has not accepted), so the portal asks again until every link has the current version.
+func (s *Service) AcceptedTerms(ctx context.Context, partyIDs []uuid.UUID) string {
+	if len(partyIDs) == 0 {
+		return ""
+	}
+	rows, err := s.client.Party.Query().Where(party.IDIn(partyIDs...)).
+		Select(party.FieldTermsAcceptedVersion).Strings(ctx)
+	if err != nil || len(rows) == 0 {
+		return ""
+	}
+	oldest := rows[0]
+	for _, v := range rows[1:] {
+		if v < oldest {
+			oldest = v
+		}
+	}
+	return oldest
+}
+
 // AcceptTerms records the terms and privacy version the caller accepted.
 func (s *Service) AcceptTerms(ctx context.Context, partyIDs []uuid.UUID, version string) error {
 	if version == "" {

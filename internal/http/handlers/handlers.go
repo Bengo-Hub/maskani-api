@@ -136,6 +136,10 @@ func (h *H) Me(w http.ResponseWriter, r *http.Request) {
 	if a.LocalUser != nil {
 		out["user"] = a.LocalUser
 	}
+	if len(a.PartyIDs) > 0 && h.Portal != nil {
+		// The portal compares this with the estate's terms version instead of trusting the device.
+		out["terms_accepted_version"] = h.Portal.AcceptedTerms(r.Context(), a.PartyIDs)
+	}
 	if s, err := h.Settings.Get(r.Context(), a.TenantID); err == nil {
 		out["settings"] = s
 	}
