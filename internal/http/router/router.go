@@ -207,6 +207,13 @@ func mount(r chi.Router, d Deps) {
 	perm := mw.RequirePermission
 	mod := func(m string) func(http.Handler) http.Handler { return mw.RequireModule(d.Settings, m) }
 
+	// Document downloads render PDFs from up to a thousand ledger rows: limited per user across pods.
+	export := func(next http.Handler) http.Handler { return next }
+	if d.Limiter != nil {
+		export = d.Limiter.MiddlewareWith(ratelimit.ValueKey("user", userKey),
+			ratelimit.Options{Name: "export-user", Limit: 20, Window: time.Minute})
+	}
+
 	r.Get("/auth/me", h.Me)
 	// Live change hints (SSE). The router's timeout already bypasses event streams.
 	r.Get("/stream", h.Stream)
@@ -290,6 +297,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingRun)).Post("/billing-runs/{id}/retry", h.RetryRun)
 		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts", h.ListAccounts)
 		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts/{id}/statement", h.Statement)
+		g.With(perm(rbac.PermBillingView), export).Get("/unit-accounts/{id}/statement/export", h.StatementExport)
 		g.With(perm(rbac.PermBillingCollect)).Post("/unit-accounts/{id}/pay", h.StaffPay)
 		g.With(perm(rbac.PermBillingCollect)).Get("/collections/suspense", h.Suspense)
 		g.With(perm(rbac.PermBillingCollect)).Post("/collections/suspense/{trans_id}/assign", h.AssignSuspense)
@@ -375,6 +383,7 @@ func mount(r chi.Router, d Deps) {
 		m.Use(mw.RequirePortalUser)
 		m.Get("/units", h.MyUnits)
 		m.Get("/accounts/{id}/statement", h.MyStatement)
+		m.With(export).Get("/accounts/{id}/statement/export", h.MyStatementExport)
 		m.Post("/accounts/{id}/pay", h.MyPay)
 		m.Get("/purchase", h.MyPurchase)
 		m.Get("/passes", h.MyPasses)

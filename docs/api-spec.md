@@ -114,7 +114,8 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/billing-runs/{id}` | Run with `counts: {pending, issued, failed, skipped, total}` | `billing.view` |
 | GET `/billing-runs/{id}/lines?status=&cursor=&limit=`; POST `/billing-runs/{id}/retry` | Lines as a keyset page in unit code order (cursor on unit code then id), optionally one status; retry failed lines | `billing.view` / `billing.run` |
 | GET `/unit-accounts` (keyset; `property_id`, `owing=true`, `fund`) | Accounts with cached balance, fund and unit | `billing.view` |
-| GET `/unit-accounts/{id}/statement` | Account with treasury ledger | `billing.view` |
+| GET `/unit-accounts/{id}/statement` | Account with treasury ledger and `entries` (bills and payments newest first, each with `balance_after`, worked back from the balance less credit) and `trimmed` (a ledger list came back full, older history exists) | `billing.view` |
+| GET `/unit-accounts/{id}/statement/export?format=pdf\|csv\|xlsx` | Branded statement download with up to 500 bills and 500 payments, oldest first, built on the shared `github.com/Bengo-Hub/reports` engine; `Cache-Control: private, no-store`; 20 per user per minute | `billing.view` |
 | POST `/unit-accounts/{id}/pay` | Staff-initiated STK for an owner | `billing.collect` |
 | GET `/collections/suspense?days=`; POST `/collections/suspense/{trans_id}/assign` `{unit_account_id}` | Unmatched paybill payments | `billing.collect` |
 | GET `/reports/arrears` (keyset by balance, largest first; `property_id`) | `{account_id, account_ref, customer_name, customer_phone, balance, last_payment_at}` | `reports.view` |
@@ -154,7 +155,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | Method and path | Purpose |
 |---|---|
 | GET `/me/units` | Units linked to the caller with role and accounts |
-| GET `/me/accounts/{id}/statement`; POST `/me/accounts/{id}/pay` | Statement and STK payment for an own account |
+| GET `/me/accounts/{id}/statement`; GET `/me/accounts/{id}/statement/export?format=`; POST `/me/accounts/{id}/pay` | Statement (with entries), its branded download, and STK payment for an own account |
 | GET `/me/purchase` | Purchase plans with schedule and next due |
 | GET, POST `/me/passes`; POST `/me/passes/{id}/cancel` | Visitor passes for own units |
 | GET, POST `/me/requests`; POST `/me/requests/{id}/actions` | Work requests; confirm or reopen within 7 days |

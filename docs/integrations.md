@@ -21,6 +21,16 @@ public `*.codevertexafrica.com` hosts, which go through Cloudflare when a variab
 changes the defaults to the in-cluster names above (`s2s-cloudflare-loopback-fleetwide-fix`). The
 tenant syncer also moves from a raw `net/http` client to shared-service-client.
 
+## Documents (shared report engine)
+
+Statements and report downloads render on `github.com/Bengo-Hub/reports` (v0.1.0), the single copy
+of the report engine that pos-api, inventory-api and treasury-api each carried. `internal/modules/docs`
+maps Maskani data into its `Report` model; the engine renders PDF, CSV and Excel. Branding comes
+from auth-api's tenant record through the shared Redis tenant cache (`cache.GetTenantDetails`,
+in-cluster `AUTH_API_URL`): name, primary colour, logo (fetched once and kept 30 minutes in memory),
+phone, email and address. The provider footer is on unless the tenant's settings metadata sets
+`provider_footer_enabled` to false. Downloads send `Cache-Control: private, no-store`.
+
 ## auth-api
 
 | Use | Call |

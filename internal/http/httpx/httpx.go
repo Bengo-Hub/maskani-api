@@ -86,11 +86,20 @@ func (e *ConflictError) Error() string { return e.Msg }
 // Conflict returns a ConflictError.
 func Conflict(msg string) error { return &ConflictError{Msg: msg} }
 
+// UnavailableError is a 503: a service this one depends on did not answer.
+type UnavailableError struct{ Msg string }
+
+func (e *UnavailableError) Error() string { return e.Msg }
+
+// Unavailable returns an UnavailableError.
+func Unavailable(msg string) error { return &UnavailableError{Msg: msg} }
+
 // Fail maps a service error to a response.
 func Fail(w http.ResponseWriter, err error) {
 	var ve *ValidationError
 	var fe *ForbiddenError
 	var ce *ConflictError
+	var ue *UnavailableError
 	switch {
 	case errors.As(err, &ve):
 		Error(w, http.StatusUnprocessableEntity, "validation_failed", ve.Msg)
@@ -98,6 +107,8 @@ func Fail(w http.ResponseWriter, err error) {
 		Error(w, http.StatusForbidden, "forbidden", fe.Msg)
 	case errors.As(err, &ce):
 		Error(w, http.StatusConflict, "conflict", ce.Msg)
+	case errors.As(err, &ue):
+		Error(w, http.StatusServiceUnavailable, "unavailable", ue.Msg)
 	case ent.IsNotFound(err):
 		Error(w, http.StatusNotFound, "not_found", "not found")
 	case ent.IsConstraintError(err):

@@ -33,6 +33,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/authapi"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
+	"github.com/bengobox/maskani-api/internal/modules/docs"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/market"
@@ -209,9 +210,11 @@ func New(ctx context.Context) (*App, error) {
 
 	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
 	importSvc := imports.NewService(orm, regSvc, log)
+	// Documents brand from auth-api's tenant record through the shared Redis tenant cache (in-cluster).
+	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, loc)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 

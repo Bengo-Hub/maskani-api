@@ -158,10 +158,22 @@ func (s *Service) SetBalance(ctx context.Context, accountID uuid.UUID, balance d
 	return u.Exec(ctx)
 }
 
-// Refresh pulls the account's ledger from treasury and updates the cached balance.
+// LedgerLimit is how many bills and how many payments a screen reads; ExportLedgerLimit is
+// treasury's maximum, used for statement downloads.
+const (
+	LedgerLimit       = 50
+	ExportLedgerLimit = 500
+)
+
+// Refresh pulls the account's latest ledger from treasury and updates the cached balance.
 func (s *Service) Refresh(ctx context.Context, acc *ent.UnitAccount) (*treasury.AccountLedger, error) {
+	return s.RefreshLedger(ctx, acc, LedgerLimit)
+}
+
+// RefreshLedger is Refresh with up to limit bills and limit payments.
+func (s *Service) RefreshLedger(ctx context.Context, acc *ent.UnitAccount, limit int) (*treasury.AccountLedger, error) {
 	tenantID, _ := tenantguard.TenantID(ctx)
-	led, err := s.treasury.Ledger(ctx, tenantID, acc.AccountRef, 50)
+	led, err := s.treasury.Ledger(ctx, tenantID, acc.AccountRef, limit)
 	if err != nil {
 		return nil, err
 	}

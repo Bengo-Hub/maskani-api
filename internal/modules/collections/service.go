@@ -38,26 +38,6 @@ func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, 
 	return &Service{client: client, treasury: tc, accounts: acc, log: log.Named("collections")}
 }
 
-// Statement is an account with treasury's ledger.
-type Statement struct {
-	Account *ent.UnitAccount        `json:"account"`
-	Ledger  *treasury.AccountLedger `json:"ledger"`
-}
-
-// Statement returns the account's ledger from treasury and refreshes the cached balance.
-func (s *Service) Statement(ctx context.Context, accountID uuid.UUID) (*Statement, error) {
-	acc, err := s.client.UnitAccount.Query().Where(unitaccount.ID(accountID)).WithFund().WithUnit().Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-	led, err := s.accounts.Refresh(ctx, acc)
-	if err != nil {
-		s.log.Warn("ledger unavailable", zap.String("account", acc.AccountRef), zap.Error(err))
-		return &Statement{Account: acc}, nil
-	}
-	return &Statement{Account: acc, Ledger: led}, nil
-}
-
 // ListAccounts returns a keyset page of accounts (newest first) for a property or the caller's
 // scope, with cached balances, fund and unit.
 func (s *Service) ListAccounts(ctx context.Context, propertyID *uuid.UUID, scope []uuid.UUID, all bool, onlyOwing bool, fundCode string, p page.Params) (page.Result[*ent.UnitAccount], error) {
