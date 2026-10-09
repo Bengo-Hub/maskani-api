@@ -112,7 +112,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/billing-runs` | Issue a run (one per property, fund and period) | `billing.run` |
 | GET `/billing-runs` (keyset; `property_id`) | Runs | `billing.view` |
 | GET `/billing-runs/{id}` | Run with `counts: {pending, issued, failed, skipped, total}` | `billing.view` |
-| GET `/billing-runs/{id}/lines`; POST `/billing-runs/{id}/retry` | Lines; retry failed lines | `billing.view` / `billing.run` |
+| GET `/billing-runs/{id}/lines?status=&cursor=&limit=`; POST `/billing-runs/{id}/retry` | Lines as a keyset page in unit code order (cursor on unit code then id), optionally one status; retry failed lines | `billing.view` / `billing.run` |
 | GET `/unit-accounts` (keyset; `property_id`, `owing=true`, `fund`) | Accounts with cached balance, fund and unit | `billing.view` |
 | GET `/unit-accounts/{id}/statement` | Account with treasury ledger | `billing.view` |
 | POST `/unit-accounts/{id}/pay` | Staff-initiated STK for an owner | `billing.collect` |

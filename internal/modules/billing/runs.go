@@ -618,10 +618,23 @@ func (s *Service) GetRun(ctx context.Context, id uuid.UUID) (*RunView, error) {
 	return v, nil
 }
 
-// RunLines returns a run's lines.
-func (s *Service) RunLines(ctx context.Context, runID uuid.UUID) ([]*ent.BillingRunLine, error) {
-	// A run has one line per unit account of one property; the cap guards memory until the run
-	// screen pages by keyset (wave 1c).
-	return s.client.BillingRunLine.Query().Where(billingrunline.RunID(runID)).
-		Order(ent.Asc(billingrunline.FieldUnitCode)).Limit(5000).All(ctx)
+// RunLines returns one page of a run's lines in unit code order, optionally one status. A run has
+// at most one line per unit account of a property, so sorting a run's lines per page stays cheap
+// on the run_id index without an index on unit_code.
+func (s *Service) RunLines(ctx context.Context, runID uuid.UUID, status string, p page.TextParams) (page.Result[*ent.BillingRunLine], error) {
+	q := s.client.BillingRunLine.Query().Where(billingrunline.RunID(runID))
+	if status != "" {
+		q = q.Where(billingrunline.StatusEQ(billingrunline.Status(status)))
+	}
+	rows, err := q.Where(p.Predicate(billingrunline.FieldUnitCode)).Order(page.OrderText(billingrunline.FieldUnitCode)).
+		Limit(p.Limit + 1).All(ctx)
+	if err != nil {
+		return page.Result[*ent.BillingRunLine]{}, err
+	}
+	return page.BuildText(rows, p.Limit, func(l *ent.BillingRunLine) (uuid.UUID, string) { return l.ID, l.UnitCode }), nil
+}
+
+// ValidLineStatus reports whether s is a run line status.
+func ValidLineStatus(s string) bool {
+	return billingrunline.StatusValidator(billingrunline.Status(s)) == nil
 }

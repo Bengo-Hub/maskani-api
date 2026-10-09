@@ -221,18 +221,23 @@ func (h *H) GetRun(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
-// RunLines is GET /billing-runs/{id}/lines.
+// RunLines is GET /billing-runs/{id}/lines?status=&cursor=&limit= (keyset page in unit code order).
 func (h *H) RunLines(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")
 	if !ok || !h.runScope(w, r, id) {
 		return
 	}
-	rows, err := h.Billing.RunLines(r.Context(), id)
+	status := r.URL.Query().Get("status")
+	if status != "" && !billing.ValidLineStatus(status) {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "unknown line status")
+		return
+	}
+	res, err := h.Billing.RunLines(r.Context(), id, status, page.ParseText(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
+	httpx.JSON(w, http.StatusOK, res)
 }
 
 // RetryRun is POST /billing-runs/{id}/retry.

@@ -133,12 +133,74 @@ func OrderDecimal(column string) func(*sql.Selector) {
 
 // BuildDecimal trims the probe row and encodes the next cursor from the last row's value and id.
 func BuildDecimal[T any](rows []T, limit int, key func(T) (uuid.UUID, decimal.Decimal)) Result[T] {
+	return buildKeyed(rows, limit, func(row T) (uuid.UUID, string) {
+		id, v := key(row)
+		return id, v.String()
+	})
+}
+
+func decodeDecimal(c string) (uuid.UUID, decimal.Decimal, error) {
+	id, s, err := decodeKeyed(c)
+	if err != nil {
+		return uuid.Nil, decimal.Zero, err
+	}
+	v, err := decimal.NewFromString(s)
+	return id, v, err
+}
+
+// TextParams page a list sorted by a text column ascending, then id ascending (unit codes on a
+// billing run, for example).
+type TextParams struct {
+	Limit    int
+	AfterID  uuid.UUID
+	AfterVal string
+	HasAfter bool
+}
+
+// ParseText reads ?limit and a cursor made by BuildText.
+func ParseText(r *http.Request) TextParams {
+	p := TextParams{Limit: Limit(r)}
+	if c := r.URL.Query().Get("cursor"); c != "" {
+		if id, v, err := decodeKeyed(c); err == nil {
+			p.AfterID, p.AfterVal, p.HasAfter = id, v, true
+		}
+	}
+	return p
+}
+
+// Predicate restricts to rows after the cursor on (column ASC, id ASC).
+func (p TextParams) Predicate(column string) func(*sql.Selector) {
+	return func(s *sql.Selector) {
+		if !p.HasAfter {
+			return
+		}
+		s.Where(sql.Or(
+			sql.GT(s.C(column), p.AfterVal),
+			sql.And(sql.EQ(s.C(column), p.AfterVal), sql.GT(s.C("id"), p.AfterID)),
+		))
+	}
+}
+
+// OrderText sorts by column ASC, id ASC.
+func OrderText(column string) func(*sql.Selector) {
+	return func(s *sql.Selector) {
+		s.OrderBy(sql.Asc(s.C(column)), sql.Asc(s.C("id")))
+	}
+}
+
+// BuildText trims the probe row and encodes the next cursor from the last row's value and id.
+func BuildText[T any](rows []T, limit int, key func(T) (uuid.UUID, string)) Result[T] {
+	return buildKeyed(rows, limit, key)
+}
+
+// buildKeyed is the shared envelope for cursors keyed on (value, id).
+func buildKeyed[T any](rows []T, limit int, key func(T) (uuid.UUID, string)) Result[T] {
 	res := Result[T]{Data: rows}
 	if len(rows) > limit {
 		res.Data = rows[:limit]
 		res.HasMore = true
 		id, v := key(res.Data[len(res.Data)-1])
-		res.NextCursor = base64.URLEncoding.EncodeToString([]byte(id.String() + "|" + v.String()))
+		res.NextCursor = base64.URLEncoding.EncodeToString([]byte(id.String() + "|" + v))
 	}
 	if res.Data == nil {
 		res.Data = []T{}
@@ -146,19 +208,18 @@ func BuildDecimal[T any](rows []T, limit int, key func(T) (uuid.UUID, decimal.De
 	return res
 }
 
-func decodeDecimal(c string) (uuid.UUID, decimal.Decimal, error) {
+func decodeKeyed(c string) (uuid.UUID, string, error) {
 	raw, err := base64.URLEncoding.DecodeString(c)
 	if err != nil {
-		return uuid.Nil, decimal.Zero, err
+		return uuid.Nil, "", err
 	}
 	parts := strings.SplitN(string(raw), "|", 2)
 	if len(parts) != 2 {
-		return uuid.Nil, decimal.Zero, strconv.ErrSyntax
+		return uuid.Nil, "", strconv.ErrSyntax
 	}
 	id, err := uuid.Parse(parts[0])
 	if err != nil {
-		return uuid.Nil, decimal.Zero, err
+		return uuid.Nil, "", err
 	}
-	v, err := decimal.NewFromString(parts[1])
-	return id, v, err
+	return id, parts[1], nil
 }

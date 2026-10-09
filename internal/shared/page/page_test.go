@@ -48,3 +48,17 @@ func TestDecimalCursorRoundTrip(t *testing.T) {
 		t.Fatal("empty page must be [] with has_more false")
 	}
 }
+
+func TestTextCursorRoundTrip(t *testing.T) {
+	type row struct {
+		id   uuid.UUID
+		code string
+	}
+	// A code may hold the separator; only the first "|" splits the cursor.
+	rows := []row{{uuid.New(), "A|1"}, {uuid.New(), "A2"}}
+	res := BuildText(rows, 1, func(r row) (uuid.UUID, string) { return r.id, r.code })
+	p := ParseText(httptest.NewRequest("GET", "/x?cursor="+res.NextCursor, nil))
+	if !p.HasAfter || p.AfterID != rows[0].id || p.AfterVal != "A|1" {
+		t.Fatalf("text cursor did not round trip: %+v", p)
+	}
+}
