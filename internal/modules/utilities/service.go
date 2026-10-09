@@ -115,14 +115,16 @@ func (s *Service) ListMeters(ctx context.Context, propertyID uuid.UUID) ([]*ent.
 
 // RoundRow is one meter on a round with its previous and current reading.
 type RoundRow struct {
-	MeterID         uuid.UUID         `json:"meter_id"`
-	Serial          string            `json:"serial"`
-	Kind            string            `json:"kind"`
-	UnitID          *uuid.UUID        `json:"unit_id,omitempty"`
-	UnitCode        string            `json:"unit_code,omitempty"`
-	Block           string            `json:"block,omitempty"`
-	PreviousReading decimal.Decimal   `json:"previous_reading"`
-	Current         *ent.MeterReading `json:"current,omitempty"`
+	MeterID         uuid.UUID       `json:"meter_id"`
+	Serial          string          `json:"serial"`
+	Kind            string          `json:"kind"`
+	UnitID          *uuid.UUID      `json:"unit_id,omitempty"`
+	UnitCode        string          `json:"unit_code,omitempty"`
+	Block           string          `json:"block,omitempty"`
+	PreviousReading decimal.Decimal `json:"previous_reading"`
+	// Multiplier turns the dial difference into use (use = (new - last) x multiplier); 1 for most meters.
+	Multiplier decimal.Decimal   `json:"multiplier"`
+	Current    *ent.MeterReading `json:"current,omitempty"`
 	// AverageUse is the meter's mean use over its last three periods, and SpikeAbove the use the
 	// server flags as much higher than usual (three times that); both absent without history.
 	AverageUse *decimal.Decimal `json:"average_use,omitempty"`
@@ -189,7 +191,7 @@ func (s *Service) GetRound(ctx context.Context, propertyID uuid.UUID, period str
 	avgs := s.averages(ctx, meterIDs, period)
 	out := &Round{ReadingRound: rr, Total: len(meters)}
 	for _, m := range meters {
-		row := RoundRow{MeterID: m.ID, Serial: m.Serial, Kind: string(m.Kind), UnitID: m.UnitID, PreviousReading: m.InitialReading}
+		row := RoundRow{MeterID: m.ID, Serial: m.Serial, Kind: string(m.Kind), UnitID: m.UnitID, PreviousReading: m.InitialReading, Multiplier: m.Multiplier}
 		if p, ok := prevByMeter[m.ID]; ok {
 			row.PreviousReading = p
 		}
