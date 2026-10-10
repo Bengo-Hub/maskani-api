@@ -12,10 +12,12 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/block"
+	"github.com/bengobox/maskani-api/internal/ent/gatedevice"
 	"github.com/bengobox/maskani-api/internal/ent/gateevent"
 	"github.com/bengobox/maskani-api/internal/ent/party"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
+	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
@@ -281,6 +283,9 @@ type InsidePerson struct {
 	PassID    *uuid.UUID `json:"pass_id,omitempty"`
 	VisitorID *uuid.UUID `json:"visitor_id,omitempty"`
 	WalkIn    bool       `json:"walk_in"`
+	// GuardName let them in, at GateName (the tablet's gate).
+	GuardName string `json:"guard_name,omitempty"`
+	GateName  string `json:"gate_name,omitempty"`
 }
 
 // Inside lists who is inside a property now, newest first (at most 300).
@@ -309,7 +314,46 @@ func (s *Service) Inside(ctx context.Context, propertyID uuid.UUID) ([]InsidePer
 			out[i].UnitCode, out[i].Block = info.code, info.block
 		}
 	}
+	s.insideNames(ctx, rows, out)
 	return out, nil
+}
+
+// insideNames fills who let each person in and at which gate: two reads for the whole list.
+func (s *Service) insideNames(ctx context.Context, rows []*ent.GateEvent, out []InsidePerson) {
+	var guards, devices []uuid.UUID
+	for _, r := range rows {
+		if r.GuardPersonnelID != nil {
+			guards = append(guards, *r.GuardPersonnelID)
+		}
+		if r.DeviceID != nil {
+			devices = append(devices, *r.DeviceID)
+		}
+	}
+	guardName, gateName := map[uuid.UUID]string{}, map[uuid.UUID]string{}
+	if len(guards) > 0 {
+		if ps, err := s.client.VendorPersonnel.Query().Where(vendorpersonnel.IDIn(guards...)).
+			Select(vendorpersonnel.FieldID, vendorpersonnel.FieldFullName).All(ctx); err == nil {
+			for _, p := range ps {
+				guardName[p.ID] = p.FullName
+			}
+		}
+	}
+	if len(devices) > 0 {
+		if ds, err := s.client.GateDevice.Query().Where(gatedevice.IDIn(devices...)).
+			Select(gatedevice.FieldID, gatedevice.FieldGateName).All(ctx); err == nil {
+			for _, d := range ds {
+				gateName[d.ID] = d.GateName
+			}
+		}
+	}
+	for i, r := range rows {
+		if r.GuardPersonnelID != nil {
+			out[i].GuardName = guardName[*r.GuardPersonnelID]
+		}
+		if r.DeviceID != nil {
+			out[i].GateName = gateName[*r.DeviceID]
+		}
+	}
 }
 
 // claimExit marks an entry as left, once: a second exit for the same entry (a double tap, a
