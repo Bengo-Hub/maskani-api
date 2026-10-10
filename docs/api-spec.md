@@ -66,7 +66,8 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 | POST `/roles` `{code, name, description, permissions}`; POST `/roles/customize` `{code}`; PUT `/roles/{id}` `{name, description, permissions}`; DELETE `/roles/{id}` | Estate roles. A default role is changed by customising it (an estate copy that replaces it for this estate, holders moved over); deleting a copy returns its holders to the default; an estate role is deleted only when nobody holds it. The administrator role is locked to every permission. Nobody can write into a role, or grant a role with, a permission they do not hold | `users.manage` |
 | DELETE `/catalogues/{kind}/{code}` | Remove an override | planned (sprint 1) |
 | GET, POST, PUT `/settings/custom-fields` | Custom field definitions | planned (sprint 1) |
-| GET, PUT `/settings/approval-rules`, `/settings/reminders` | Approval and reminder rules | planned (sprint 2) |
+| GET, POST `/settings/approval-rules`; PUT, DELETE `/settings/approval-rules/{id}` `{action: credit_note or adjustment, min_amount, max_amount, levels 1 to 3, approver_roles, active}` | Who approves credits by amount band; bands of active rules for one action may not overlap; with no rule a credit takes one `billing.approve` approval | `settings.view` or `billing.approve` / `settings.manage` |
+| GET, PUT `/settings/reminders` | Reminder schedules beyond the collections ladder | planned |
 
 ## Register (module `properties`)
 

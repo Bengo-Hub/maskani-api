@@ -247,6 +247,10 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings", h.UpdateSettings)
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
+	r.With(perm(rbac.PermSettingsView, rbac.PermBillingApprove)).Get("/settings/approval-rules", h.ListApprovalRules)
+	r.With(perm(rbac.PermSettingsManage)).Post("/settings/approval-rules", h.CreateApprovalRule)
+	r.With(perm(rbac.PermSettingsManage)).Put("/settings/approval-rules/{id}", h.UpdateApprovalRule)
+	r.With(perm(rbac.PermSettingsManage)).Delete("/settings/approval-rules/{id}", h.DeleteApprovalRule)
 	r.With(perm(rbac.PermSettingsView)).Get("/document-sequences", h.ListSequences)
 	r.With(perm(rbac.PermSettingsManage)).Put("/document-sequences/{kind}", h.SaveSequence)
 	// Documents: templates (documents.manage approves), issuing and the files of issued ones.
