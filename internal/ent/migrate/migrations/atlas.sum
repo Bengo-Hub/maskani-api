@@ -1,5 +1,6 @@
-h1:pOsI5iIJ6HCTQi3iBaPP2unm3V/EquCwVgrs+A1FVck=
+h1:ceK+fD72/zI313F2iPfSKGtlxuKZgFFZFvD0q0FAs58=
 20261007124306_initial_schema.sql h1:HKWGbbgsrJ6SYm8zcqjtHliD01Cf9F57Fs0Hz2ftrf0=
 20261008082552_keyset_list_indexes.sql h1:/Y3nPoCtnrKSJEC5x6EcAEmQZyTOeds0xxE07a1HMOM=
 20261009012750_job_and_lookup_indexes.sql h1:w+eS8b3zLH0GPUH1DIgmkl8XxvDGNUHJo45RTok+mrk=
 20261009161807_gate_visitors_and_exits.sql h1:4kO5UITj16/mfH699H0lGUA7OGiZB6kL6C/T2bLtunQ=
+20261010112923_account_collections.sql h1:EBWCUXkxfZfOagjCuxEMo9ZyyT/0IPC5vu83bfukLSs=

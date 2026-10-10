@@ -44,6 +44,33 @@ func (DailyStat) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "property_id", "day").Unique()}
 }
 
+// AccountCollection is what one unit account paid on one day: the per-account side of
+// DailyStat.collected, so collections can be narrowed by block (through the unit) and fund the
+// way billed and arrears already are. Written by the payment consumer in the same transaction as
+// the daily total; older days are filled once from treasury's account ledger.
+type AccountCollection struct{ ent.Schema }
+
+func (AccountCollection) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
+
+func (AccountCollection) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("unit_account_id", uuid.UUID{}),
+		field.UUID("unit_id", uuid.UUID{}),
+		field.UUID("property_id", uuid.UUID{}),
+		field.UUID("fund_id", uuid.UUID{}),
+		field.Time("day").SchemaType(map[string]string{"postgres": "date"}),
+		money("amount"),
+		field.Int("payments_count").Default(0),
+	}
+}
+
+func (AccountCollection) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("tenant_id", "unit_account_id", "day").Unique(),
+		index.Fields("tenant_id", "property_id", "day"),
+	}
+}
+
 // ImportJob tracks a CSV import from dry run to commit.
 type ImportJob struct{ ent.Schema }
 

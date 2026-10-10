@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// AccountCollection is the predicate function for accountcollection builders.
+type AccountCollection func(*sql.Selector)
+
 // Adjustment is the predicate function for adjustment builders.
 type Adjustment func(*sql.Selector)
 

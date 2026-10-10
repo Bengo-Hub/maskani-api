@@ -194,6 +194,9 @@ func (c *Consumer) apply(ctx context.Context, tenantID, accountID, eventID uuid.
 		if err = reports.RecordCollection(ctx, tx.Client(), tenantID, acc.Edges.Unit.PropertyID, paidAt, amt, c.loc); err != nil {
 			return nil, false, err
 		}
+		if err = reports.RecordAccountCollection(ctx, tx.Client(), tenantID, acc, acc.Edges.Unit.PropertyID, paidAt, amt, c.loc); err != nil {
+			return nil, false, err
+		}
 	}
 	if err = events.Publish(ctx, tx.OutboxEvent, tenantID, acc.ID.String(), events.PaymentApplied, map[string]any{
 		"account_id": acc.ID, "account_ref": acc.AccountRef, "amount": str(p["amount"]),

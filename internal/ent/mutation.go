@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
@@ -100,6 +101,7 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
+	TypeAccountCollection   = "AccountCollection"
 	TypeAdjustment          = "Adjustment"
 	TypeApprovalRule        = "ApprovalRule"
 	TypeAuditLog            = "AuditLog"
@@ -175,6 +177,969 @@ const (
 	TypeWorkOrder           = "WorkOrder"
 	TypeWorkOrderEvent      = "WorkOrderEvent"
 )
+
+// AccountCollectionMutation represents an operation that mutates the AccountCollection nodes in the graph.
+type AccountCollectionMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *uuid.UUID
+	tenant_id         *uuid.UUID
+	created_at        *time.Time
+	updated_at        *time.Time
+	metadata          *map[string]interface{}
+	unit_account_id   *uuid.UUID
+	unit_id           *uuid.UUID
+	property_id       *uuid.UUID
+	fund_id           *uuid.UUID
+	day               *time.Time
+	amount            *decimal.Decimal
+	addamount         *decimal.Decimal
+	payments_count    *int
+	addpayments_count *int
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*AccountCollection, error)
+	predicates        []predicate.AccountCollection
+}
+
+var _ ent.Mutation = (*AccountCollectionMutation)(nil)
+
+// accountcollectionOption allows management of the mutation configuration using functional options.
+type accountcollectionOption func(*AccountCollectionMutation)
+
+// newAccountCollectionMutation creates new mutation for the AccountCollection entity.
+func newAccountCollectionMutation(c config, op Op, opts ...accountcollectionOption) *AccountCollectionMutation {
+	m := &AccountCollectionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAccountCollection,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAccountCollectionID sets the ID field of the mutation.
+func withAccountCollectionID(id uuid.UUID) accountcollectionOption {
+	return func(m *AccountCollectionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AccountCollection
+		)
+		m.oldValue = func(ctx context.Context) (*AccountCollection, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AccountCollection.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAccountCollection sets the old AccountCollection of the mutation.
+func withAccountCollection(node *AccountCollection) accountcollectionOption {
+	return func(m *AccountCollectionMutation) {
+		m.oldValue = func(context.Context) (*AccountCollection, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AccountCollectionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AccountCollectionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of AccountCollection entities.
+func (m *AccountCollectionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AccountCollectionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AccountCollectionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AccountCollection.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *AccountCollectionMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *AccountCollectionMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *AccountCollectionMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AccountCollectionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AccountCollectionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AccountCollectionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AccountCollectionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AccountCollectionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AccountCollectionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetMetadata sets the "metadata" field.
+func (m *AccountCollectionMutation) SetMetadata(value map[string]interface{}) {
+	m.metadata = &value
+}
+
+// Metadata returns the value of the "metadata" field in the mutation.
+func (m *AccountCollectionMutation) Metadata() (r map[string]interface{}, exists bool) {
+	v := m.metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadata returns the old "metadata" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldMetadata(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadata: %w", err)
+	}
+	return oldValue.Metadata, nil
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (m *AccountCollectionMutation) ClearMetadata() {
+	m.metadata = nil
+	m.clearedFields[accountcollection.FieldMetadata] = struct{}{}
+}
+
+// MetadataCleared returns if the "metadata" field was cleared in this mutation.
+func (m *AccountCollectionMutation) MetadataCleared() bool {
+	_, ok := m.clearedFields[accountcollection.FieldMetadata]
+	return ok
+}
+
+// ResetMetadata resets all changes to the "metadata" field.
+func (m *AccountCollectionMutation) ResetMetadata() {
+	m.metadata = nil
+	delete(m.clearedFields, accountcollection.FieldMetadata)
+}
+
+// SetUnitAccountID sets the "unit_account_id" field.
+func (m *AccountCollectionMutation) SetUnitAccountID(u uuid.UUID) {
+	m.unit_account_id = &u
+}
+
+// UnitAccountID returns the value of the "unit_account_id" field in the mutation.
+func (m *AccountCollectionMutation) UnitAccountID() (r uuid.UUID, exists bool) {
+	v := m.unit_account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitAccountID returns the old "unit_account_id" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldUnitAccountID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitAccountID: %w", err)
+	}
+	return oldValue.UnitAccountID, nil
+}
+
+// ResetUnitAccountID resets all changes to the "unit_account_id" field.
+func (m *AccountCollectionMutation) ResetUnitAccountID() {
+	m.unit_account_id = nil
+}
+
+// SetUnitID sets the "unit_id" field.
+func (m *AccountCollectionMutation) SetUnitID(u uuid.UUID) {
+	m.unit_id = &u
+}
+
+// UnitID returns the value of the "unit_id" field in the mutation.
+func (m *AccountCollectionMutation) UnitID() (r uuid.UUID, exists bool) {
+	v := m.unit_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitID returns the old "unit_id" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldUnitID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitID: %w", err)
+	}
+	return oldValue.UnitID, nil
+}
+
+// ResetUnitID resets all changes to the "unit_id" field.
+func (m *AccountCollectionMutation) ResetUnitID() {
+	m.unit_id = nil
+}
+
+// SetPropertyID sets the "property_id" field.
+func (m *AccountCollectionMutation) SetPropertyID(u uuid.UUID) {
+	m.property_id = &u
+}
+
+// PropertyID returns the value of the "property_id" field in the mutation.
+func (m *AccountCollectionMutation) PropertyID() (r uuid.UUID, exists bool) {
+	v := m.property_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPropertyID returns the old "property_id" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldPropertyID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPropertyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPropertyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPropertyID: %w", err)
+	}
+	return oldValue.PropertyID, nil
+}
+
+// ResetPropertyID resets all changes to the "property_id" field.
+func (m *AccountCollectionMutation) ResetPropertyID() {
+	m.property_id = nil
+}
+
+// SetFundID sets the "fund_id" field.
+func (m *AccountCollectionMutation) SetFundID(u uuid.UUID) {
+	m.fund_id = &u
+}
+
+// FundID returns the value of the "fund_id" field in the mutation.
+func (m *AccountCollectionMutation) FundID() (r uuid.UUID, exists bool) {
+	v := m.fund_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFundID returns the old "fund_id" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldFundID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFundID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFundID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFundID: %w", err)
+	}
+	return oldValue.FundID, nil
+}
+
+// ResetFundID resets all changes to the "fund_id" field.
+func (m *AccountCollectionMutation) ResetFundID() {
+	m.fund_id = nil
+}
+
+// SetDay sets the "day" field.
+func (m *AccountCollectionMutation) SetDay(t time.Time) {
+	m.day = &t
+}
+
+// Day returns the value of the "day" field in the mutation.
+func (m *AccountCollectionMutation) Day() (r time.Time, exists bool) {
+	v := m.day
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDay returns the old "day" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldDay(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDay is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDay requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDay: %w", err)
+	}
+	return oldValue.Day, nil
+}
+
+// ResetDay resets all changes to the "day" field.
+func (m *AccountCollectionMutation) ResetDay() {
+	m.day = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *AccountCollectionMutation) SetAmount(d decimal.Decimal) {
+	m.amount = &d
+	m.addamount = nil
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *AccountCollectionMutation) Amount() (r decimal.Decimal, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldAmount(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// AddAmount adds d to the "amount" field.
+func (m *AccountCollectionMutation) AddAmount(d decimal.Decimal) {
+	if m.addamount != nil {
+		*m.addamount = m.addamount.Add(d)
+	} else {
+		m.addamount = &d
+	}
+}
+
+// AddedAmount returns the value that was added to the "amount" field in this mutation.
+func (m *AccountCollectionMutation) AddedAmount() (r decimal.Decimal, exists bool) {
+	v := m.addamount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *AccountCollectionMutation) ResetAmount() {
+	m.amount = nil
+	m.addamount = nil
+}
+
+// SetPaymentsCount sets the "payments_count" field.
+func (m *AccountCollectionMutation) SetPaymentsCount(i int) {
+	m.payments_count = &i
+	m.addpayments_count = nil
+}
+
+// PaymentsCount returns the value of the "payments_count" field in the mutation.
+func (m *AccountCollectionMutation) PaymentsCount() (r int, exists bool) {
+	v := m.payments_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentsCount returns the old "payments_count" field's value of the AccountCollection entity.
+// If the AccountCollection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountCollectionMutation) OldPaymentsCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentsCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentsCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentsCount: %w", err)
+	}
+	return oldValue.PaymentsCount, nil
+}
+
+// AddPaymentsCount adds i to the "payments_count" field.
+func (m *AccountCollectionMutation) AddPaymentsCount(i int) {
+	if m.addpayments_count != nil {
+		*m.addpayments_count += i
+	} else {
+		m.addpayments_count = &i
+	}
+}
+
+// AddedPaymentsCount returns the value that was added to the "payments_count" field in this mutation.
+func (m *AccountCollectionMutation) AddedPaymentsCount() (r int, exists bool) {
+	v := m.addpayments_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPaymentsCount resets all changes to the "payments_count" field.
+func (m *AccountCollectionMutation) ResetPaymentsCount() {
+	m.payments_count = nil
+	m.addpayments_count = nil
+}
+
+// Where appends a list predicates to the AccountCollectionMutation builder.
+func (m *AccountCollectionMutation) Where(ps ...predicate.AccountCollection) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AccountCollectionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AccountCollectionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AccountCollection, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AccountCollectionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AccountCollectionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AccountCollection).
+func (m *AccountCollectionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AccountCollectionMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.tenant_id != nil {
+		fields = append(fields, accountcollection.FieldTenantID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, accountcollection.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, accountcollection.FieldUpdatedAt)
+	}
+	if m.metadata != nil {
+		fields = append(fields, accountcollection.FieldMetadata)
+	}
+	if m.unit_account_id != nil {
+		fields = append(fields, accountcollection.FieldUnitAccountID)
+	}
+	if m.unit_id != nil {
+		fields = append(fields, accountcollection.FieldUnitID)
+	}
+	if m.property_id != nil {
+		fields = append(fields, accountcollection.FieldPropertyID)
+	}
+	if m.fund_id != nil {
+		fields = append(fields, accountcollection.FieldFundID)
+	}
+	if m.day != nil {
+		fields = append(fields, accountcollection.FieldDay)
+	}
+	if m.amount != nil {
+		fields = append(fields, accountcollection.FieldAmount)
+	}
+	if m.payments_count != nil {
+		fields = append(fields, accountcollection.FieldPaymentsCount)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AccountCollectionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case accountcollection.FieldTenantID:
+		return m.TenantID()
+	case accountcollection.FieldCreatedAt:
+		return m.CreatedAt()
+	case accountcollection.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case accountcollection.FieldMetadata:
+		return m.Metadata()
+	case accountcollection.FieldUnitAccountID:
+		return m.UnitAccountID()
+	case accountcollection.FieldUnitID:
+		return m.UnitID()
+	case accountcollection.FieldPropertyID:
+		return m.PropertyID()
+	case accountcollection.FieldFundID:
+		return m.FundID()
+	case accountcollection.FieldDay:
+		return m.Day()
+	case accountcollection.FieldAmount:
+		return m.Amount()
+	case accountcollection.FieldPaymentsCount:
+		return m.PaymentsCount()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AccountCollectionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case accountcollection.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case accountcollection.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case accountcollection.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case accountcollection.FieldMetadata:
+		return m.OldMetadata(ctx)
+	case accountcollection.FieldUnitAccountID:
+		return m.OldUnitAccountID(ctx)
+	case accountcollection.FieldUnitID:
+		return m.OldUnitID(ctx)
+	case accountcollection.FieldPropertyID:
+		return m.OldPropertyID(ctx)
+	case accountcollection.FieldFundID:
+		return m.OldFundID(ctx)
+	case accountcollection.FieldDay:
+		return m.OldDay(ctx)
+	case accountcollection.FieldAmount:
+		return m.OldAmount(ctx)
+	case accountcollection.FieldPaymentsCount:
+		return m.OldPaymentsCount(ctx)
+	}
+	return nil, fmt.Errorf("unknown AccountCollection field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountCollectionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case accountcollection.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case accountcollection.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case accountcollection.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case accountcollection.FieldMetadata:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadata(v)
+		return nil
+	case accountcollection.FieldUnitAccountID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitAccountID(v)
+		return nil
+	case accountcollection.FieldUnitID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitID(v)
+		return nil
+	case accountcollection.FieldPropertyID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPropertyID(v)
+		return nil
+	case accountcollection.FieldFundID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFundID(v)
+		return nil
+	case accountcollection.FieldDay:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDay(v)
+		return nil
+	case accountcollection.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case accountcollection.FieldPaymentsCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentsCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountCollection field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AccountCollectionMutation) AddedFields() []string {
+	var fields []string
+	if m.addamount != nil {
+		fields = append(fields, accountcollection.FieldAmount)
+	}
+	if m.addpayments_count != nil {
+		fields = append(fields, accountcollection.FieldPaymentsCount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AccountCollectionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case accountcollection.FieldAmount:
+		return m.AddedAmount()
+	case accountcollection.FieldPaymentsCount:
+		return m.AddedPaymentsCount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountCollectionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case accountcollection.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmount(v)
+		return nil
+	case accountcollection.FieldPaymentsCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentsCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountCollection numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AccountCollectionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(accountcollection.FieldMetadata) {
+		fields = append(fields, accountcollection.FieldMetadata)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AccountCollectionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AccountCollectionMutation) ClearField(name string) error {
+	switch name {
+	case accountcollection.FieldMetadata:
+		m.ClearMetadata()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountCollection nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AccountCollectionMutation) ResetField(name string) error {
+	switch name {
+	case accountcollection.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case accountcollection.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case accountcollection.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case accountcollection.FieldMetadata:
+		m.ResetMetadata()
+		return nil
+	case accountcollection.FieldUnitAccountID:
+		m.ResetUnitAccountID()
+		return nil
+	case accountcollection.FieldUnitID:
+		m.ResetUnitID()
+		return nil
+	case accountcollection.FieldPropertyID:
+		m.ResetPropertyID()
+		return nil
+	case accountcollection.FieldFundID:
+		m.ResetFundID()
+		return nil
+	case accountcollection.FieldDay:
+		m.ResetDay()
+		return nil
+	case accountcollection.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case accountcollection.FieldPaymentsCount:
+		m.ResetPaymentsCount()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountCollection field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AccountCollectionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AccountCollectionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AccountCollectionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AccountCollectionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AccountCollectionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AccountCollectionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AccountCollectionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AccountCollection unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AccountCollectionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AccountCollection edge %s", name)
+}
 
 // AdjustmentMutation represents an operation that mutates the Adjustment nodes in the graph.
 type AdjustmentMutation struct {

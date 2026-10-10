@@ -9,6 +9,18 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 )
 
+// The AccountCollectionFunc type is an adapter to allow the use of ordinary
+// function as AccountCollection mutator.
+type AccountCollectionFunc func(context.Context, *ent.AccountCollectionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AccountCollectionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AccountCollectionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountCollectionMutation", m)
+}
+
 // The AdjustmentFunc type is an adapter to allow the use of ordinary
 // function as Adjustment mutator.
 type AdjustmentFunc func(context.Context, *ent.AdjustmentMutation) (ent.Value, error)

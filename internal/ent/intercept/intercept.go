@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
@@ -139,6 +140,33 @@ func (f TraverseFunc) Traverse(ctx context.Context, q ent.Query) error {
 		return err
 	}
 	return f(ctx, query)
+}
+
+// The AccountCollectionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AccountCollectionFunc func(context.Context, *ent.AccountCollectionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AccountCollectionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AccountCollectionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AccountCollectionQuery", q)
+}
+
+// The TraverseAccountCollection type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAccountCollection func(context.Context, *ent.AccountCollectionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAccountCollection) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAccountCollection) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AccountCollectionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AccountCollectionQuery", q)
 }
 
 // The AdjustmentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -2142,6 +2170,8 @@ func (f TraverseWorkOrderEvent) Traverse(ctx context.Context, q ent.Query) error
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
+	case *ent.AccountCollectionQuery:
+		return &query[*ent.AccountCollectionQuery, predicate.AccountCollection, accountcollection.OrderOption]{typ: ent.TypeAccountCollection, tq: q}, nil
 	case *ent.AdjustmentQuery:
 		return &query[*ent.AdjustmentQuery, predicate.Adjustment, adjustment.OrderOption]{typ: ent.TypeAdjustment, tq: q}, nil
 	case *ent.ApprovalRuleQuery:

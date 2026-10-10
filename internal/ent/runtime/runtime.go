@@ -5,6 +5,7 @@ package runtime
 import (
 	"time"
 
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
@@ -87,6 +88,37 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	accountcollectionMixin := schema.AccountCollection{}.Mixin()
+	accountcollectionMixinHooks0 := accountcollectionMixin[0].Hooks()
+	accountcollection.Hooks[0] = accountcollectionMixinHooks0[0]
+	accountcollectionMixinInters0 := accountcollectionMixin[0].Interceptors()
+	accountcollection.Interceptors[0] = accountcollectionMixinInters0[0]
+	accountcollectionMixinFields0 := accountcollectionMixin[0].Fields()
+	_ = accountcollectionMixinFields0
+	accountcollectionFields := schema.AccountCollection{}.Fields()
+	_ = accountcollectionFields
+	// accountcollectionDescCreatedAt is the schema descriptor for created_at field.
+	accountcollectionDescCreatedAt := accountcollectionMixinFields0[2].Descriptor()
+	// accountcollection.DefaultCreatedAt holds the default value on creation for the created_at field.
+	accountcollection.DefaultCreatedAt = accountcollectionDescCreatedAt.Default.(func() time.Time)
+	// accountcollectionDescUpdatedAt is the schema descriptor for updated_at field.
+	accountcollectionDescUpdatedAt := accountcollectionMixinFields0[3].Descriptor()
+	// accountcollection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	accountcollection.DefaultUpdatedAt = accountcollectionDescUpdatedAt.Default.(func() time.Time)
+	// accountcollection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	accountcollection.UpdateDefaultUpdatedAt = accountcollectionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// accountcollectionDescAmount is the schema descriptor for amount field.
+	accountcollectionDescAmount := accountcollectionFields[5].Descriptor()
+	// accountcollection.DefaultAmount holds the default value on creation for the amount field.
+	accountcollection.DefaultAmount = accountcollectionDescAmount.Default.(func() decimal.Decimal)
+	// accountcollectionDescPaymentsCount is the schema descriptor for payments_count field.
+	accountcollectionDescPaymentsCount := accountcollectionFields[6].Descriptor()
+	// accountcollection.DefaultPaymentsCount holds the default value on creation for the payments_count field.
+	accountcollection.DefaultPaymentsCount = accountcollectionDescPaymentsCount.Default.(int)
+	// accountcollectionDescID is the schema descriptor for id field.
+	accountcollectionDescID := accountcollectionMixinFields0[0].Descriptor()
+	// accountcollection.DefaultID holds the default value on creation for the id field.
+	accountcollection.DefaultID = accountcollectionDescID.Default.(func() uuid.UUID)
 	adjustmentMixin := schema.Adjustment{}.Mixin()
 	adjustmentMixinHooks0 := adjustmentMixin[0].Hooks()
 	adjustment.Hooks[0] = adjustmentMixinHooks0[0]

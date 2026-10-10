@@ -9,6 +9,39 @@ import (
 )
 
 var (
+	// AccountCollectionsColumns holds the columns for the "account_collections" table.
+	AccountCollectionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "unit_account_id", Type: field.TypeUUID},
+		{Name: "unit_id", Type: field.TypeUUID},
+		{Name: "property_id", Type: field.TypeUUID},
+		{Name: "fund_id", Type: field.TypeUUID},
+		{Name: "day", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "date"}},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
+		{Name: "payments_count", Type: field.TypeInt, Default: 0},
+	}
+	// AccountCollectionsTable holds the schema information for the "account_collections" table.
+	AccountCollectionsTable = &schema.Table{
+		Name:       "account_collections",
+		Columns:    AccountCollectionsColumns,
+		PrimaryKey: []*schema.Column{AccountCollectionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountcollection_tenant_id_unit_account_id_day",
+				Unique:  true,
+				Columns: []*schema.Column{AccountCollectionsColumns[1], AccountCollectionsColumns[5], AccountCollectionsColumns[9]},
+			},
+			{
+				Name:    "accountcollection_tenant_id_property_id_day",
+				Unique:  false,
+				Columns: []*schema.Column{AccountCollectionsColumns[1], AccountCollectionsColumns[7], AccountCollectionsColumns[9]},
+			},
+		},
+	}
 	// AdjustmentsColumns holds the columns for the "adjustments" table.
 	AdjustmentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -3109,6 +3142,7 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		AccountCollectionsTable,
 		AdjustmentsTable,
 		ApprovalRulesTable,
 		AuditLogsTable,

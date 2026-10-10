@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
@@ -97,6 +98,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// AccountCollection is the client for interacting with the AccountCollection builders.
+	AccountCollection *AccountCollectionClient
 	// Adjustment is the client for interacting with the Adjustment builders.
 	Adjustment *AdjustmentClient
 	// ApprovalRule is the client for interacting with the ApprovalRule builders.
@@ -256,6 +259,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.AccountCollection = NewAccountCollectionClient(c.config)
 	c.Adjustment = NewAdjustmentClient(c.config)
 	c.ApprovalRule = NewApprovalRuleClient(c.config)
 	c.AuditLog = NewAuditLogClient(c.config)
@@ -422,6 +426,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:                 ctx,
 		config:              cfg,
+		AccountCollection:   NewAccountCollectionClient(cfg),
 		Adjustment:          NewAdjustmentClient(cfg),
 		ApprovalRule:        NewApprovalRuleClient(cfg),
 		AuditLog:            NewAuditLogClient(cfg),
@@ -515,6 +520,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:                 ctx,
 		config:              cfg,
+		AccountCollection:   NewAccountCollectionClient(cfg),
 		Adjustment:          NewAdjustmentClient(cfg),
 		ApprovalRule:        NewApprovalRuleClient(cfg),
 		AuditLog:            NewAuditLogClient(cfg),
@@ -595,7 +601,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		Adjustment.
+//		AccountCollection.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -618,9 +624,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Adjustment, c.ApprovalRule, c.AuditLog, c.BillQuery, c.BillingRun,
-		c.BillingRunLine, c.Block, c.CatalogEntry, c.ChargeRate, c.ChargeType,
-		c.ConsumedEvent, c.CustomFieldDef, c.DailyStat, c.Document,
+		c.AccountCollection, c.Adjustment, c.ApprovalRule, c.AuditLog, c.BillQuery,
+		c.BillingRun, c.BillingRunLine, c.Block, c.CatalogEntry, c.ChargeRate,
+		c.ChargeType, c.ConsumedEvent, c.CustomFieldDef, c.DailyStat, c.Document,
 		c.DocumentAccessLog, c.DocumentSequence, c.DocumentSignature,
 		c.DocumentTemplate, c.Enquiry, c.Fund, c.GateDevice, c.GateEvent, c.GuardPost,
 		c.Handover, c.ImportJob, c.Incident, c.Instalment, c.InstalmentSchedule,
@@ -643,9 +649,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Adjustment, c.ApprovalRule, c.AuditLog, c.BillQuery, c.BillingRun,
-		c.BillingRunLine, c.Block, c.CatalogEntry, c.ChargeRate, c.ChargeType,
-		c.ConsumedEvent, c.CustomFieldDef, c.DailyStat, c.Document,
+		c.AccountCollection, c.Adjustment, c.ApprovalRule, c.AuditLog, c.BillQuery,
+		c.BillingRun, c.BillingRunLine, c.Block, c.CatalogEntry, c.ChargeRate,
+		c.ChargeType, c.ConsumedEvent, c.CustomFieldDef, c.DailyStat, c.Document,
 		c.DocumentAccessLog, c.DocumentSequence, c.DocumentSignature,
 		c.DocumentTemplate, c.Enquiry, c.Fund, c.GateDevice, c.GateEvent, c.GuardPost,
 		c.Handover, c.ImportJob, c.Incident, c.Instalment, c.InstalmentSchedule,
@@ -667,6 +673,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *AccountCollectionMutation:
+		return c.AccountCollection.mutate(ctx, m)
 	case *AdjustmentMutation:
 		return c.Adjustment.mutate(ctx, m)
 	case *ApprovalRuleMutation:
@@ -817,6 +825,141 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.WorkOrderEvent.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// AccountCollectionClient is a client for the AccountCollection schema.
+type AccountCollectionClient struct {
+	config
+}
+
+// NewAccountCollectionClient returns a client for the AccountCollection from the given config.
+func NewAccountCollectionClient(c config) *AccountCollectionClient {
+	return &AccountCollectionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accountcollection.Hooks(f(g(h())))`.
+func (c *AccountCollectionClient) Use(hooks ...Hook) {
+	c.hooks.AccountCollection = append(c.hooks.AccountCollection, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accountcollection.Intercept(f(g(h())))`.
+func (c *AccountCollectionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountCollection = append(c.inters.AccountCollection, interceptors...)
+}
+
+// Create returns a builder for creating a AccountCollection entity.
+func (c *AccountCollectionClient) Create() *AccountCollectionCreate {
+	mutation := newAccountCollectionMutation(c.config, OpCreate)
+	return &AccountCollectionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountCollection entities.
+func (c *AccountCollectionClient) CreateBulk(builders ...*AccountCollectionCreate) *AccountCollectionCreateBulk {
+	return &AccountCollectionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountCollectionClient) MapCreateBulk(slice any, setFunc func(*AccountCollectionCreate, int)) *AccountCollectionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountCollectionCreateBulk{err: fmt.Errorf("calling to AccountCollectionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountCollectionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountCollectionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountCollection.
+func (c *AccountCollectionClient) Update() *AccountCollectionUpdate {
+	mutation := newAccountCollectionMutation(c.config, OpUpdate)
+	return &AccountCollectionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountCollectionClient) UpdateOne(_m *AccountCollection) *AccountCollectionUpdateOne {
+	mutation := newAccountCollectionMutation(c.config, OpUpdateOne, withAccountCollection(_m))
+	return &AccountCollectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountCollectionClient) UpdateOneID(id uuid.UUID) *AccountCollectionUpdateOne {
+	mutation := newAccountCollectionMutation(c.config, OpUpdateOne, withAccountCollectionID(id))
+	return &AccountCollectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountCollection.
+func (c *AccountCollectionClient) Delete() *AccountCollectionDelete {
+	mutation := newAccountCollectionMutation(c.config, OpDelete)
+	return &AccountCollectionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountCollectionClient) DeleteOne(_m *AccountCollection) *AccountCollectionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountCollectionClient) DeleteOneID(id uuid.UUID) *AccountCollectionDeleteOne {
+	builder := c.Delete().Where(accountcollection.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountCollectionDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountCollection.
+func (c *AccountCollectionClient) Query() *AccountCollectionQuery {
+	return &AccountCollectionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountCollection},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountCollection entity by its id.
+func (c *AccountCollectionClient) Get(ctx context.Context, id uuid.UUID) (*AccountCollection, error) {
+	return c.Query().Where(accountcollection.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountCollectionClient) GetX(ctx context.Context, id uuid.UUID) *AccountCollection {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AccountCollectionClient) Hooks() []Hook {
+	hooks := c.hooks.AccountCollection
+	return append(hooks[:len(hooks):len(hooks)], accountcollection.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountCollectionClient) Interceptors() []Interceptor {
+	inters := c.inters.AccountCollection
+	return append(inters[:len(inters):len(inters)], accountcollection.Interceptors[:]...)
+}
+
+func (c *AccountCollectionClient) mutate(ctx context.Context, m *AccountCollectionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountCollectionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountCollectionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountCollectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountCollectionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountCollection mutation op: %q", m.Op())
 	}
 }
 
@@ -11649,34 +11792,35 @@ func (c *WorkOrderEventClient) mutate(ctx context.Context, m *WorkOrderEventMuta
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Adjustment, ApprovalRule, AuditLog, BillQuery, BillingRun, BillingRunLine,
-		Block, CatalogEntry, ChargeRate, ChargeType, ConsumedEvent, CustomFieldDef,
-		DailyStat, Document, DocumentAccessLog, DocumentSequence, DocumentSignature,
-		DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent, GuardPost, Handover,
-		ImportJob, Incident, Instalment, InstalmentSchedule, MaintenanceSchedule,
-		MaskaniPermission, MaskaniRole, MaskaniUser, MaskaniUserOutlet, Meter,
-		MeterReading, Notice, NoticeDelivery, OccurrenceEntry, OutboxEvent, Outlet,
-		Party, PatrolCheckpoint, PatrolScan, Portfolio, PriceList, PriceListItem,
-		PrivacyRequest, Property, ReadingRound, ReminderSchedule, Reservation,
-		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
-		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
-		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, Visitor, VisitorPass, WorkOrder, WorkOrderEvent []ent.Hook
+		AccountCollection, Adjustment, ApprovalRule, AuditLog, BillQuery, BillingRun,
+		BillingRunLine, Block, CatalogEntry, ChargeRate, ChargeType, ConsumedEvent,
+		CustomFieldDef, DailyStat, Document, DocumentAccessLog, DocumentSequence,
+		DocumentSignature, DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent,
+		GuardPost, Handover, ImportJob, Incident, Instalment, InstalmentSchedule,
+		MaintenanceSchedule, MaskaniPermission, MaskaniRole, MaskaniUser,
+		MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
+		OccurrenceEntry, OutboxEvent, Outlet, Party, PatrolCheckpoint, PatrolScan,
+		Portfolio, PriceList, PriceListItem, PrivacyRequest, Property, ReadingRound,
+		ReminderSchedule, Reservation, RolePermission, Roster, SaleContract,
+		ServiceSchedule, ServiceVisit, Tenant, TenantModule, TenantSetting, TitleStage,
+		Unit, UnitAccount, UnitCharge, UnitParty, UserRoleAssignment, Vehicle, Vendor,
+		VendorContract, VendorDocument, VendorPersonnel, Visitor, VisitorPass,
+		WorkOrder, WorkOrderEvent []ent.Hook
 	}
 	inters struct {
-		Adjustment, ApprovalRule, AuditLog, BillQuery, BillingRun, BillingRunLine,
-		Block, CatalogEntry, ChargeRate, ChargeType, ConsumedEvent, CustomFieldDef,
-		DailyStat, Document, DocumentAccessLog, DocumentSequence, DocumentSignature,
-		DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent, GuardPost, Handover,
-		ImportJob, Incident, Instalment, InstalmentSchedule, MaintenanceSchedule,
-		MaskaniPermission, MaskaniRole, MaskaniUser, MaskaniUserOutlet, Meter,
-		MeterReading, Notice, NoticeDelivery, OccurrenceEntry, OutboxEvent, Outlet,
-		Party, PatrolCheckpoint, PatrolScan, Portfolio, PriceList, PriceListItem,
-		PrivacyRequest, Property, ReadingRound, ReminderSchedule, Reservation,
-		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
-		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
-		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, Visitor, VisitorPass, WorkOrder,
-		WorkOrderEvent []ent.Interceptor
+		AccountCollection, Adjustment, ApprovalRule, AuditLog, BillQuery, BillingRun,
+		BillingRunLine, Block, CatalogEntry, ChargeRate, ChargeType, ConsumedEvent,
+		CustomFieldDef, DailyStat, Document, DocumentAccessLog, DocumentSequence,
+		DocumentSignature, DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent,
+		GuardPost, Handover, ImportJob, Incident, Instalment, InstalmentSchedule,
+		MaintenanceSchedule, MaskaniPermission, MaskaniRole, MaskaniUser,
+		MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
+		OccurrenceEntry, OutboxEvent, Outlet, Party, PatrolCheckpoint, PatrolScan,
+		Portfolio, PriceList, PriceListItem, PrivacyRequest, Property, ReadingRound,
+		ReminderSchedule, Reservation, RolePermission, Roster, SaleContract,
+		ServiceSchedule, ServiceVisit, Tenant, TenantModule, TenantSetting, TitleStage,
+		Unit, UnitAccount, UnitCharge, UnitParty, UserRoleAssignment, Vehicle, Vendor,
+		VendorContract, VendorDocument, VendorPersonnel, Visitor, VisitorPass,
+		WorkOrder, WorkOrderEvent []ent.Interceptor
 	}
 )

@@ -12,6 +12,8 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// AccountCollection is the client for interacting with the AccountCollection builders.
+	AccountCollection *AccountCollectionClient
 	// Adjustment is the client for interacting with the Adjustment builders.
 	Adjustment *AdjustmentClient
 	// ApprovalRule is the client for interacting with the ApprovalRule builders.
@@ -291,6 +293,7 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.AccountCollection = NewAccountCollectionClient(tx.config)
 	tx.Adjustment = NewAdjustmentClient(tx.config)
 	tx.ApprovalRule = NewApprovalRuleClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
@@ -374,7 +377,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: Adjustment.QueryXXX(), the query will be executed
+// applies a query, for example: AccountCollection.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

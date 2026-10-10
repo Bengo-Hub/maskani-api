@@ -21,6 +21,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
 	"github.com/bengobox/maskani-api/internal/ent/billingrunline"
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/dailystat"
 	"github.com/bengobox/maskani-api/internal/ent/fund"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
@@ -689,6 +690,20 @@ func RecordCollection(ctx context.Context, client *ent.Client, tenantID, propert
 		OnConflictColumns(dailystat.FieldTenantID, dailystat.FieldPropertyID, dailystat.FieldDay).
 		Update(func(u *ent.DailyStatUpsert) {
 			u.AddCollected(amount)
+			u.AddPaymentsCount(1)
+		}).Exec(ctx)
+}
+
+// RecordAccountCollection adds a payment to the account's day, the per-account side of
+// RecordCollection (call both in the consumer's transaction).
+func RecordAccountCollection(ctx context.Context, client *ent.Client, tenantID uuid.UUID, acc *ent.UnitAccount, propertyID uuid.UUID,
+	at time.Time, amount decimal.Decimal, loc *time.Location) error {
+	day := time.Date(at.In(loc).Year(), at.In(loc).Month(), at.In(loc).Day(), 0, 0, 0, 0, time.UTC)
+	return client.AccountCollection.Create().SetTenantID(tenantID).SetUnitAccountID(acc.ID).SetUnitID(acc.UnitID).
+		SetPropertyID(propertyID).SetFundID(acc.FundID).SetDay(day).SetAmount(amount).SetPaymentsCount(1).
+		OnConflictColumns(accountcollection.FieldTenantID, accountcollection.FieldUnitAccountID, accountcollection.FieldDay).
+		Update(func(u *ent.AccountCollectionUpsert) {
+			u.AddAmount(amount)
 			u.AddPaymentsCount(1)
 		}).Exec(ctx)
 }
