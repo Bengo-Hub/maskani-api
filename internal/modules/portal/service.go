@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 )
 
@@ -36,11 +37,13 @@ func NewService(client *ent.Client, log *zap.Logger) *Service {
 
 // MyUnit is a unit the caller is linked to, with its accounts and last water reading.
 type MyUnit struct {
-	Link        *ent.UnitParty     `json:"link"`
-	Unit        *ent.Unit          `json:"unit"`
-	Property    *ent.Property      `json:"property"`
-	Accounts    []*ent.UnitAccount `json:"accounts"`
-	LastReading *LastReading       `json:"last_reading,omitempty"`
+	Link     *ent.UnitParty     `json:"link"`
+	Unit     *ent.Unit          `json:"unit"`
+	Property *ent.Property      `json:"property"`
+	Accounts []*ent.UnitAccount `json:"accounts"`
+	// Pay says how to pay each account at its fund's paybill, keyed by account id.
+	Pay         map[uuid.UUID]accounts.PayInstruction `json:"pay"`
+	LastReading *LastReading                          `json:"last_reading,omitempty"`
 }
 
 // LastReading is the unit meter's latest accepted reading, for the portal home (SRDD figure 14).
@@ -123,10 +126,12 @@ func (s *Service) Units(ctx context.Context, partyIDs []uuid.UUID) ([]MyUnit, er
 			continue
 		}
 		seen[l.UnitID] = true
-		mu := MyUnit{Link: l, Unit: u, Property: u.Edges.Property, Accounts: []*ent.UnitAccount{}, LastReading: lastRead[l.UnitID]}
+		mu := MyUnit{Link: l, Unit: u, Property: u.Edges.Property, Accounts: []*ent.UnitAccount{},
+			Pay: map[uuid.UUID]accounts.PayInstruction{}, LastReading: lastRead[l.UnitID]}
 		for _, a := range byUnit[l.UnitID] {
 			if accountVisible(l, a) {
 				mu.Accounts = append(mu.Accounts, a)
+				mu.Pay[a.ID] = accounts.PayInstructionFor(a.Edges.Fund, a.AccountRef)
 			}
 		}
 		out = append(out, mu)

@@ -168,7 +168,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 
 | Method and path | Purpose |
 |---|---|
-| GET `/me/units` | Units linked to the caller with role and accounts |
+| GET `/me/units` | Units linked to the caller with role, accounts, the last reading, and `pay` (per account id: paybill, pay_account, pay_reference, bank_matched) |
 | GET `/me/accounts/{id}/statement`; GET `/me/accounts/{id}/statement/export?format=`; POST `/me/accounts/{id}/pay` | Statement (with entries), its branded download, and STK payment for an own account |
 | GET `/me/purchase` | Purchase plans with schedule and next due |
 | GET, POST `/me/passes`; POST `/me/passes/{id}/cancel` | Visitor passes for own units |
