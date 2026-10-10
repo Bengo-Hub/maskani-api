@@ -56,6 +56,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Media upload needs a staff or portal session (portal users only their kinds), per-user rate limits, image dimensions checked before decoding; signing limited to the caller's kinds; signing key derived from the field key instead of the internal service key (NFR-09, `15375db`)
 - [x] EndLink keeps a link active until a future end date (`15375db`)
 - [x] Phone numbers validated with the fleet's httpware `contact` rules, stored form unchanged (`b8be252`)
+- [x] Estate and unit photo galleries (12 each, first is the cover); estate and unit photos are public media, other kinds stay signed; the market projection returns absolute links (api `b12835a`, ui `e64a30e`, commerce `bdb9bbd`)
 - [ ] Custom field definitions with validation of `custom_fields` on write, filters and exports (FR-07, wave 2.11)
 - [ ] Layered configuration: property overrides read by the module check (FR-07, FR-08, wave 2.11)
 - [x] Module switched off (or off the plan) keeps its data readable: reads pass with `X-Module-Read-Only`, writes refused (FR-09, `3ae57a5`); jobs skipping switched-off modules still open

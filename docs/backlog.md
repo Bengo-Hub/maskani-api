@@ -17,10 +17,11 @@ and the record of deliberate deferrals. The plan that closes them is
 
 ## Schema built but not yet used (2026-10-09)
 
-Adjustment, BillQuery, ServiceSchedule, ServiceVisit, MaintenanceSchedule, GuardPost, Roster,
-PatrolCheckpoint, PatrolScan, OccurrenceEntry, CustomFieldDef, ApprovalRule, ReminderSchedule,
-DocumentTemplate, Document, DocumentSignature, DocumentAccessLog, PrivacyRequest, Handover,
-TitleStage, Portfolio, AuditLog. VendorContract is only counted on the dashboard; Vehicle has no list
+ServiceSchedule, ServiceVisit, MaintenanceSchedule, GuardPost, Roster, PatrolCheckpoint, PatrolScan,
+OccurrenceEntry, CustomFieldDef, ReminderSchedule, PrivacyRequest, Handover, TitleStage, Portfolio,
+AuditLog. (Adjustment, BillQuery and ApprovalRule went live 2026-10-10; the document tables with
+wave 2.1.) ApprovalRule has no settings screen yet, so every credit needs one `billing.approve`
+approval until rules are added (wave 2.11). VendorContract is only counted on the dashboard; Vehicle has no list
 or delete; `daily_stats` fills 2 of its 19 metrics. Each is picked up by a wave 2 or wave 4 item.
 
 ## Deliberate deferrals
@@ -34,6 +35,16 @@ or delete; `daily_stats` fills 2 of its 19 metrics. Each is picked up by a wave 
 | Channel sync with Airbnb and Booking.com | Short stays run on pos-api's hotel engine from R2; channel sync is a separate integration | R4 |
 
 ## Decisions recorded here
+
+- **Credit notes on unit accounts (2026-10-10):** treasury credit notes inherit the bill's
+  `account_ref`; the account ledger nets them off (`total_credited`, per bill `amount_credited`) and
+  the payment allocator skips them and sees partial credits. Only the unpaid part of a bill can be
+  credited; money already paid needs a refund, which is not built. Credit note lines carry no VAT,
+  so a VAT-bearing charge credited this way under-reverses output VAT; estate service charges are
+  untaxed today.
+- **Public media (2026-10-10):** estate and unit photos (`kind=properties`, `kind=units`) are served
+  without a signature and cached immutably, so the public site and next/image can use them; every
+  other kind stays signed. Keys stay unguessable.
 
 - **Vendor bills:** treasury has no S2S vendor-bill create, but it already raises bills from events
   (`arpa/service_delivery_bill_subscriber.go`, `POBillSubscriber`). Maskani publishes

@@ -45,20 +45,24 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 02 (not started).
 - [x] Live hints: `billing_run.progress`, `payment.applied`, `reading.saved` (2026-10-08)
 - [ ] Statement PDF and CSV
 - [ ] Reminder job (1, 7, 14 days)
-- [ ] Adjustments and bill queries (after demo)
+- [x] Adjustments and bill queries (2026-10-10, see the audit list)
 - [ ] KES 1 live tests on both paybills (user confirms first)
 - [x] maskani-ui billing, meters and collections screens (meter photo optional since `fb46c61`)
 
 ### Gaps found by the 2026-10-09 audit
 Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in brackets).
 
-- [ ] Statements carry a running balance from the API and page through the whole treasury ledger, not the first 50 rows (FR-35, wave 1c and 2.1)
-- [ ] Statement export `?format=pdf|csv|xlsx` on the copied fleet docs engine (FR-35, wave 2.1)
-- [ ] Arrears ladder driven by `arrears_steps` and `ReminderSchedule`: reminders on days 1, 7 and 14, a late charge only where the charge type allows it (capped, never compounded), a call list at 30, a demand letter at 45, escalation at 60. Reuses treasury dunning if it fits (FR-34, wave 2.2)
-- [ ] Payment plans and clearance certificates (FR-34, wave 2.2)
-- [ ] Adjustments and credit notes through treasury under `ApprovalRule` thresholds; bill queries with a finance queue and portal submission (FR-29, FR-30, wave 2.5)
+- [x] Statements carry a running balance from the API and page through the whole treasury ledger, not the first 50 rows (FR-35, wave 1c and 2.1); credits on a bill show as their own entry (`e7b27c0`)
+- [x] Statement export `?format=pdf|csv|xlsx` on the shared reports module (FR-35, wave 2.1)
+- [x] Arrears ladder driven by `arrears_steps`: reminders on days 1, 7 and 14, a call list at 30, a demand letter at 45, escalation at 60; promise to pay holds the letter and escalation; treasury dunning stays off for Maskani tenants (FR-34, `c699d08`)
+- [ ] Late charge: tenant setting (percent and or fixed, cap, grace days, funds), once a month per account on overdue principal only, never compounded, deduped by a treasury reference (FR-34, wave 2.5, in progress)
+- [ ] Payment plan schedule on an account (the agreement document exists) and clearance certificates (FR-34, wave 2.5)
+- [x] Adjustments and credit notes through treasury under `ApprovalRule` thresholds (levels, roles, no self approval); bill queries within 30 days with a finance queue, 7 day answer date and portal submission (FR-29, FR-30, api `e7b27c0`, treasury `9f45b90`, notifications `fb49156`, ui `e2551f0`)
+- [x] Manual payments (bank, cash, cheque, typed M-Pesa) with review by someone other than the recorder; residents above the KES 250,000 M-Pesa limit give a bank or cheque reference (api `9a1cbda`, treasury `645f060`)
+- [x] Bank paybills: fund paybill account format (`{ref}`, `2362010#{ref}` or the bank account alone), pay instruction on bills, messages, statements and the portal; bank statement CSV import into review (api `d46337b`, `628986d`, ui `d7e43d3`)
+- [x] Per-account collections, so dashboard collections follow a block or fund (api `15f347f`, `65fd340`)
 - [ ] Meter replacement route with closing and opening readings; batch bulk and borehole readings (FR-27, wave 2.7)
-- [ ] Arrears search and minimum balance filtered in SQL, not over loaded pages; suspense total from the API (wave 1c)
+- [x] Arrears search and minimum balance filtered in SQL, not over loaded pages; suspense total from the API (wave 1c)
 - [x] Water balance and arrears read from the replica with a 60 second cache invalidated across pods (`bf20a0d`)
 - [x] Billing issue and retry run under a per-run fleet lease, mark themselves alive per batch, and a two-minute job resumes runs a stopped pod left in "issuing" (NFR-06, `bf20a0d`)
 - [x] Billing run accounts read once per batch of 500 instead of once per line (`bf20a0d`)
