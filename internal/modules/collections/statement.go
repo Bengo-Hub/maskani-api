@@ -25,6 +25,8 @@ type Statement struct {
 	// Trimmed is true when treasury's list of bills or payments was full, so older history exists
 	// beyond the entries shown (they stop where both lists are complete).
 	Trimmed bool `json:"trimmed"`
+	// Pay says how to pay this account at its paybill (account number, or bank account and reference).
+	Pay accounts.PayInstruction `json:"pay"`
 }
 
 // StatementEntry is one bill or payment.
@@ -58,10 +60,10 @@ func (s *Service) statement(ctx context.Context, accountID uuid.UUID, limit int)
 	led, err := s.accounts.RefreshLedger(ctx, acc, limit)
 	if err != nil {
 		s.log.Warn("ledger unavailable", zap.String("account", acc.AccountRef), zap.Error(err))
-		return &Statement{Account: acc, Entries: []StatementEntry{}}, nil
+		return &Statement{Account: acc, Entries: []StatementEntry{}, Pay: accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef)}, nil
 	}
 	entries, trimmed := Entries(led, limit)
-	return &Statement{Account: acc, Ledger: led, Entries: entries, Trimmed: trimmed}, nil
+	return &Statement{Account: acc, Ledger: led, Entries: entries, Trimmed: trimmed, Pay: accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef)}, nil
 }
 
 // Entries merges a ledger's bills and payments newest first and works the balance after each one

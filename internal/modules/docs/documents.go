@@ -26,6 +26,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
 
@@ -97,7 +98,7 @@ func (s *Service) accountSubject(ctx context.Context, k DocKind, id uuid.UUID) (
 		v["last_paid"] = reports.Date(st.Ledger.LastPaidAt.In(s.loc))
 	}
 	if f := acc.Edges.Fund; f != nil {
-		v["fund_name"], v["paybill"] = f.Name, f.PaybillShortcode
+		v["fund_name"], v["paybill"], v["pay_account"] = f.Name, f.PaybillShortcode, accounts.PayInstructionFor(f, acc.AccountRef).Account
 	}
 	sub := &Subject{PropertyID: u.PropertyID, UnitID: u.ID, values: v}
 	if acc.PrimaryPartyID != nil {

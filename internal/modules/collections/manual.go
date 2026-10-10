@@ -44,6 +44,8 @@ type Submitter struct {
 	UserID uuid.UUID
 	Name   string
 	Portal bool
+	// Quiet skips the reviewer alert per entry (a statement import; its lines show in the queue).
+	Quiet bool
 }
 
 var staffMethods = map[string]bool{"bank_transfer": true, "cash": true, "cheque": true, "mpesa": true}
@@ -109,7 +111,9 @@ func (s *Service) SubmitManual(ctx context.Context, accountID uuid.UUID, by Subm
 			payload["responders"] = rs
 		}
 	}
-	_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, mp.ID.String(), ManualPaymentSubmitted, payload)
+	if !by.Quiet {
+		_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, mp.ID.String(), ManualPaymentSubmitted, payload)
+	}
 	return mp, nil
 }
 

@@ -300,6 +300,8 @@ func (s *Service) act(ctx context.Context, tenantID uuid.UUID, slug string, acc 
 		"account_id": acc.ID, "account_ref": acc.AccountRef, "name": acc.CustomerName, "phone": acc.CustomerPhone,
 		"email": accounts.CustomerEmail(acc), "balance": acc.Balance.StringFixed(2), "days_overdue": age, "step_day": step.Day,
 		"paybill": paybill, "unit_code": unitCode, "property_id": prop.id, "property": prop.name,
+		"pay_account":   accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef).Account,
+		"pay_reference": accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef).Reference,
 	}
 	switch step.Action {
 	case settings.ArrearsReminder:

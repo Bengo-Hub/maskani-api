@@ -118,6 +118,8 @@ func (s *Service) remindInstalments(ctx context.Context, tenantID uuid.UUID, now
 			"amount": in.Amount.StringFixed(2), "outstanding": in.Amount.Sub(in.PaidAmount).StringFixed(2),
 			"due_date": d.Format("2006-01-02"), "days_to_due": offset, "account_id": acc.ID, "account_ref": acc.AccountRef,
 			"name": acc.CustomerName, "phone": acc.CustomerPhone, "email": accounts.CustomerEmail(acc), "paybill": paybill,
+			"pay_account":   accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef).Account,
+			"pay_reference": accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef).Reference,
 		}
 		if err := events.Publish(ctx, s.client.OutboxEvent, tenantID, in.ID.String(), events.InstalmentDue, payload); err != nil {
 			return sent, err

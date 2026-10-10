@@ -30,7 +30,7 @@ type DocKind struct {
 }
 
 var accountFields = []string{"estate_name", "property_name", "unit_code", "account_ref", "owner_name", "fund_name",
-	"paybill", "balance", "last_paid", "date", "document_number"}
+	"paybill", "pay_account", "balance", "last_paid", "date", "document_number"}
 
 var contractFields = []string{"estate_name", "property_name", "unit_code", "contract_number", "buyer_name", "price",
 	"deposit", "term_months", "payment_option", "balance", "date", "document_number"}

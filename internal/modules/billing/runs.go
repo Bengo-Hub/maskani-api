@@ -484,6 +484,7 @@ func (s *Service) issueOne(ctx context.Context, tenantID uuid.UUID, run *ent.Bil
 		"name":  acc.CustomerName, "paybill": f.PaybillShortcode, "fund": f.Code, "fund_name": f.Name,
 		"items": items, "subtotal": l.Subtotal.StringFixed(2), "tax_total": l.TaxTotal.StringFixed(2),
 		"invoice_date": run.InvoiceDate.Format("2 Jan 2006"),
+		"pay_account":  accounts.PayInstructionFor(f, acc.AccountRef).Account, "pay_reference": accounts.PayInstructionFor(f, acc.AccountRef).Reference,
 	})
 	_ = tx.Commit()
 }

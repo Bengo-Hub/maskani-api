@@ -145,3 +145,36 @@ func (h *H) RejectManualPayment(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, mp)
 }
+
+// ImportBankLines is POST /collections/bank-lines {fund, property_id, lines: [{date, amount,
+// reference, description, payer}]}: bank statement credits matched to accounts (unit reference in
+// the text, else the owner's phone) and queued for review as bank transfers. Returns each line's
+// outcome: queued, duplicate, unmatched or invalid.
+func (h *H) ImportBankLines(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Fund       string                 `json:"fund"`
+		PropertyID *uuid.UUID             `json:"property_id"`
+		Lines      []collections.BankLine `json:"lines"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	a := access(r)
+	ids, all := a.PropertyIDs, a.AllProperties || a.Bypass
+	if in.PropertyID != nil {
+		if !requireProperty(w, r, *in.PropertyID) {
+			return
+		}
+		ids, all = []uuid.UUID{*in.PropertyID}, false
+	}
+	if in.Fund == "" {
+		in.Fund = "estate"
+	}
+	res, err := h.Collections.ImportBankLines(r.Context(), in.Fund, ids, all,
+		collections.Submitter{UserID: actor(r), Name: displayName(r)}, in.Lines)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": res})
+}

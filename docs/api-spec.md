@@ -108,7 +108,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET `/funds`; PATCH `/funds/{id}` | Funds with bank account, paybill and account prefix | `billing.view` / `billing.manage` |
+| GET `/funds`; PATCH `/funds/{id}` | Funds with bank account, paybill and account prefix. `paybill_account_format` (kept in the fund metadata) is what owners type as the paybill account number: `{ref}` (default, the unit reference), `2362010#{ref}` for a bank paybill that takes a reference, or the bank account alone (`2362010`), when the unit reference is quoted separately and payments come in from the bank side (statement import or recorded payments). Statements, bills, reminders and documents carry the resulting `pay_account` and `pay_reference`, and C2B routes follow it | `billing.view` / `billing.manage` |
 | GET `/charge-types?all=`; POST `/charge-types`; POST `/charge-types/enable` `{code}`; PATCH `/charge-types/{id}` | Charge catalogue | `billing.view` / `billing.manage` |
 | POST `/charge-types/{id}/rates` | Dated rate by scope; issued invoices never change | `billing.manage` |
 | POST `/billing-runs/preview` `{property_id, fund, period}` | Compute a run without issuing | `billing.run` |
@@ -126,6 +126,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/collections/suspense?days=`; POST `/collections/suspense/{trans_id}/assign` `{unit_account_id}` | Unmatched paybill payments | `billing.collect` |
 | GET `/collections/call-list?property_id=` | Accounts the collections ladder put on the call list (day 30 by default) that still owe, largest first: account, customer, phone, unit, balance, last payment, oldest due, promise date, last note | `billing.collect` |
 | POST `/unit-accounts/{id}/manual-payments` `{amount, method, reference, paid_on, payer_name, note, evidence_key}` | Staff record a bank transfer, cash, cheque or typed M-Pesa payment; it waits for review. One slip once (method and reference, a rejected one can be resubmitted) | `billing.collect` |
+| POST `/collections/bank-lines` `{fund, property_id, lines: [{date, amount, reference, description, payer}]}` | Bank statement credits (up to 2,000) matched to the fund's accounts by a unit reference in the text (`TAN7`, `2362010#TAN7`; normalised like paybill references), else by the owner's phone (never a phone shared by two accounts), and queued for review as bank transfers. Each line comes back queued, duplicate (that bank reference is already queued), unmatched or invalid | `billing.collect` |
 | POST `/me/accounts/{id}/manual-payments` | Portal: a resident gives a bank transfer or cheque reference (M-Pesa prompts stop at KES 250,000); it waits for review | portal user |
 | GET `/collections/manual-payments?status=&property_id=&account_id=` (keyset) | The review queue and its history | `billing.collect` or `billing.verify` |
 | POST `/manual-payments/{id}/approve` `{note}`; POST `/manual-payments/{id}/reject` `{reason}` | Approve books it in treasury (S2S manual-payments, allocated oldest due first, ledger by method) and closes it; the person who recorded it cannot approve it; reject needs a reason | `billing.verify` (property managers, caretakers, administrators) |

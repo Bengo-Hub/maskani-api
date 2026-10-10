@@ -119,8 +119,17 @@ func (s *Service) register(ctx context.Context, acc *ent.UnitAccount, f *ent.Fun
 	if !ok {
 		tenantID = acc.TenantID
 	}
+	pay := PayInstructionFor(f, acc.AccountRef)
+	if pay.Reference != "" {
+		// A bank paybill that takes only the estate's bank account: nothing in the payment names the
+		// unit, so there is no route to register; payments come in from the bank side.
+		_ = s.client.UnitAccount.UpdateOneID(acc.ID).SetC2bRouteRegisteredAt(time.Now()).Exec(ctx)
+		return
+	}
+	// The route matches what the owner types: the reference, or "2362010#TAN7" on a bank paybill
+	// that accepts one.
 	err := s.treasury.RegisterC2BRoute(ctx, tenantID, treasury.C2BRoute{
-		AccountRef: acc.AccountRef, Shortcode: f.PaybillShortcode, ReferenceID: acc.ID.String(), Fund: f.Code,
+		AccountRef: pay.Account, Shortcode: f.PaybillShortcode, ReferenceID: acc.ID.String(), Fund: f.Code,
 	})
 	if err != nil {
 		s.log.Warn("c2b route registration failed; will retry", zap.String("account_ref", acc.AccountRef), zap.Error(err))

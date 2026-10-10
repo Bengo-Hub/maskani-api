@@ -59,9 +59,13 @@ type FundInput struct {
 	CostCenterCode        *string    `json:"cost_center_code"`
 	IncomeAccountCode     *string    `json:"income_account_code"`
 	ReceivableAccountCode *string    `json:"receivable_account_code"`
+	// PaybillAccountFormat is what owners type as the paybill account number: "{ref}" (default),
+	// "2362010#{ref}" for a bank paybill that takes a reference, or the bank account alone.
+	PaybillAccountFormat *string `json:"paybill_account_format"`
 }
 
-// UpdateFund edits a fund. Changing the paybill re-queues route registration for its accounts.
+// UpdateFund edits a fund. Changing the paybill or its account format re-queues route
+// registration for its accounts, so routes match what owners now type.
 func (s *Service) UpdateFund(ctx context.Context, id uuid.UUID, in FundInput) (*ent.Fund, error) {
 	u := s.client.Fund.UpdateOneID(id)
 	if in.Name != nil {
@@ -85,8 +89,28 @@ func (s *Service) UpdateFund(ctx context.Context, id uuid.UUID, in FundInput) (*
 	if in.ReceivableAccountCode != nil {
 		u.SetReceivableAccountCode(*in.ReceivableAccountCode)
 	}
+	if in.PaybillAccountFormat != nil {
+		format := strings.TrimSpace(*in.PaybillAccountFormat)
+		if len(format) > 40 || strings.Count(format, "{ref}") > 1 {
+			return nil, httpx.Invalid("the paybill account format is the bank account, optionally with {ref} once")
+		}
+		cur, err := s.client.Fund.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		meta := map[string]any{}
+		for k, v := range cur.Metadata {
+			meta[k] = v
+		}
+		if format == "" || format == "{ref}" {
+			delete(meta, "paybill_account_format")
+		} else {
+			meta["paybill_account_format"] = format
+		}
+		u.SetMetadata(meta)
+	}
 	f, err := u.Save(ctx)
-	if err == nil && in.PaybillShortcode != nil {
+	if err == nil && (in.PaybillShortcode != nil || in.PaybillAccountFormat != nil) {
 		_, _ = s.client.UnitAccount.Update().Where(unitaccount.FundID(id)).ClearC2bRouteRegisteredAt().Save(ctx)
 	}
 	return f, err

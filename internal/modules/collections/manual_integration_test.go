@@ -75,4 +75,30 @@ func TestManualPaymentsOnPostgres(t *testing.T) {
 	if _, err := s.SubmitManual(tctx, acc.ID, clerk, in); err != nil {
 		t.Fatalf("a rejected slip should be submittable again: %v", err)
 	}
+
+	// Bank statement import: Lockwood-style "account#ref", a phone, a repeat, and an unknown line.
+	u2, err := client.Unit.Create().SetPropertyID(p.ID).SetCode("TAN7").Save(tctx)
+	must(err)
+	tan, err := client.UnitAccount.Create().SetUnitID(u2.ID).SetFundID(f.ID).SetAccountRef("TAN7").SetCustomerPhone("254712345678").Save(tctx)
+	must(err)
+	lines := []BankLine{
+		{Date: "2026-10-01", Amount: decimal.NewFromInt(17400), Reference: "FT26274A", Description: "MPESA C2B 2362010#TAN7 TITUS"},
+		{Date: "2026-10-02", Amount: decimal.NewFromInt(500), Reference: "FT26275B", Description: "Deposit from 0712345678"},
+		{Date: "2026-10-01", Amount: decimal.NewFromInt(17400), Reference: "FT26274A", Description: "MPESA C2B 2362010#TAN7 TITUS"},
+		{Date: "2026-10-03", Amount: decimal.NewFromInt(900), Reference: "FT26276C", Description: "Unknown payer"},
+	}
+	res, err := s.ImportBankLines(tctx, "estate", nil, true, clerk, lines)
+	must(err)
+	want := []string{"queued", "queued", "duplicate", "unmatched"}
+	for i, r := range res {
+		if r.Status != want[i] {
+			t.Fatalf("line %d: %s (%s), want %s", i, r.Status, r.Error, want[i])
+		}
+		if r.Status == "queued" && (r.AccountID == nil || *r.AccountID != tan.ID) {
+			t.Fatalf("line %d matched the wrong account: %+v", i, r)
+		}
+	}
+	if res[0].MatchedBy != "reference" || res[1].MatchedBy != "phone" {
+		t.Fatalf("matched by: %s, %s", res[0].MatchedBy, res[1].MatchedBy)
+	}
 }
