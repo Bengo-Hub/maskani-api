@@ -112,6 +112,30 @@ func TestDashboardFiltersOnPostgres(t *testing.T) {
 	check("two months", DashboardFilter{From: "2026-08", To: "2026-09"}, 1300, 1400, 2)
 	check("block A", DashboardFilter{From: "2026-08", To: "2026-09", BlockID: &blockA.ID}, 300, 500, 1)
 	check("sales fund", DashboardFilter{From: "2026-08", To: "2026-09", FundID: &sales.ID}, 1000, 900, 2)
+	// Collections by block and fund come from the per-account totals.
+	sep := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+	must(client.AccountCollection.Create().SetUnitAccountID(accA.ID).SetUnitID(ua.ID).SetPropertyID(p.ID).SetFundID(estate.ID).
+		SetDay(sep).SetAmount(decimal.NewFromInt(150)).SetPaymentsCount(1).Exec(tctx))
+	must(client.AccountCollection.Create().SetUnitAccountID(accB.ID).SetUnitID(ub.ID).SetPropertyID(p.ID).SetFundID(sales.ID).
+		SetDay(sep).SetAmount(decimal.NewFromInt(400)).SetPaymentsCount(1).Exec(tctx))
+	s.Invalidate(uuid.Nil)
+	for name, tc := range map[string]struct {
+		f    DashboardFilter
+		want int64
+	}{
+		"block A collected":    {DashboardFilter{From: "2026-09", To: "2026-09", BlockID: &blockA.ID}, 150},
+		"sales fund collected": {DashboardFilter{From: "2026-09", To: "2026-09", FundID: &sales.ID}, 400},
+	} {
+		d, err := s.Dashboard(tctx, sc, tc.f)
+		must(err)
+		var weekly decimal.Decimal
+		for _, w := range d.CollectionsByWeek {
+			weekly = weekly.Add(w.Collected)
+		}
+		if !d.Collected.Equal(decimal.NewFromInt(tc.want)) || !weekly.Equal(decimal.NewFromInt(tc.want)) || d.CollectionsScope != "accounts" {
+			t.Fatalf("%s: collected %s weekly %s scope %s", name, d.Collected, weekly, d.CollectionsScope)
+		}
+	}
 	if _, err := s.Dashboard(tctx, sc, DashboardFilter{From: "2025-01", To: "2026-09"}); err == nil {
 		t.Fatal("a range over 12 months should be refused")
 	}

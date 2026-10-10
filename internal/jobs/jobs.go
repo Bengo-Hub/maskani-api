@@ -16,6 +16,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
+	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
@@ -42,19 +43,20 @@ type Runner struct {
 
 // Deps are the services jobs call.
 type Deps struct {
-	Client    *ent.Client
-	SQL       *stdsql.DB // primary handle for set-based rollups
-	Loc       *time.Location
-	Accounts  *accounts.Service
-	Billing   *billing.Service
-	Imports   *imports.Service
-	Sales     *sales.Service
-	Works     *works.Service
-	Gate      *gate.Service
-	Notices   *notices.Service
-	Settings  *settings.Service
-	Reminders *reminders.Service
-	Log       *zap.Logger
+	Client      *ent.Client
+	SQL         *stdsql.DB // primary handle for set-based rollups
+	Loc         *time.Location
+	Accounts    *accounts.Service
+	Billing     *billing.Service
+	Imports     *imports.Service
+	Sales       *sales.Service
+	Works       *works.Service
+	Gate        *gate.Service
+	Notices     *notices.Service
+	Settings    *settings.Service
+	Reminders   *reminders.Service
+	Collections *collections.Service
+	Log         *zap.Logger
 }
 
 // New builds the runner with the standard maskani jobs (docs/architecture.md, background jobs).
@@ -91,6 +93,22 @@ func New(d Deps) *Runner {
 			n, err := d.Billing.RunSchedules(ctx, on)
 			if n > 0 {
 				log.Info("scheduled billing runs started", zap.Int("runs", n))
+			}
+			return err
+		}},
+		// Per-account collections before 2026-10-10 come from treasury's ledgers, 200 accounts an
+		// hour, each once; after that the payment consumer writes them.
+		{"maskani:collections-backfill", time.Hour, func(ctx context.Context) error {
+			if d.Collections == nil {
+				return nil
+			}
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "billing")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			n, err := d.Collections.BackfillAccountCollections(ctx, on, d.Loc, 200)
+			if n > 0 {
+				log.Info("account collections backfilled", zap.Int("accounts", n))
 			}
 			return err
 		}},

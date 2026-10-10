@@ -134,8 +134,8 @@ type Dashboard struct {
 	Period string `json:"period"` // the last month of the range
 	From   string `json:"from"`
 	To     string `json:"to"`
-	// CollectionsScope is "filtered", or "property" when a block or fund is chosen: collections are
-	// recorded per property and day, so they follow the property and months only.
+	// CollectionsScope is "filtered", or "accounts" when a block or fund is chosen: collections then
+	// come from per-account totals (filled from treasury ledgers up to 2026-10-10, then live).
 	CollectionsScope  string           `json:"collections_scope"`
 	Billed            decimal.Decimal  `json:"billed"`
 	Collected         decimal.Decimal  `json:"collected"`
@@ -181,8 +181,8 @@ var AgeBuckets = []string{"0-30", "31-60", "61-90", "90+"}
 // are cached for 60 seconds per tenant, scope and period.
 // DashboardFilter narrows the dashboard: a range of months (From to To, YYYY-MM, at most 12), a
 // block and a fund. Block and fund narrow what is kept per unit or account (billed, outstanding,
-// arrears, units, work orders, sales); collections are recorded per property, so they follow the
-// property and months only and the response says so in CollectionsScope.
+// arrears, units, work orders, sales) and collections too, read from the per-account totals
+// (CollectionsScope "accounts").
 type DashboardFilter struct {
 	From, To string
 	BlockID  *uuid.UUID
@@ -238,7 +238,7 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 	period := f.To
 	d := &Dashboard{Period: period, From: f.From, To: f.To, CollectionsScope: "filtered"}
 	if f.BlockID != nil || f.FundID != nil {
-		d.CollectionsScope = "property"
+		d.CollectionsScope = "accounts"
 	}
 	start, _ := time.ParseInLocation("2006-01", f.From, s.loc)
 	last, _ := time.ParseInLocation("2006-01", f.To, s.loc)
@@ -274,12 +274,29 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 	// daily_stats.day holds the local date at UTC midnight (RecordCollection).
 	dayFrom := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, time.UTC)
 	dayTo := time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, time.UTC)
-	sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(dayFrom), dailystat.DayLT(dayTo))
-	if ids != nil {
-		sq = sq.Where(dailystat.PropertyIDIn(ids...))
-	}
-	if err := sq.Aggregate(sqlx.SumAs(dailystat.FieldCollected, "collected", "")).Scan(ctx, &coll); err != nil {
-		return nil, err
+	if f.BlockID != nil || f.FundID != nil {
+		// A block or fund: per-account collections, narrowed the same way as billed.
+		aq := s.client.AccountCollection.Query().Where(accountcollection.DayGTE(dayFrom), accountcollection.DayLT(dayTo))
+		if ids != nil {
+			aq = aq.Where(accountcollection.PropertyIDIn(ids...))
+		}
+		if f.FundID != nil {
+			aq = aq.Where(accountcollection.FundID(*f.FundID))
+		}
+		if f.BlockID != nil {
+			aq = aq.Where(unitsOfBlock(*f.BlockID))
+		}
+		if err := aq.Aggregate(sqlx.SumAs(accountcollection.FieldAmount, "collected", "")).Scan(ctx, &coll); err != nil {
+			return nil, err
+		}
+	} else {
+		sq := s.client.DailyStat.Query().Where(dailystat.DayGTE(dayFrom), dailystat.DayLT(dayTo))
+		if ids != nil {
+			sq = sq.Where(dailystat.PropertyIDIn(ids...))
+		}
+		if err := sq.Aggregate(sqlx.SumAs(dailystat.FieldCollected, "collected", "")).Scan(ctx, &coll); err != nil {
+			return nil, err
+		}
 	}
 	if len(coll) > 0 {
 		d.Collected = coll[0].Collected
@@ -432,11 +449,21 @@ WITH weeks AS (
      AND ($5::text IS NULL OR r.property_id = ANY($5::text::uuid[]))
    GROUP BY 1
 ), coll AS (
-  SELECT date_trunc('week', d.day)::date AS wk, SUM(d.collected) AS amt
-    FROM daily_stats d
-   WHERE d.tenant_id = $1 AND d.day >= $2::date AND d.day < $3::date
-     AND ($5::text IS NULL OR d.property_id = ANY($5::text::uuid[]))
-   GROUP BY 1
+  SELECT wk, SUM(amt) AS amt FROM (
+    SELECT date_trunc('week', d.day)::date AS wk, d.collected AS amt
+      FROM daily_stats d
+     WHERE d.tenant_id = $1 AND d.day >= $2::date AND d.day < $3::date
+       AND ($5::text IS NULL OR d.property_id = ANY($5::text::uuid[]))
+       AND $8::uuid IS NULL AND $9::uuid IS NULL
+    UNION ALL
+    SELECT date_trunc('week', a.day)::date, a.amount
+      FROM account_collections a
+     WHERE a.tenant_id = $1 AND a.day >= $2::date AND a.day < $3::date
+       AND ($5::text IS NULL OR a.property_id = ANY($5::text::uuid[]))
+       AND ($8::uuid IS NOT NULL OR $9::uuid IS NOT NULL)
+       AND ($8::uuid IS NULL OR a.unit_id IN (SELECT id FROM units WHERE tenant_id = $1 AND block_id = $8::uuid))
+       AND ($9::uuid IS NULL OR a.fund_id = $9::uuid)
+  ) x GROUP BY 1
 )
 SELECT to_char(w.week_start, 'YYYY-MM-DD'), COALESCE(b.amt, 0), COALESCE(c.amt, 0)
   FROM weeks w LEFT JOIN billed b ON b.wk = w.week_start LEFT JOIN coll c ON c.wk = w.week_start
