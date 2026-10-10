@@ -134,7 +134,12 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/reports/arrears` (keyset by balance, largest first; `property_id`) | `{account_id, account_ref, customer_name, customer_phone, balance, last_payment_at}` | `reports.view` |
 | GET, POST `/units/{id}/charges`; PATCH `/unit-charges/{id}` | Opt-in charges per unit | planned (sprint 2) |
 | GET `/unit-accounts/{id}`; statement `?format=pdf` | | planned (sprint 2) |
-| POST `/adjustments`; `/adjustments/{id}/approve`, `/reject`; `/bill-queries` | Credit notes, waivers, bill queries | planned (sprint 2) |
+| POST `/unit-accounts/{id}/adjustments` `{kind: credit_note or waiver, invoice_id, amount, reason}` | Asks to credit part of one unpaid bill on the account (never more than it still owes; one open request per bill) | `billing.adjust` |
+| GET `/collections/adjustments?status=&property_id=&account_id=` (keyset) | Credits waiting for approval and their history | `billing.adjust` or `billing.approve` |
+| POST `/adjustments/{id}/approve` `{note}`; POST `/adjustments/{id}/reject` `{reason}` | The approval rule for the amount (`approval_rules`, action credit_note or adjustment) sets the levels and the roles; with no rule one approval. The requester never approves, one person once. The last approval raises the treasury credit note (S2S create-credit-note); a treasury failure leaves it approved and approving again retries | `billing.approve` |
+| GET `/collections/bill-queries?status=&property_id=` (keyset) | Residents' bill queries, answer due 7 days after raising | `billing.view` |
+| POST `/bill-queries/{id}/answer` `{status: in_review, resolved or rejected, resolution}` | Take a query, or answer it; the resident is told | `billing.adjust` or `billing.manage` |
+| POST `/me/accounts/{id}/bill-queries` `{invoice_id, subject, body}`; GET `/me/bill-queries` | Portal: query a bill within 30 days of its date (five open per account at most) and see the answers | portal user |
 
 ## Meters and utilities (module `utilities`)
 

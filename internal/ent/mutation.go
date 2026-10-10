@@ -1154,6 +1154,7 @@ type AdjustmentMutation struct {
 	updated_at              *time.Time
 	metadata                *map[string]interface{}
 	unit_account_id         *uuid.UUID
+	property_id             *uuid.UUID
 	kind                    *adjustment.Kind
 	amount                  *decimal.Decimal
 	addamount               *decimal.Decimal
@@ -1465,6 +1466,42 @@ func (m *AdjustmentMutation) OldUnitAccountID(ctx context.Context) (v uuid.UUID,
 // ResetUnitAccountID resets all changes to the "unit_account_id" field.
 func (m *AdjustmentMutation) ResetUnitAccountID() {
 	m.unit_account_id = nil
+}
+
+// SetPropertyID sets the "property_id" field.
+func (m *AdjustmentMutation) SetPropertyID(u uuid.UUID) {
+	m.property_id = &u
+}
+
+// PropertyID returns the value of the "property_id" field in the mutation.
+func (m *AdjustmentMutation) PropertyID() (r uuid.UUID, exists bool) {
+	v := m.property_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPropertyID returns the old "property_id" field's value of the Adjustment entity.
+// If the Adjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdjustmentMutation) OldPropertyID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPropertyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPropertyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPropertyID: %w", err)
+	}
+	return oldValue.PropertyID, nil
+}
+
+// ResetPropertyID resets all changes to the "property_id" field.
+func (m *AdjustmentMutation) ResetPropertyID() {
+	m.property_id = nil
 }
 
 // SetKind sets the "kind" field.
@@ -1864,7 +1901,7 @@ func (m *AdjustmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdjustmentMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.tenant_id != nil {
 		fields = append(fields, adjustment.FieldTenantID)
 	}
@@ -1879,6 +1916,9 @@ func (m *AdjustmentMutation) Fields() []string {
 	}
 	if m.unit_account_id != nil {
 		fields = append(fields, adjustment.FieldUnitAccountID)
+	}
+	if m.property_id != nil {
+		fields = append(fields, adjustment.FieldPropertyID)
 	}
 	if m.kind != nil {
 		fields = append(fields, adjustment.FieldKind)
@@ -1922,6 +1962,8 @@ func (m *AdjustmentMutation) Field(name string) (ent.Value, bool) {
 		return m.Metadata()
 	case adjustment.FieldUnitAccountID:
 		return m.UnitAccountID()
+	case adjustment.FieldPropertyID:
+		return m.PropertyID()
 	case adjustment.FieldKind:
 		return m.Kind()
 	case adjustment.FieldAmount:
@@ -1957,6 +1999,8 @@ func (m *AdjustmentMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldMetadata(ctx)
 	case adjustment.FieldUnitAccountID:
 		return m.OldUnitAccountID(ctx)
+	case adjustment.FieldPropertyID:
+		return m.OldPropertyID(ctx)
 	case adjustment.FieldKind:
 		return m.OldKind(ctx)
 	case adjustment.FieldAmount:
@@ -2016,6 +2060,13 @@ func (m *AdjustmentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUnitAccountID(v)
+		return nil
+	case adjustment.FieldPropertyID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPropertyID(v)
 		return nil
 	case adjustment.FieldKind:
 		v, ok := value.(adjustment.Kind)
@@ -2178,6 +2229,9 @@ func (m *AdjustmentMutation) ResetField(name string) error {
 		return nil
 	case adjustment.FieldUnitAccountID:
 		m.ResetUnitAccountID()
+		return nil
+	case adjustment.FieldPropertyID:
+		m.ResetPropertyID()
 		return nil
 	case adjustment.FieldKind:
 		m.ResetKind()
@@ -4288,6 +4342,7 @@ type BillQueryMutation struct {
 	updated_at          *time.Time
 	metadata            *map[string]interface{}
 	unit_account_id     *uuid.UUID
+	property_id         *uuid.UUID
 	treasury_invoice_id *uuid.UUID
 	party_id            *uuid.UUID
 	subject             *string
@@ -4597,6 +4652,42 @@ func (m *BillQueryMutation) OldUnitAccountID(ctx context.Context) (v uuid.UUID, 
 // ResetUnitAccountID resets all changes to the "unit_account_id" field.
 func (m *BillQueryMutation) ResetUnitAccountID() {
 	m.unit_account_id = nil
+}
+
+// SetPropertyID sets the "property_id" field.
+func (m *BillQueryMutation) SetPropertyID(u uuid.UUID) {
+	m.property_id = &u
+}
+
+// PropertyID returns the value of the "property_id" field in the mutation.
+func (m *BillQueryMutation) PropertyID() (r uuid.UUID, exists bool) {
+	v := m.property_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPropertyID returns the old "property_id" field's value of the BillQuery entity.
+// If the BillQuery object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillQueryMutation) OldPropertyID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPropertyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPropertyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPropertyID: %w", err)
+	}
+	return oldValue.PropertyID, nil
+}
+
+// ResetPropertyID resets all changes to the "property_id" field.
+func (m *BillQueryMutation) ResetPropertyID() {
+	m.property_id = nil
 }
 
 // SetTreasuryInvoiceID sets the "treasury_invoice_id" field.
@@ -4986,7 +5077,7 @@ func (m *BillQueryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BillQueryMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.tenant_id != nil {
 		fields = append(fields, billquery.FieldTenantID)
 	}
@@ -5001,6 +5092,9 @@ func (m *BillQueryMutation) Fields() []string {
 	}
 	if m.unit_account_id != nil {
 		fields = append(fields, billquery.FieldUnitAccountID)
+	}
+	if m.property_id != nil {
+		fields = append(fields, billquery.FieldPropertyID)
 	}
 	if m.treasury_invoice_id != nil {
 		fields = append(fields, billquery.FieldTreasuryInvoiceID)
@@ -5044,6 +5138,8 @@ func (m *BillQueryMutation) Field(name string) (ent.Value, bool) {
 		return m.Metadata()
 	case billquery.FieldUnitAccountID:
 		return m.UnitAccountID()
+	case billquery.FieldPropertyID:
+		return m.PropertyID()
 	case billquery.FieldTreasuryInvoiceID:
 		return m.TreasuryInvoiceID()
 	case billquery.FieldPartyID:
@@ -5079,6 +5175,8 @@ func (m *BillQueryMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldMetadata(ctx)
 	case billquery.FieldUnitAccountID:
 		return m.OldUnitAccountID(ctx)
+	case billquery.FieldPropertyID:
+		return m.OldPropertyID(ctx)
 	case billquery.FieldTreasuryInvoiceID:
 		return m.OldTreasuryInvoiceID(ctx)
 	case billquery.FieldPartyID:
@@ -5138,6 +5236,13 @@ func (m *BillQueryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUnitAccountID(v)
+		return nil
+	case billquery.FieldPropertyID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPropertyID(v)
 		return nil
 	case billquery.FieldTreasuryInvoiceID:
 		v, ok := value.(uuid.UUID)
@@ -5297,6 +5402,9 @@ func (m *BillQueryMutation) ResetField(name string) error {
 		return nil
 	case billquery.FieldUnitAccountID:
 		m.ResetUnitAccountID()
+		return nil
+	case billquery.FieldPropertyID:
+		m.ResetPropertyID()
 		return nil
 	case billquery.FieldTreasuryInvoiceID:
 		m.ResetTreasuryInvoiceID()

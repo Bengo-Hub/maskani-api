@@ -69,7 +69,7 @@ func (h *H) MySubmitManualPayment(w http.ResponseWriter, r *http.Request) {
 // ListManualPayments is GET /collections/manual-payments?status=&property_id=&account_id=
 // (keyset): the review queue and its history.
 func (h *H) ListManualPayments(w http.ResponseWriter, r *http.Request) {
-	f, ok := scopeFilter(w, r)
+	ids, all, ok := scopeIDs(w, r)
 	if !ok {
 		return
 	}
@@ -77,10 +77,6 @@ func (h *H) ListManualPayments(w http.ResponseWriter, r *http.Request) {
 	if status != "" && status != "pending" && status != "approved" && status != "rejected" {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "status must be pending, approved or rejected")
 		return
-	}
-	ids, all := f.Scope, f.AllProperties || access(r).Bypass
-	if f.PropertyID != nil {
-		ids, all = []uuid.UUID{*f.PropertyID}, false
 	}
 	accID := httpx.QueryUUID(r, "account_id")
 	if accID != nil && !h.accountScope(w, r, *accID) {

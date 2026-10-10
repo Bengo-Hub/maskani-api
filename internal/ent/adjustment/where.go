@@ -76,6 +76,11 @@ func UnitAccountID(v uuid.UUID) predicate.Adjustment {
 	return predicate.Adjustment(sql.FieldEQ(FieldUnitAccountID, v))
 }
 
+// PropertyID applies equality check predicate on the "property_id" field. It's identical to PropertyIDEQ.
+func PropertyID(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldEQ(FieldPropertyID, v))
+}
+
 // Amount applies equality check predicate on the "amount" field. It's identical to AmountEQ.
 func Amount(v decimal.Decimal) predicate.Adjustment {
 	return predicate.Adjustment(sql.FieldEQ(FieldAmount, v))
@@ -269,6 +274,46 @@ func UnitAccountIDLT(v uuid.UUID) predicate.Adjustment {
 // UnitAccountIDLTE applies the LTE predicate on the "unit_account_id" field.
 func UnitAccountIDLTE(v uuid.UUID) predicate.Adjustment {
 	return predicate.Adjustment(sql.FieldLTE(FieldUnitAccountID, v))
+}
+
+// PropertyIDEQ applies the EQ predicate on the "property_id" field.
+func PropertyIDEQ(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldEQ(FieldPropertyID, v))
+}
+
+// PropertyIDNEQ applies the NEQ predicate on the "property_id" field.
+func PropertyIDNEQ(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldNEQ(FieldPropertyID, v))
+}
+
+// PropertyIDIn applies the In predicate on the "property_id" field.
+func PropertyIDIn(vs ...uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldIn(FieldPropertyID, vs...))
+}
+
+// PropertyIDNotIn applies the NotIn predicate on the "property_id" field.
+func PropertyIDNotIn(vs ...uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldNotIn(FieldPropertyID, vs...))
+}
+
+// PropertyIDGT applies the GT predicate on the "property_id" field.
+func PropertyIDGT(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldGT(FieldPropertyID, v))
+}
+
+// PropertyIDGTE applies the GTE predicate on the "property_id" field.
+func PropertyIDGTE(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldGTE(FieldPropertyID, v))
+}
+
+// PropertyIDLT applies the LT predicate on the "property_id" field.
+func PropertyIDLT(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldLT(FieldPropertyID, v))
+}
+
+// PropertyIDLTE applies the LTE predicate on the "property_id" field.
+func PropertyIDLTE(v uuid.UUID) predicate.Adjustment {
+	return predicate.Adjustment(sql.FieldLTE(FieldPropertyID, v))
 }
 
 // KindEQ applies the EQ predicate on the "kind" field.

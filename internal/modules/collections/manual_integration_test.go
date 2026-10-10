@@ -101,4 +101,52 @@ func TestManualPaymentsOnPostgres(t *testing.T) {
 	if res[0].MatchedBy != "reference" || res[1].MatchedBy != "phone" {
 		t.Fatalf("matched by: %s, %s", res[0].MatchedBy, res[1].MatchedBy)
 	}
+
+	// Bill queries: a resident raises one, finance takes it, then answers; a second answer is refused.
+	bq, err := s.RaiseBillQuery(tctx, acc.ID, Raiser{UserID: uuid.New(), Name: "Owner"}, BillQueryInput{Subject: "Water charge", Body: "The reading looks doubled"})
+	must(err)
+	if bq.Status != "open" || bq.DueBy == nil || bq.PropertyID != p.ID {
+		t.Fatalf("raised: %+v", bq)
+	}
+	if _, err := s.AnswerBillQuery(tctx, bq.ID, Reviewer{UserID: uuid.New(), Name: "Finance"}, BillQueryAnswer{Status: "resolved"}); err == nil {
+		t.Fatal("resolving without an answer should be refused")
+	}
+	if _, err := s.AnswerBillQuery(tctx, bq.ID, Reviewer{UserID: uuid.New(), Name: "Finance"}, BillQueryAnswer{Status: "in_review"}); err != nil {
+		t.Fatal(err)
+	}
+	done, err := s.AnswerBillQuery(tctx, bq.ID, Reviewer{UserID: uuid.New(), Name: "Finance"}, BillQueryAnswer{Status: "resolved", Resolution: "Meter re-read; credit raised"})
+	must(err)
+	if done.Status != "resolved" || done.Metadata["answered_by_name"] != "Finance" {
+		t.Fatalf("answered: %+v", done)
+	}
+	if _, err := s.AnswerBillQuery(tctx, bq.ID, Reviewer{UserID: uuid.New()}, BillQueryAnswer{Status: "rejected", Resolution: "x"}); err == nil {
+		t.Fatal("an answered query should not be answered again")
+	}
+
+	// Adjustments: a two-level rule above 10,000 for named roles; the requester cannot approve.
+	_, err = client.ApprovalRule.Create().SetAction("credit_note").SetMinAmount(decimal.NewFromInt(10000)).SetLevels(2).
+		SetApproverRoles([]string{"tenant_admin"}).Save(tctx)
+	must(err)
+	asker := uuid.New()
+	adj, err := client.Adjustment.Create().SetUnitAccountID(acc.ID).SetPropertyID(p.ID).SetKind("credit_note").
+		SetAmount(decimal.NewFromInt(12000)).SetReason("double billed").SetRequestedBy(asker).Save(tctx)
+	must(err)
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: asker, Roles: []string{"tenant_admin"}}, ""); err == nil {
+		t.Fatal("the requester should not approve their own credit")
+	}
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: uuid.New(), Roles: []string{"finance_officer"}}, ""); err == nil {
+		t.Fatal("a role the rule does not name should not approve")
+	}
+	first := uuid.New()
+	one, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: first, Name: "A", Roles: []string{"tenant_admin"}}, "")
+	must(err)
+	if one.Status != "pending_approval" || len(one.Approvals) != 1 {
+		t.Fatalf("after one of two approvals: %s %d", one.Status, len(one.Approvals))
+	}
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: first, Roles: []string{"tenant_admin"}}, ""); err == nil {
+		t.Fatal("one person should not approve twice")
+	}
+	if _, err := s.RejectAdjustment(tctx, adj.ID, Approver{UserID: uuid.New(), Name: "B"}, "not a billing error"); err != nil {
+		t.Fatal(err)
+	}
 }

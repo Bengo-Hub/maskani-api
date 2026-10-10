@@ -19,7 +19,11 @@ envelope first and are idempotent on event ID.
 | `maskani.instalment.due` | Instalment reminder 3 days before, on the day, 7 and 14 days late | instalment_id, contract_number, seq, amount, outstanding, due_date, days_to_due, account_ref, name, phone, email, paybill | notifications to the buyer |
 | `maskani.bill.issued` | One run line issued | account_ref, unit_code, period, invoice_number, invoice_date, due_date, `items` (description, amount, plus quantity and rate only for rated charges, tax only for taxed charges), subtotal, tax_total, amount (total), paybill, fund, fund_name, name, phone, email | notifications: itemised bill by email and WhatsApp (untaxed, VAT or no-paybill template) |
 | `maskani.payment.applied` | Payment reflected on an account | account_ref, amount, receipt, balance, method, fund, name, phone, email | notifications: receipt by email and WhatsApp |
-| `maskani.instalment.due` | Reminder offsets (3 days before, due, 7 and 14 after) | contract, seq, amount, due_date | notifications |
+| `maskani.manual_payment.submitted` | A bank, cash, cheque or typed M-Pesa payment waits for review (not sent per line on a bank statement import) | manual_payment_id, account_ref, unit_code, amount, method, reference, submitted_by, property, responders (managers and caretakers) | staff alert (email and push) |
+| `maskani.adjustment.requested` | A credit note or waiver waits for approval | adjustment_id, account_ref, unit_code, kind, amount, reason, invoice_number, requested_by, property, responders (finance and managers) | staff alert |
+| `maskani.adjustment.applied` | The treasury credit note was raised | adjustment_id, account_ref, kind, amount, credit_note_number | notifications (optional) |
+| `maskani.bill_query.raised` | A resident queried a bill | bill_query_id, account_ref, unit_code, subject, invoice_number, raised_by, due_by, property, responders (finance and managers) | staff alert |
+| `maskani.bill_query.answered` | Finance resolved or rejected a query | bill_query_id, account_ref, subject, status, resolution, invoice_number, name, phone, email | notifications to the resident |
 | `maskani.sale_contract.activated`, `.defaulted`, `.fully_paid` | Contract state changes | contract, unit, buyer | notifications, dashboard |
 | `maskani.unit.handed_over` | Handover completed | unit, owner, date | estate billing start, welcome message |
 | `maskani.work_order.created`, `.assigned`, `.completed`, `.sla_breached` | Works lifecycle | number, priority, unit, assignee, due | notifications to requester, assignee, manager |

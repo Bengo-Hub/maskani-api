@@ -140,7 +140,7 @@ func init() {
 	// adjustment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	adjustment.UpdateDefaultUpdatedAt = adjustmentDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// adjustmentDescAmount is the schema descriptor for amount field.
-	adjustmentDescAmount := adjustmentFields[2].Descriptor()
+	adjustmentDescAmount := adjustmentFields[3].Descriptor()
 	// adjustment.DefaultAmount holds the default value on creation for the amount field.
 	adjustment.DefaultAmount = adjustmentDescAmount.Default.(func() decimal.Decimal)
 	// adjustmentDescID is the schema descriptor for id field.
@@ -224,7 +224,7 @@ func init() {
 	// billquery.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	billquery.UpdateDefaultUpdatedAt = billqueryDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// billqueryDescSubject is the schema descriptor for subject field.
-	billqueryDescSubject := billqueryFields[3].Descriptor()
+	billqueryDescSubject := billqueryFields[4].Descriptor()
 	// billquery.SubjectValidator is a validator for the "subject" field. It is called by the builders before save.
 	billquery.SubjectValidator = billqueryDescSubject.Validators[0].(func(string) error)
 	// billqueryDescID is the schema descriptor for id field.

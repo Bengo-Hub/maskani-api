@@ -265,6 +265,7 @@ func (BillingRunLine) Indexes() []ent.Index {
 }
 
 // Adjustment is a credit note, waiver, debit or write-off on an account, under approval rules.
+// Metadata keeps what the queue shows (account_ref, unit_code, invoice_number, requested_by_name).
 type Adjustment struct{ ent.Schema }
 
 func (Adjustment) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
@@ -272,6 +273,7 @@ func (Adjustment) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
 func (Adjustment) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("unit_account_id", uuid.UUID{}),
+		field.UUID("property_id", uuid.UUID{}),
 		field.Enum("kind").Values("credit_note", "debit", "waiver", "write_off"),
 		money("amount"),
 		field.Text("reason"),
@@ -284,10 +286,12 @@ func (Adjustment) Fields() []ent.Field {
 }
 
 func (Adjustment) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "status")}
+	return []ent.Index{index.Fields("tenant_id", "status"), index.Fields("tenant_id", "property_id", "status", "created_at"),
+		index.Fields("unit_account_id", "created_at")}
 }
 
-// BillQuery is a resident's query about a bill, handled in a finance queue.
+// BillQuery is a resident's query about a bill, handled in a finance queue. Metadata keeps what
+// the queue shows (account_ref, unit_code, invoice_number, raised_by_name, answered_by_name).
 type BillQuery struct{ ent.Schema }
 
 func (BillQuery) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
@@ -295,6 +299,7 @@ func (BillQuery) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
 func (BillQuery) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("unit_account_id", uuid.UUID{}),
+		field.UUID("property_id", uuid.UUID{}),
 		field.UUID("treasury_invoice_id", uuid.UUID{}).Optional().Nillable(),
 		field.UUID("party_id", uuid.UUID{}).Optional().Nillable(),
 		field.String("subject").NotEmpty(),
@@ -307,7 +312,8 @@ func (BillQuery) Fields() []ent.Field {
 }
 
 func (BillQuery) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "status", "due_by")}
+	return []ent.Index{index.Fields("tenant_id", "status", "due_by"), index.Fields("tenant_id", "property_id", "status", "created_at"),
+		index.Fields("unit_account_id", "created_at")}
 }
 
 // ManualPayment is money staff record that did not come through a gateway prompt or the paybill

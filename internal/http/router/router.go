@@ -335,6 +335,14 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingCollect, rbac.PermBillingVerify)).Get("/collections/manual-payments", h.ListManualPayments)
 		g.With(perm(rbac.PermBillingVerify)).Post("/manual-payments/{id}/approve", h.ApproveManualPayment)
 		g.With(perm(rbac.PermBillingVerify)).Post("/manual-payments/{id}/reject", h.RejectManualPayment)
+		// Credit notes and waivers: finance asks (billing.adjust), approvers decide by the amount rule.
+		g.With(perm(rbac.PermBillingAdjust)).Post("/unit-accounts/{id}/adjustments", h.RequestAdjustment)
+		g.With(perm(rbac.PermBillingAdjust, rbac.PermBillingApprove)).Get("/collections/adjustments", h.ListAdjustments)
+		g.With(perm(rbac.PermBillingApprove)).Post("/adjustments/{id}/approve", h.ApproveAdjustment)
+		g.With(perm(rbac.PermBillingApprove)).Post("/adjustments/{id}/reject", h.RejectAdjustment)
+		// Bill queries from residents: finance answers.
+		g.With(perm(rbac.PermBillingView)).Get("/collections/bill-queries", h.ListBillQueries)
+		g.With(perm(rbac.PermBillingAdjust, rbac.PermBillingManage)).Post("/bill-queries/{id}/answer", h.AnswerBillQuery)
 		g.With(perm(rbac.PermBillingCollect)).Post("/collections/suspense/{trans_id}/assign", h.AssignSuspense)
 		g.With(perm(rbac.PermReportsView)).Get("/reports/arrears", h.Arrears)
 		g.With(perm(rbac.PermReportsView), perm(rbac.PermReportsExport), export).Get("/reports/arrears/export", h.ArrearsExport)
@@ -429,6 +437,8 @@ func mount(r chi.Router, d Deps) {
 		m.With(export).Get("/accounts/{id}/statement/export", h.MyStatementExport)
 		m.Post("/accounts/{id}/pay", h.MyPay)
 		m.Post("/accounts/{id}/manual-payments", h.MySubmitManualPayment)
+		m.Post("/accounts/{id}/bill-queries", h.MyRaiseBillQuery)
+		m.Get("/bill-queries", h.MyBillQueries)
 		m.Get("/purchase", h.MyPurchase)
 		m.Get("/passes", h.MyPasses)
 		m.Post("/passes", h.MyCreatePass)

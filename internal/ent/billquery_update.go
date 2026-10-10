@@ -62,6 +62,20 @@ func (_u *BillQueryUpdate) SetNillableUnitAccountID(v *uuid.UUID) *BillQueryUpda
 	return _u
 }
 
+// SetPropertyID sets the "property_id" field.
+func (_u *BillQueryUpdate) SetPropertyID(v uuid.UUID) *BillQueryUpdate {
+	_u.mutation.SetPropertyID(v)
+	return _u
+}
+
+// SetNillablePropertyID sets the "property_id" field if the given value is not nil.
+func (_u *BillQueryUpdate) SetNillablePropertyID(v *uuid.UUID) *BillQueryUpdate {
+	if v != nil {
+		_u.SetPropertyID(*v)
+	}
+	return _u
+}
+
 // SetTreasuryInvoiceID sets the "treasury_invoice_id" field.
 func (_u *BillQueryUpdate) SetTreasuryInvoiceID(v uuid.UUID) *BillQueryUpdate {
 	_u.mutation.SetTreasuryInvoiceID(v)
@@ -296,6 +310,9 @@ func (_u *BillQueryUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UnitAccountID(); ok {
 		_spec.SetField(billquery.FieldUnitAccountID, field.TypeUUID, value)
 	}
+	if value, ok := _u.mutation.PropertyID(); ok {
+		_spec.SetField(billquery.FieldPropertyID, field.TypeUUID, value)
+	}
 	if value, ok := _u.mutation.TreasuryInvoiceID(); ok {
 		_spec.SetField(billquery.FieldTreasuryInvoiceID, field.TypeUUID, value)
 	}
@@ -385,6 +402,20 @@ func (_u *BillQueryUpdateOne) SetUnitAccountID(v uuid.UUID) *BillQueryUpdateOne 
 func (_u *BillQueryUpdateOne) SetNillableUnitAccountID(v *uuid.UUID) *BillQueryUpdateOne {
 	if v != nil {
 		_u.SetUnitAccountID(*v)
+	}
+	return _u
+}
+
+// SetPropertyID sets the "property_id" field.
+func (_u *BillQueryUpdateOne) SetPropertyID(v uuid.UUID) *BillQueryUpdateOne {
+	_u.mutation.SetPropertyID(v)
+	return _u
+}
+
+// SetNillablePropertyID sets the "property_id" field if the given value is not nil.
+func (_u *BillQueryUpdateOne) SetNillablePropertyID(v *uuid.UUID) *BillQueryUpdateOne {
+	if v != nil {
+		_u.SetPropertyID(*v)
 	}
 	return _u
 }
@@ -652,6 +683,9 @@ func (_u *BillQueryUpdateOne) sqlSave(ctx context.Context) (_node *BillQuery, er
 	}
 	if value, ok := _u.mutation.UnitAccountID(); ok {
 		_spec.SetField(billquery.FieldUnitAccountID, field.TypeUUID, value)
+	}
+	if value, ok := _u.mutation.PropertyID(); ok {
+		_spec.SetField(billquery.FieldPropertyID, field.TypeUUID, value)
 	}
 	if value, ok := _u.mutation.TreasuryInvoiceID(); ok {
 		_spec.SetField(billquery.FieldTreasuryInvoiceID, field.TypeUUID, value)

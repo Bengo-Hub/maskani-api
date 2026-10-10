@@ -71,6 +71,12 @@ func (_c *AdjustmentCreate) SetUnitAccountID(v uuid.UUID) *AdjustmentCreate {
 	return _c
 }
 
+// SetPropertyID sets the "property_id" field.
+func (_c *AdjustmentCreate) SetPropertyID(v uuid.UUID) *AdjustmentCreate {
+	_c.mutation.SetPropertyID(v)
+	return _c
+}
+
 // SetKind sets the "kind" field.
 func (_c *AdjustmentCreate) SetKind(v adjustment.Kind) *AdjustmentCreate {
 	_c.mutation.SetKind(v)
@@ -251,6 +257,9 @@ func (_c *AdjustmentCreate) check() error {
 	if _, ok := _c.mutation.UnitAccountID(); !ok {
 		return &ValidationError{Name: "unit_account_id", err: errors.New(`ent: missing required field "Adjustment.unit_account_id"`)}
 	}
+	if _, ok := _c.mutation.PropertyID(); !ok {
+		return &ValidationError{Name: "property_id", err: errors.New(`ent: missing required field "Adjustment.property_id"`)}
+	}
 	if _, ok := _c.mutation.Kind(); !ok {
 		return &ValidationError{Name: "kind", err: errors.New(`ent: missing required field "Adjustment.kind"`)}
 	}
@@ -331,6 +340,10 @@ func (_c *AdjustmentCreate) createSpec() (*Adjustment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UnitAccountID(); ok {
 		_spec.SetField(adjustment.FieldUnitAccountID, field.TypeUUID, value)
 		_node.UnitAccountID = value
+	}
+	if value, ok := _c.mutation.PropertyID(); ok {
+		_spec.SetField(adjustment.FieldPropertyID, field.TypeUUID, value)
+		_node.PropertyID = value
 	}
 	if value, ok := _c.mutation.Kind(); ok {
 		_spec.SetField(adjustment.FieldKind, field.TypeEnum, value)
@@ -455,6 +468,18 @@ func (u *AdjustmentUpsert) SetUnitAccountID(v uuid.UUID) *AdjustmentUpsert {
 // UpdateUnitAccountID sets the "unit_account_id" field to the value that was provided on create.
 func (u *AdjustmentUpsert) UpdateUnitAccountID() *AdjustmentUpsert {
 	u.SetExcluded(adjustment.FieldUnitAccountID)
+	return u
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *AdjustmentUpsert) SetPropertyID(v uuid.UUID) *AdjustmentUpsert {
+	u.Set(adjustment.FieldPropertyID, v)
+	return u
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *AdjustmentUpsert) UpdatePropertyID() *AdjustmentUpsert {
+	u.SetExcluded(adjustment.FieldPropertyID)
 	return u
 }
 
@@ -678,6 +703,20 @@ func (u *AdjustmentUpsertOne) SetUnitAccountID(v uuid.UUID) *AdjustmentUpsertOne
 func (u *AdjustmentUpsertOne) UpdateUnitAccountID() *AdjustmentUpsertOne {
 	return u.Update(func(s *AdjustmentUpsert) {
 		s.UpdateUnitAccountID()
+	})
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *AdjustmentUpsertOne) SetPropertyID(v uuid.UUID) *AdjustmentUpsertOne {
+	return u.Update(func(s *AdjustmentUpsert) {
+		s.SetPropertyID(v)
+	})
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *AdjustmentUpsertOne) UpdatePropertyID() *AdjustmentUpsertOne {
+	return u.Update(func(s *AdjustmentUpsert) {
+		s.UpdatePropertyID()
 	})
 }
 
@@ -1088,6 +1127,20 @@ func (u *AdjustmentUpsertBulk) SetUnitAccountID(v uuid.UUID) *AdjustmentUpsertBu
 func (u *AdjustmentUpsertBulk) UpdateUnitAccountID() *AdjustmentUpsertBulk {
 	return u.Update(func(s *AdjustmentUpsert) {
 		s.UpdateUnitAccountID()
+	})
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *AdjustmentUpsertBulk) SetPropertyID(v uuid.UUID) *AdjustmentUpsertBulk {
+	return u.Update(func(s *AdjustmentUpsert) {
+		s.SetPropertyID(v)
+	})
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *AdjustmentUpsertBulk) UpdatePropertyID() *AdjustmentUpsertBulk {
+	return u.Update(func(s *AdjustmentUpsert) {
+		s.UpdatePropertyID()
 	})
 }
 

@@ -27,6 +27,8 @@ const (
 	FieldMetadata = "metadata"
 	// FieldUnitAccountID holds the string denoting the unit_account_id field in the database.
 	FieldUnitAccountID = "unit_account_id"
+	// FieldPropertyID holds the string denoting the property_id field in the database.
+	FieldPropertyID = "property_id"
 	// FieldKind holds the string denoting the kind field in the database.
 	FieldKind = "kind"
 	// FieldAmount holds the string denoting the amount field in the database.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldMetadata,
 	FieldUnitAccountID,
+	FieldPropertyID,
 	FieldKind,
 	FieldAmount,
 	FieldReason,
@@ -174,6 +177,11 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUnitAccountID orders the results by the unit_account_id field.
 func ByUnitAccountID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUnitAccountID, opts...).ToFunc()
+}
+
+// ByPropertyID orders the results by the property_id field.
+func ByPropertyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPropertyID, opts...).ToFunc()
 }
 
 // ByKind orders the results by the kind field.

@@ -50,6 +50,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
 		{Name: "unit_account_id", Type: field.TypeUUID},
+		{Name: "property_id", Type: field.TypeUUID},
 		{Name: "kind", Type: field.TypeEnum, Enums: []string{"credit_note", "debit", "waiver", "write_off"}},
 		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
 		{Name: "reason", Type: field.TypeString, Size: 2147483647},
@@ -68,7 +69,17 @@ var (
 			{
 				Name:    "adjustment_tenant_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{AdjustmentsColumns[1], AdjustmentsColumns[11]},
+				Columns: []*schema.Column{AdjustmentsColumns[1], AdjustmentsColumns[12]},
+			},
+			{
+				Name:    "adjustment_tenant_id_property_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AdjustmentsColumns[1], AdjustmentsColumns[6], AdjustmentsColumns[12], AdjustmentsColumns[2]},
+			},
+			{
+				Name:    "adjustment_unit_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AdjustmentsColumns[5], AdjustmentsColumns[2]},
 			},
 		},
 	}
@@ -141,6 +152,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
 		{Name: "unit_account_id", Type: field.TypeUUID},
+		{Name: "property_id", Type: field.TypeUUID},
 		{Name: "treasury_invoice_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "party_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "subject", Type: field.TypeString},
@@ -159,7 +171,17 @@ var (
 			{
 				Name:    "billquery_tenant_id_status_due_by",
 				Unique:  false,
-				Columns: []*schema.Column{BillQueriesColumns[1], BillQueriesColumns[10], BillQueriesColumns[12]},
+				Columns: []*schema.Column{BillQueriesColumns[1], BillQueriesColumns[11], BillQueriesColumns[13]},
+			},
+			{
+				Name:    "billquery_tenant_id_property_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillQueriesColumns[1], BillQueriesColumns[6], BillQueriesColumns[11], BillQueriesColumns[2]},
+			},
+			{
+				Name:    "billquery_unit_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillQueriesColumns[5], BillQueriesColumns[2]},
 			},
 		},
 	}

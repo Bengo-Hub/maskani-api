@@ -75,6 +75,11 @@ func UnitAccountID(v uuid.UUID) predicate.BillQuery {
 	return predicate.BillQuery(sql.FieldEQ(FieldUnitAccountID, v))
 }
 
+// PropertyID applies equality check predicate on the "property_id" field. It's identical to PropertyIDEQ.
+func PropertyID(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldEQ(FieldPropertyID, v))
+}
+
 // TreasuryInvoiceID applies equality check predicate on the "treasury_invoice_id" field. It's identical to TreasuryInvoiceIDEQ.
 func TreasuryInvoiceID(v uuid.UUID) predicate.BillQuery {
 	return predicate.BillQuery(sql.FieldEQ(FieldTreasuryInvoiceID, v))
@@ -278,6 +283,46 @@ func UnitAccountIDLT(v uuid.UUID) predicate.BillQuery {
 // UnitAccountIDLTE applies the LTE predicate on the "unit_account_id" field.
 func UnitAccountIDLTE(v uuid.UUID) predicate.BillQuery {
 	return predicate.BillQuery(sql.FieldLTE(FieldUnitAccountID, v))
+}
+
+// PropertyIDEQ applies the EQ predicate on the "property_id" field.
+func PropertyIDEQ(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldEQ(FieldPropertyID, v))
+}
+
+// PropertyIDNEQ applies the NEQ predicate on the "property_id" field.
+func PropertyIDNEQ(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldNEQ(FieldPropertyID, v))
+}
+
+// PropertyIDIn applies the In predicate on the "property_id" field.
+func PropertyIDIn(vs ...uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldIn(FieldPropertyID, vs...))
+}
+
+// PropertyIDNotIn applies the NotIn predicate on the "property_id" field.
+func PropertyIDNotIn(vs ...uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldNotIn(FieldPropertyID, vs...))
+}
+
+// PropertyIDGT applies the GT predicate on the "property_id" field.
+func PropertyIDGT(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldGT(FieldPropertyID, v))
+}
+
+// PropertyIDGTE applies the GTE predicate on the "property_id" field.
+func PropertyIDGTE(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldGTE(FieldPropertyID, v))
+}
+
+// PropertyIDLT applies the LT predicate on the "property_id" field.
+func PropertyIDLT(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldLT(FieldPropertyID, v))
+}
+
+// PropertyIDLTE applies the LTE predicate on the "property_id" field.
+func PropertyIDLTE(v uuid.UUID) predicate.BillQuery {
+	return predicate.BillQuery(sql.FieldLTE(FieldPropertyID, v))
 }
 
 // TreasuryInvoiceIDEQ applies the EQ predicate on the "treasury_invoice_id" field.

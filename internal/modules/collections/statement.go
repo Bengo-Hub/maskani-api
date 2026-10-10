@@ -31,7 +31,7 @@ type Statement struct {
 
 // StatementEntry is one bill or payment.
 type StatementEntry struct {
-	Kind         string          `json:"kind"` // bill or payment
+	Kind         string          `json:"kind"` // bill, credit or payment
 	Date         time.Time       `json:"date"`
 	Label        string          `json:"label"`
 	Reference    string          `json:"reference,omitempty"`
@@ -66,7 +66,7 @@ func (s *Service) statement(ctx context.Context, accountID uuid.UUID, limit int)
 	return &Statement{Account: acc, Ledger: led, Entries: entries, Trimmed: trimmed, Pay: accounts.PayInstructionFor(acc.Edges.Fund, acc.AccountRef)}, nil
 }
 
-// Entries merges a ledger's bills and payments newest first and works the balance after each one
+// Entries merges a ledger's bills, credits and payments newest first and works the balance after each one
 // backwards from today's position (balance due less held credit). When a list came back full
 // (limit entries), anything older than its oldest entry is dropped: bills or payments before that
 // point are missing, so their balances would be wrong.
@@ -79,6 +79,11 @@ func Entries(led *treasury.AccountLedger, limit int) ([]StatementEntry, bool) {
 		}
 		out = append(out, StatementEntry{Kind: "bill", Date: inv.InvoiceDate, Label: label, Reference: inv.InvoiceNumber,
 			Debit: inv.TotalAmount, Status: inv.PaymentStatus})
+		// Credit notes and waivers on the bill, shown just after it so every balance stays right.
+		if inv.AmountCredited.IsPositive() {
+			out = append(out, StatementEntry{Kind: "credit", Date: inv.InvoiceDate.Add(time.Second), Label: "Credit on " + inv.InvoiceNumber,
+				Reference: inv.InvoiceNumber, Credit: inv.AmountCredited})
+		}
 	}
 	for _, p := range led.Payments {
 		label := "Payment"

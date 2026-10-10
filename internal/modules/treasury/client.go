@@ -324,10 +324,12 @@ type AccountLedger struct {
 	Balance     decimal.Decimal `json:"balance"`
 	TotalBilled decimal.Decimal `json:"total_billed"`
 	TotalPaid   decimal.Decimal `json:"total_paid"`
-	Credit      decimal.Decimal `json:"credit"`
-	LastPaidAt  *time.Time      `json:"last_paid_at,omitempty"`
-	Invoices    []LedgerInvoice `json:"invoices"`
-	Payments    []LedgerPayment `json:"payments"`
+	// TotalCredited is the credit notes raised against the account's bills.
+	TotalCredited decimal.Decimal `json:"total_credited"`
+	Credit        decimal.Decimal `json:"credit"`
+	LastPaidAt    *time.Time      `json:"last_paid_at,omitempty"`
+	Invoices      []LedgerInvoice `json:"invoices"`
+	Payments      []LedgerPayment `json:"payments"`
 }
 
 // LedgerInvoice is one invoice line in the account ledger.
@@ -338,9 +340,11 @@ type LedgerInvoice struct {
 	DueDate       time.Time       `json:"due_date"`
 	TotalAmount   decimal.Decimal `json:"total_amount"`
 	AmountPaid    decimal.Decimal `json:"amount_paid"`
-	PaymentStatus string          `json:"payment_status"`
-	PublicToken   uuid.UUID       `json:"public_token"`
-	Description   string          `json:"description"`
+	// AmountCredited is the credit notes raised against this bill.
+	AmountCredited decimal.Decimal `json:"amount_credited"`
+	PaymentStatus  string          `json:"payment_status"`
+	PublicToken    uuid.UUID       `json:"public_token"`
+	Description    string          `json:"description"`
 }
 
 // LedgerPayment is one payment applied to the account.
@@ -361,6 +365,28 @@ func (c *Client) Ledger(ctx context.Context, tenantID uuid.UUID, accountRef stri
 		return nil, err
 	}
 	return &out, nil
+}
+
+// CreditNoteLine is one credited line on a credit note.
+type CreditNoteLine struct {
+	Description string          `json:"description"`
+	Quantity    decimal.Decimal `json:"quantity"`
+	UnitPrice   decimal.Decimal `json:"unit_price"`
+	TaxRate     decimal.Decimal `json:"tax_rate"`
+}
+
+// CreateCreditNote credits part of an unpaid bill (POST /s2s/{tenant}/invoices/{id}/create-credit-note).
+// Treasury refuses more than the bill still owes and carries the bill's account_ref onto the note,
+// so the account ledger nets it off. Returns the credit note id and number.
+func (c *Client) CreateCreditNote(ctx context.Context, tenantID, invoiceID uuid.UUID, lines []CreditNoteLine, idem string) (uuid.UUID, string, error) {
+	var out struct {
+		ID            uuid.UUID `json:"id"`
+		InvoiceNumber string    `json:"invoice_number"`
+	}
+	if err := c.post(ctx, tenantID, "/invoices/"+invoiceID.String()+"/create-credit-note", idem, map[string]any{"lines": lines}, &out); err != nil {
+		return uuid.Nil, "", err
+	}
+	return out.ID, out.InvoiceNumber, nil
 }
 
 // ManualPaymentRequest books a verified bank, cash, cheque or typed M-Pesa payment against an

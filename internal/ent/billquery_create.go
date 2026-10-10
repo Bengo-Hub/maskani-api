@@ -70,6 +70,12 @@ func (_c *BillQueryCreate) SetUnitAccountID(v uuid.UUID) *BillQueryCreate {
 	return _c
 }
 
+// SetPropertyID sets the "property_id" field.
+func (_c *BillQueryCreate) SetPropertyID(v uuid.UUID) *BillQueryCreate {
+	_c.mutation.SetPropertyID(v)
+	return _c
+}
+
 // SetTreasuryInvoiceID sets the "treasury_invoice_id" field.
 func (_c *BillQueryCreate) SetTreasuryInvoiceID(v uuid.UUID) *BillQueryCreate {
 	_c.mutation.SetTreasuryInvoiceID(v)
@@ -259,6 +265,9 @@ func (_c *BillQueryCreate) check() error {
 	if _, ok := _c.mutation.UnitAccountID(); !ok {
 		return &ValidationError{Name: "unit_account_id", err: errors.New(`ent: missing required field "BillQuery.unit_account_id"`)}
 	}
+	if _, ok := _c.mutation.PropertyID(); !ok {
+		return &ValidationError{Name: "property_id", err: errors.New(`ent: missing required field "BillQuery.property_id"`)}
+	}
 	if _, ok := _c.mutation.Subject(); !ok {
 		return &ValidationError{Name: "subject", err: errors.New(`ent: missing required field "BillQuery.subject"`)}
 	}
@@ -333,6 +342,10 @@ func (_c *BillQueryCreate) createSpec() (*BillQuery, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UnitAccountID(); ok {
 		_spec.SetField(billquery.FieldUnitAccountID, field.TypeUUID, value)
 		_node.UnitAccountID = value
+	}
+	if value, ok := _c.mutation.PropertyID(); ok {
+		_spec.SetField(billquery.FieldPropertyID, field.TypeUUID, value)
+		_node.PropertyID = value
 	}
 	if value, ok := _c.mutation.TreasuryInvoiceID(); ok {
 		_spec.SetField(billquery.FieldTreasuryInvoiceID, field.TypeUUID, value)
@@ -457,6 +470,18 @@ func (u *BillQueryUpsert) SetUnitAccountID(v uuid.UUID) *BillQueryUpsert {
 // UpdateUnitAccountID sets the "unit_account_id" field to the value that was provided on create.
 func (u *BillQueryUpsert) UpdateUnitAccountID() *BillQueryUpsert {
 	u.SetExcluded(billquery.FieldUnitAccountID)
+	return u
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *BillQueryUpsert) SetPropertyID(v uuid.UUID) *BillQueryUpsert {
+	u.Set(billquery.FieldPropertyID, v)
+	return u
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *BillQueryUpsert) UpdatePropertyID() *BillQueryUpsert {
+	u.SetExcluded(billquery.FieldPropertyID)
 	return u
 }
 
@@ -686,6 +711,20 @@ func (u *BillQueryUpsertOne) SetUnitAccountID(v uuid.UUID) *BillQueryUpsertOne {
 func (u *BillQueryUpsertOne) UpdateUnitAccountID() *BillQueryUpsertOne {
 	return u.Update(func(s *BillQueryUpsert) {
 		s.UpdateUnitAccountID()
+	})
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *BillQueryUpsertOne) SetPropertyID(v uuid.UUID) *BillQueryUpsertOne {
+	return u.Update(func(s *BillQueryUpsert) {
+		s.SetPropertyID(v)
+	})
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *BillQueryUpsertOne) UpdatePropertyID() *BillQueryUpsertOne {
+	return u.Update(func(s *BillQueryUpsert) {
+		s.UpdatePropertyID()
 	})
 }
 
@@ -1103,6 +1142,20 @@ func (u *BillQueryUpsertBulk) SetUnitAccountID(v uuid.UUID) *BillQueryUpsertBulk
 func (u *BillQueryUpsertBulk) UpdateUnitAccountID() *BillQueryUpsertBulk {
 	return u.Update(func(s *BillQueryUpsert) {
 		s.UpdateUnitAccountID()
+	})
+}
+
+// SetPropertyID sets the "property_id" field.
+func (u *BillQueryUpsertBulk) SetPropertyID(v uuid.UUID) *BillQueryUpsertBulk {
+	return u.Update(func(s *BillQueryUpsert) {
+		s.SetPropertyID(v)
+	})
+}
+
+// UpdatePropertyID sets the "property_id" field to the value that was provided on create.
+func (u *BillQueryUpsertBulk) UpdatePropertyID() *BillQueryUpsertBulk {
+	return u.Update(func(s *BillQueryUpsert) {
+		s.UpdatePropertyID()
 	})
 }
 

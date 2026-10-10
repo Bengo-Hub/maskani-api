@@ -64,6 +64,20 @@ func (_u *AdjustmentUpdate) SetNillableUnitAccountID(v *uuid.UUID) *AdjustmentUp
 	return _u
 }
 
+// SetPropertyID sets the "property_id" field.
+func (_u *AdjustmentUpdate) SetPropertyID(v uuid.UUID) *AdjustmentUpdate {
+	_u.mutation.SetPropertyID(v)
+	return _u
+}
+
+// SetNillablePropertyID sets the "property_id" field if the given value is not nil.
+func (_u *AdjustmentUpdate) SetNillablePropertyID(v *uuid.UUID) *AdjustmentUpdate {
+	if v != nil {
+		_u.SetPropertyID(*v)
+	}
+	return _u
+}
+
 // SetKind sets the "kind" field.
 func (_u *AdjustmentUpdate) SetKind(v adjustment.Kind) *AdjustmentUpdate {
 	_u.mutation.SetKind(v)
@@ -291,6 +305,9 @@ func (_u *AdjustmentUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.UnitAccountID(); ok {
 		_spec.SetField(adjustment.FieldUnitAccountID, field.TypeUUID, value)
 	}
+	if value, ok := _u.mutation.PropertyID(); ok {
+		_spec.SetField(adjustment.FieldPropertyID, field.TypeUUID, value)
+	}
 	if value, ok := _u.mutation.Kind(); ok {
 		_spec.SetField(adjustment.FieldKind, field.TypeEnum, value)
 	}
@@ -382,6 +399,20 @@ func (_u *AdjustmentUpdateOne) SetUnitAccountID(v uuid.UUID) *AdjustmentUpdateOn
 func (_u *AdjustmentUpdateOne) SetNillableUnitAccountID(v *uuid.UUID) *AdjustmentUpdateOne {
 	if v != nil {
 		_u.SetUnitAccountID(*v)
+	}
+	return _u
+}
+
+// SetPropertyID sets the "property_id" field.
+func (_u *AdjustmentUpdateOne) SetPropertyID(v uuid.UUID) *AdjustmentUpdateOne {
+	_u.mutation.SetPropertyID(v)
+	return _u
+}
+
+// SetNillablePropertyID sets the "property_id" field if the given value is not nil.
+func (_u *AdjustmentUpdateOne) SetNillablePropertyID(v *uuid.UUID) *AdjustmentUpdateOne {
+	if v != nil {
+		_u.SetPropertyID(*v)
 	}
 	return _u
 }
@@ -642,6 +673,9 @@ func (_u *AdjustmentUpdateOne) sqlSave(ctx context.Context) (_node *Adjustment, 
 	}
 	if value, ok := _u.mutation.UnitAccountID(); ok {
 		_spec.SetField(adjustment.FieldUnitAccountID, field.TypeUUID, value)
+	}
+	if value, ok := _u.mutation.PropertyID(); ok {
+		_spec.SetField(adjustment.FieldPropertyID, field.TypeUUID, value)
 	}
 	if value, ok := _u.mutation.Kind(); ok {
 		_spec.SetField(adjustment.FieldKind, field.TypeEnum, value)

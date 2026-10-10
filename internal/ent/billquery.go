@@ -29,6 +29,8 @@ type BillQuery struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// UnitAccountID holds the value of the "unit_account_id" field.
 	UnitAccountID uuid.UUID `json:"unit_account_id,omitempty"`
+	// PropertyID holds the value of the "property_id" field.
+	PropertyID uuid.UUID `json:"property_id,omitempty"`
 	// TreasuryInvoiceID holds the value of the "treasury_invoice_id" field.
 	TreasuryInvoiceID *uuid.UUID `json:"treasury_invoice_id,omitempty"`
 	// PartyID holds the value of the "party_id" field.
@@ -61,7 +63,7 @@ func (*BillQuery) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case billquery.FieldCreatedAt, billquery.FieldUpdatedAt, billquery.FieldDueBy:
 			values[i] = new(sql.NullTime)
-		case billquery.FieldID, billquery.FieldTenantID, billquery.FieldUnitAccountID:
+		case billquery.FieldID, billquery.FieldTenantID, billquery.FieldUnitAccountID, billquery.FieldPropertyID:
 			values[i] = new(uuid.UUID)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -115,6 +117,12 @@ func (_m *BillQuery) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field unit_account_id", values[i])
 			} else if value != nil {
 				_m.UnitAccountID = *value
+			}
+		case billquery.FieldPropertyID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field property_id", values[i])
+			} else if value != nil {
+				_m.PropertyID = *value
 			}
 		case billquery.FieldTreasuryInvoiceID:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -218,6 +226,9 @@ func (_m *BillQuery) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("unit_account_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UnitAccountID))
+	builder.WriteString(", ")
+	builder.WriteString("property_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PropertyID))
 	builder.WriteString(", ")
 	if v := _m.TreasuryInvoiceID; v != nil {
 		builder.WriteString("treasury_invoice_id=")
