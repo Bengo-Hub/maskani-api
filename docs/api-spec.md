@@ -72,10 +72,10 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET, POST `/properties`; GET, PATCH `/properties/{id}` | Properties (POST creates the auth-api outlet with the caller's token). `use_case` (a preset code) and `module_overrides` (`{module: true or false}` over the preset) decide the property's modules; changing either on PATCH needs `settings.manage` | `properties.view` / `properties.manage` |
+| GET, POST `/properties`; GET, PATCH `/properties/{id}` | Properties (POST creates the auth-api outlet with the caller's token). `use_case` (a preset code) and `module_overrides` (`{module: true or false}` over the preset) decide the property's modules; changing either on PATCH needs `settings.manage`. `photos` is the gallery in order (first is the cover, up to 12), each a key uploaded with `kind=properties` | `properties.view` / `properties.manage` |
 | POST `/properties/{id}/blocks` | Add a block | `properties.manage` |
 | GET `/properties/{id}/staff`; POST `/properties/{id}/staff` `{auth_user_id, property_role, erp_employee_id}`; DELETE `/staff-assignments/{id}` | Staff per property | `users.view` / `users.manage` |
-| GET `/units` (keyset; `property_id`, `block_id`, `sale_status`, `occupancy_status`, `q`); POST `/units`; GET, PATCH `/units/{id}` | Units with owner name and balance | `units.view` / `units.manage` |
+| GET `/units` (keyset; `property_id`, `block_id`, `sale_status`, `occupancy_status`, `q`); POST `/units`; GET, PATCH `/units/{id}` | Units with owner name and balance. `photos` on PATCH: up to 12 keys uploaded with `kind=units` | `units.view` / `units.manage` |
 | POST `/units/{id}/parties` `{party_id, role, ownership_share, is_primary, start_date, end_date, bill_to, source}`; POST `/unit-parties/{id}/end` `{end_date}` | Ownerships and occupancies | `parties.manage` |
 | POST `/units/{id}/vehicles` `{party_id, plate, make, model, colour}` | Vehicles | `parties.manage` |
 | GET `/parties` (keyset; `q`); POST `/parties`; GET, PATCH `/parties/{id}`; POST `/parties/{id}/invite` | Parties (identity numbers masked) | `parties.view` / `parties.manage` |
@@ -281,3 +281,9 @@ their properties only.
 | GET `/estates/{slug}` | Published estate with units for sale and prices |
 | POST `/enquiries` | Enquiry (5 a minute per IP) |
 | GET `/units/{id}` | planned (sprint 8) |
+
+## Media visibility
+Estate and unit photos (`kind=properties` and `kind=units`) are published images: `/media/...` serves
+them without a signature, with immutable caching, and the market projection returns them as absolute
+links. Every other kind (documents, readings, works, incidents, vendors, evidence) needs a signed
+link from `POST /media/sign` and is never cached by shared caches.

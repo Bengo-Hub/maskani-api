@@ -20,6 +20,7 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/http/handlers"
+	"github.com/bengobox/maskani-api/internal/modules/market"
 	mw "github.com/bengobox/maskani-api/internal/http/middleware"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
@@ -73,7 +74,8 @@ func New(d Deps) http.Handler {
 
 	if d.MediaRoot != "" {
 		r.Handle("/media/*", http.StripPrefix("/media", httpware.StaticMedia(d.MediaRoot, httpware.MediaOptions{
-			Private: func(string) bool { return true },
+			// Estate and unit photos are published images; every other upload needs a signed link.
+			Private: func(name string) bool { return !market.PublicMediaKind(name) },
 			Signer:  d.MediaSigner,
 		})))
 	}

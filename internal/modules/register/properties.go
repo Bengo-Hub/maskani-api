@@ -53,6 +53,7 @@ type PropertyInput struct {
 	YearBuilt       *int            `json:"year_built"`
 	Phases          []string        `json:"phases"`
 	Amenities       []string        `json:"amenities"`
+	Photos          []string        `json:"photos"`
 	ModuleOverrides map[string]bool `json:"module_overrides"`
 	Published       *bool           `json:"published"`
 	PublicSlug      *string         `json:"public_slug"`
@@ -196,6 +197,13 @@ func (s *Service) UpdateProperty(ctx context.Context, id uuid.UUID, in PropertyI
 	}
 	if in.Amenities != nil {
 		u.SetAmenities(in.Amenities)
+	}
+	if in.Photos != nil {
+		photos, err := cleanPhotos(ctx, "properties", in.Photos)
+		if err != nil {
+			return nil, err
+		}
+		u.SetPhotos(photos)
 	}
 	if in.ModuleOverrides != nil {
 		u.SetModuleOverrides(in.ModuleOverrides)

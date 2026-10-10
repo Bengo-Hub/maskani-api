@@ -37,6 +37,7 @@ type UnitInput struct {
 	OccupancyStatus *string        `json:"occupancy_status"`
 	Rentable        *bool          `json:"rentable"`
 	Features        []string       `json:"features"`
+	Photos          []string       `json:"photos"`
 	WalkingOrder    *int           `json:"walking_order"`
 	Status          *string        `json:"status"`
 	CustomFields    map[string]any `json:"custom_fields"`
@@ -158,6 +159,13 @@ func (s *Service) UpdateUnit(ctx context.Context, id uuid.UUID, in UnitInput) (*
 	}
 	if in.Features != nil {
 		u.SetFeatures(in.Features)
+	}
+	if in.Photos != nil {
+		photos, err := cleanPhotos(ctx, "units", in.Photos)
+		if err != nil {
+			return nil, err
+		}
+		u.SetPhotos(photos)
 	}
 	if in.WalkingOrder != nil {
 		u.SetWalkingOrder(*in.WalkingOrder)

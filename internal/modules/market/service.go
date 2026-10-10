@@ -25,14 +25,35 @@ import (
 
 // Service is the public market service.
 type Service struct {
-	client *ent.Client
-	box    *secure.Box
-	log    *zap.Logger
+	client    *ent.Client
+	box       *secure.Box
+	log       *zap.Logger
+	mediaBase string
 }
 
-// NewService creates the market service.
-func NewService(client *ent.Client, box *secure.Box, log *zap.Logger) *Service {
-	return &Service{client: client, box: box, log: log.Named("market")}
+// NewService creates the market service. mediaBase is the API's public origin (MEDIA_URL_BASE),
+// so photo keys go out as absolute links the public site can load.
+func NewService(client *ent.Client, box *secure.Box, log *zap.Logger, mediaBase string) *Service {
+	return &Service{client: client, box: box, log: log.Named("market"), mediaBase: strings.TrimRight(mediaBase, "/")}
+}
+
+// PublicMediaKind reports whether a media key holds estate or unit photos, the only uploads served
+// without a signed link (they are published marketing images under unguessable names).
+func PublicMediaKind(key string) bool {
+	parts := strings.SplitN(strings.TrimPrefix(key, "/"), "/", 4)
+	return len(parts) == 4 && parts[0] == "tenants" && (parts[2] == "properties" || parts[2] == "units")
+}
+
+// photoURLs turns stored photo keys into public links; anything else (another kind, a stray
+// value) is left out, so no private key reaches the public site.
+func (s *Service) photoURLs(keys []string) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if PublicMediaKind(k) && !strings.Contains(k, "..") {
+			out = append(out, s.mediaBase+"/media/"+k)
+		}
+	}
+	return out
 }
 
 // PublicUnit is the published view of a unit for sale.
@@ -157,14 +178,14 @@ func (s *Service) estates(ctx context.Context, props []*ent.Property, withUnits 
 		// The description may be editor HTML; the public site gets readable plain text.
 		out[i] = PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name,
 			Description: richtext.PlainText(p.Description), Area: p.Area, Town: p.Town, County: p.County,
-			Latitude: p.Latitude, Longitude: p.Longitude, Amenities: p.Amenities, Photos: p.Photos, Verified: true,
+			Latitude: p.Latitude, Longitude: p.Longitude, Amenities: p.Amenities, Photos: s.photoURLs(p.Photos), Verified: true,
 			Units: []PublicUnit{}}
 		index[p.ID] = i
 	}
 	for _, u := range units {
 		e := &out[index[u.PropertyID]]
 		pu := PublicUnit{ID: u.ID, Code: u.Code, UnitType: u.UnitType, Bedrooms: u.Bedrooms, Bathrooms: u.Bathrooms,
-			SizeSqm: u.SizeSqm, Floor: u.Floor, Status: string(u.SaleStatus), Features: u.Features, Photos: u.Photos}
+			SizeSqm: u.SizeSqm, Floor: u.Floor, Status: string(u.SaleStatus), Features: u.Features, Photos: s.photoURLs(u.Photos)}
 		if it := byProp[u.PropertyID].find(u); it != nil {
 			price, fee := it.Price, it.ReservationFee
 			pu.Price, pu.ReservationFee, pu.DepositPct, pu.MaxTermMonths = &price, &fee, it.DepositPct, it.MaxTermMonths

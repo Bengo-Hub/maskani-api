@@ -177,7 +177,7 @@ func New(ctx context.Context) (*App, error) {
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
 	portalSvc := portal.NewService(orm, log)
-	marketSvc := market.NewService(orm, box, log)
+	marketSvc := market.NewService(orm, box, log, cfg.Media.URLBase)
 
 	consumer := collections.NewConsumer(orm, collSvc, salesSvc.SyncProgress, loc, log)
 	consumer.OnApplied = reportSvc.Invalidate
