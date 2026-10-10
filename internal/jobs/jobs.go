@@ -137,6 +137,10 @@ func New(d Deps) *Runner {
 			if err != nil || len(on) == 0 {
 				return err
 			}
+			// Payment plans first, so a plan broken today releases the ladder on the same run.
+			if _, err := d.Reminders.CheckPlans(ctx, on, time.Now(), 500); err != nil {
+				log.Warn("payment plan check", zap.Error(err))
+			}
 			n, err := d.Reminders.RunLadder(ctx, on, time.Now())
 			if n > 0 {
 				log.Info("collections steps run", zap.Int("steps", n))

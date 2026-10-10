@@ -53,11 +53,40 @@ func (h *H) AddCollectionNote(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
-	by := access(r).Email
-	if u := access(r).LocalUser; u != nil && u.Name != "" {
-		by = u.Name
+	l, err := h.Reminders.AddNote(r.Context(), id, displayName(r), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
 	}
-	l, err := h.Reminders.AddNote(r.Context(), id, by, in)
+	httpx.JSON(w, http.StatusOK, l)
+}
+
+// SetPaymentPlan is PUT /unit-accounts/{id}/payment-plan {instalments: [{due, amount}], note}: an
+// agreed plan for the arrears; while active it holds back the demand letter and escalation.
+func (h *H) SetPaymentPlan(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok || !h.accountScope(w, r, id) {
+		return
+	}
+	var in reminders.PlanInput
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	l, err := h.Reminders.SetPlan(r.Context(), id, displayName(r), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, l)
+}
+
+// CancelPaymentPlan is DELETE /unit-accounts/{id}/payment-plan.
+func (h *H) CancelPaymentPlan(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok || !h.accountScope(w, r, id) {
+		return
+	}
+	l, err := h.Reminders.CancelPlan(r.Context(), id, displayName(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

@@ -24,6 +24,7 @@ envelope first and are idempotent on event ID.
 | `maskani.adjustment.applied` | The treasury credit note was raised | adjustment_id, account_ref, kind, amount, credit_note_number | notifications (optional) |
 | `maskani.bill_query.raised` | A resident queried a bill | bill_query_id, account_ref, unit_code, subject, invoice_number, raised_by, due_by, property, responders (finance and managers) | staff alert |
 | `maskani.bill_query.answered` | Finance resolved or rejected a query | bill_query_id, account_ref, subject, status, resolution, invoice_number, name, phone, email | notifications to the resident |
+| `maskani.payment_plan.broken` | An agreed payment plan fell behind (an instalment more than 3 days late) | account_ref, unit_code, name, total, paid, balance, property, responders (finance and managers) | staff alert |
 | `maskani.sale_contract.activated`, `.defaulted`, `.fully_paid` | Contract state changes | contract, unit, buyer | notifications, dashboard |
 | `maskani.unit.handed_over` | Handover completed | unit, owner, date | estate billing start, welcome message |
 | `maskani.work_order.created`, `.assigned`, `.completed`, `.sla_breached` | Works lifecycle | number, priority, unit, assignee, due | notifications to requester, assignee, manager |

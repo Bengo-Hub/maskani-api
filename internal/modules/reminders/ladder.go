@@ -74,6 +74,8 @@ type Ladder struct {
 	// PromiseDate pauses the demand letter and escalation until it passes.
 	PromiseDate string `json:"promise_date,omitempty"`
 	Notes       []Note `json:"notes,omitempty"`
+	// Plan is an agreed payment plan; while active it holds back the letter and escalation too.
+	Plan *Plan `json:"plan,omitempty"`
 }
 
 // Note is one collections call or contact.
@@ -110,7 +112,7 @@ func (s *Service) writeLadder(ctx context.Context, acc *ent.UnitAccount, l Ladde
 // next picks the step to run for a debt of age days: the highest step reached and not yet done.
 // Lower steps missed (a new estate, a long outage) are marked done without sending, so an owner
 // never gets three reminders in one go. A promise to pay holds back the demand letter and
-// escalation until the promised date passes.
+// escalation until the promised date passes, and an active payment plan holds them while it lasts.
 func next(steps []settings.ArrearsStep, l Ladder, age int, today string) (settings.ArrearsStep, []int, bool) {
 	done := map[int]bool{}
 	for _, d := range l.Done {
@@ -123,7 +125,7 @@ func next(steps []settings.ArrearsStep, l Ladder, age int, today string) (settin
 		if st.Day > age || done[st.Day] {
 			continue
 		}
-		held := l.PromiseDate != "" && l.PromiseDate >= today &&
+		held := ((l.PromiseDate != "" && l.PromiseDate >= today) || l.Plan.active()) &&
 			(st.Action == settings.ArrearsDemandLetter || st.Action == settings.ArrearsEscalate)
 		if held {
 			continue
@@ -235,7 +237,7 @@ func (s *Service) runTenant(ctx context.Context, tenantID uuid.UUID, now time.Ti
 		episode := oldest.Format("2006-01-02")
 		if l.Episode != episode {
 			// Paid down to a newer bill (or a first debt): the ladder starts over; notes stay.
-			l = Ladder{Episode: episode, Notes: l.Notes}
+			l = Ladder{Episode: episode, Notes: l.Notes, Plan: l.Plan}
 		}
 		if l.LastDay == today {
 			continue

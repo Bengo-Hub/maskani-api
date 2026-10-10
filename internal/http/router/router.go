@@ -329,6 +329,8 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermBillingCollect)).Get("/collections/call-list", h.CallList)
 		g.With(perm(rbac.PermBillingView)).Get("/unit-accounts/{id}/collections", h.AccountCollections)
 		g.With(perm(rbac.PermBillingCollect)).Post("/unit-accounts/{id}/collection-notes", h.AddCollectionNote)
+		g.With(perm(rbac.PermBillingCollect)).Put("/unit-accounts/{id}/payment-plan", h.SetPaymentPlan)
+		g.With(perm(rbac.PermBillingCollect)).Delete("/unit-accounts/{id}/payment-plan", h.CancelPaymentPlan)
 		// Manual payments: staff record, reviewers (billing.verify) approve or reject.
 		g.With(perm(rbac.PermBillingCollect)).Post("/unit-accounts/{id}/manual-payments", h.SubmitManualPayment)
 		g.With(perm(rbac.PermBillingCollect)).Post("/collections/bank-lines", h.ImportBankLines)
