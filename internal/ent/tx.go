@@ -72,6 +72,8 @@ type Tx struct {
 	InstalmentSchedule *InstalmentScheduleClient
 	// MaintenanceSchedule is the client for interacting with the MaintenanceSchedule builders.
 	MaintenanceSchedule *MaintenanceScheduleClient
+	// ManualPayment is the client for interacting with the ManualPayment builders.
+	ManualPayment *ManualPaymentClient
 	// MaskaniPermission is the client for interacting with the MaskaniPermission builders.
 	MaskaniPermission *MaskaniPermissionClient
 	// MaskaniRole is the client for interacting with the MaskaniRole builders.
@@ -323,6 +325,7 @@ func (tx *Tx) init() {
 	tx.Instalment = NewInstalmentClient(tx.config)
 	tx.InstalmentSchedule = NewInstalmentScheduleClient(tx.config)
 	tx.MaintenanceSchedule = NewMaintenanceScheduleClient(tx.config)
+	tx.ManualPayment = NewManualPaymentClient(tx.config)
 	tx.MaskaniPermission = NewMaskaniPermissionClient(tx.config)
 	tx.MaskaniRole = NewMaskaniRoleClient(tx.config)
 	tx.MaskaniUser = NewMaskaniUserClient(tx.config)

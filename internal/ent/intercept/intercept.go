@@ -38,6 +38,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/maintenanceschedule"
+	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
 	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
@@ -950,6 +951,33 @@ func (f TraverseMaintenanceSchedule) Traverse(ctx context.Context, q ent.Query) 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.MaintenanceScheduleQuery", q)
+}
+
+// The ManualPaymentFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ManualPaymentFunc func(context.Context, *ent.ManualPaymentQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ManualPaymentFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ManualPaymentQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ManualPaymentQuery", q)
+}
+
+// The TraverseManualPayment type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseManualPayment func(context.Context, *ent.ManualPaymentQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseManualPayment) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseManualPayment) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ManualPaymentQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ManualPaymentQuery", q)
 }
 
 // The MaskaniPermissionFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -2230,6 +2258,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.InstalmentScheduleQuery, predicate.InstalmentSchedule, instalmentschedule.OrderOption]{typ: ent.TypeInstalmentSchedule, tq: q}, nil
 	case *ent.MaintenanceScheduleQuery:
 		return &query[*ent.MaintenanceScheduleQuery, predicate.MaintenanceSchedule, maintenanceschedule.OrderOption]{typ: ent.TypeMaintenanceSchedule, tq: q}, nil
+	case *ent.ManualPaymentQuery:
+		return &query[*ent.ManualPaymentQuery, predicate.ManualPayment, manualpayment.OrderOption]{typ: ent.TypeManualPayment, tq: q}, nil
 	case *ent.MaskaniPermissionQuery:
 		return &query[*ent.MaskaniPermissionQuery, predicate.MaskaniPermission, maskanipermission.OrderOption]{typ: ent.TypeMaskaniPermission, tq: q}, nil
 	case *ent.MaskaniRoleQuery:

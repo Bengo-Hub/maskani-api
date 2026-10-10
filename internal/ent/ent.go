@@ -42,6 +42,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/maintenanceschedule"
+	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
 	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
@@ -177,6 +178,7 @@ func checkColumn(t, c string) error {
 			instalment.Table:          instalment.ValidColumn,
 			instalmentschedule.Table:  instalmentschedule.ValidColumn,
 			maintenanceschedule.Table: maintenanceschedule.ValidColumn,
+			manualpayment.Table:       manualpayment.ValidColumn,
 			maskanipermission.Table:   maskanipermission.ValidColumn,
 			maskanirole.Table:         maskanirole.ValidColumn,
 			maskaniuser.Table:         maskaniuser.ValidColumn,

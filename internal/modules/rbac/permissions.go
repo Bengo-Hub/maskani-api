@@ -22,6 +22,7 @@ const (
 	PermBillingCollect   = "maskani.billing.collect"
 	PermBillingAdjust    = "maskani.billing.adjust"
 	PermBillingApprove   = "maskani.billing.approve"
+	PermBillingVerify    = "maskani.billing.verify"
 	PermUtilitiesRead    = "maskani.utilities.read"
 	PermUtilitiesView    = "maskani.utilities.view"
 	PermUtilitiesManage  = "maskani.utilities.manage"
@@ -72,6 +73,7 @@ var Catalogue = []PermissionDef{
 	{PermBillingCollect, "Record and assign payments", "billing", "collect"},
 	{PermBillingAdjust, "Request credit notes and adjustments", "billing", "adjust"},
 	{PermBillingApprove, "Approve credit notes and adjustments", "billing", "approve"},
+	{PermBillingVerify, "Verify recorded bank, cash and cheque payments", "billing", "verify"},
 	{PermUtilitiesRead, "Capture meter readings", "utilities", "read"},
 	{PermUtilitiesView, "View meters, readings and water balance", "utilities", "view"},
 	{PermUtilitiesManage, "Manage meters and verify readings", "utilities", "manage"},
@@ -103,6 +105,7 @@ var ImpliedBy = map[string]string{
 	PermDocumentsView:  PermDocumentsManage,
 	PermDocumentsIssue: PermDocumentsManage,
 	PermReportsExport:  PermReportsView,
+	PermBillingVerify:  PermBillingApprove,
 }
 
 // RoleDef describes a seeded system role.
@@ -145,7 +148,7 @@ var Roles = []RoleDef{
 		PermSettingsView, PermUsersView, PermPropertiesView, PermPropertiesManage, PermUnitsView, PermUnitsManage,
 		PermPartiesView, PermPartiesManage, PermImportsRun, PermBillingView, PermUtilitiesView, PermUtilitiesManage,
 		PermUtilitiesRead, PermSalesView, PermWorksView, PermWorksManage, PermVendorsView, PermVendorsManage,
-		PermGateView, PermGateManage, PermGatePasses, PermNoticesView, PermNoticesManage, PermDocumentsView,
+		PermGateView, PermGateManage, PermGatePasses, PermNoticesView, PermNoticesManage, PermDocumentsView, PermBillingVerify,
 		PermDocumentsIssue, PermDocumentsManage, PermReportsView, PermReportsExport,
 	}},
 	{RoleFinanceOfficer, "Finance officer", "Billing, collections and adjustments", false, []string{
@@ -159,7 +162,7 @@ var Roles = []RoleDef{
 	}},
 	{RoleCaretaker, "Caretaker", "On-site readings, work orders, resident requests and notices", false, []string{
 		PermPropertiesView, PermUnitsView, PermPartiesView, PermUtilitiesRead, PermUtilitiesView, PermWorksView,
-		PermWorksManage, PermGateView, PermGatePasses, PermNoticesView, PermNoticesManage,
+		PermWorksManage, PermGateView, PermGatePasses, PermNoticesView, PermNoticesManage, PermBillingVerify,
 	}},
 	{RoleSecurityManager, "Security manager", "Gate, passes, patrols and incidents", false, []string{
 		PermPropertiesView, PermUnitsView, PermGateView, PermGateManage, PermGatePasses, PermVendorsView, PermNoticesView,

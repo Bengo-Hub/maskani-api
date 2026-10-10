@@ -19,9 +19,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
 	"github.com/bengobox/maskani-api/internal/ent/billingrunline"
-	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/dailystat"
 	"github.com/bengobox/maskani-api/internal/ent/fund"
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"

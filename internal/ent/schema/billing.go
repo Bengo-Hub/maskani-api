@@ -309,3 +309,43 @@ func (BillQuery) Fields() []ent.Field {
 func (BillQuery) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "status", "due_by")}
 }
+
+// ManualPayment is money staff record that did not come through a gateway prompt or the paybill
+// route: a bank transfer, cash, a cheque, or an M-Pesa payment typed in from a statement. It
+// waits for review; a property manager or caretaker who can verify (billing.verify) approves it,
+// and only then is it booked in treasury against the account. The submitter cannot approve their
+// own entry.
+type ManualPayment struct{ ent.Schema }
+
+func (ManualPayment) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
+
+func (ManualPayment) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("unit_account_id", uuid.UUID{}),
+		field.UUID("property_id", uuid.UUID{}),
+		money("amount"),
+		field.Enum("method").Values("bank_transfer", "cash", "cheque", "mpesa"),
+		field.String("reference").NotEmpty().Comment("bank slip, cheque number, receipt or M-Pesa code"),
+		field.Time("paid_on").SchemaType(map[string]string{"postgres": "date"}),
+		field.String("payer_name").Optional(),
+		field.Text("note").Optional(),
+		field.String("evidence_key").Optional().Comment("media key of a slip or cheque photo"),
+		field.Enum("status").Values("pending", "approved", "rejected").Default("pending"),
+		field.UUID("submitted_by", uuid.UUID{}),
+		field.String("submitted_by_name").Optional(),
+		field.UUID("reviewed_by", uuid.UUID{}).Optional().Nillable(),
+		field.String("reviewed_by_name").Optional(),
+		field.Time("reviewed_at").Optional().Nillable(),
+		field.Text("review_note").Optional(),
+		field.UUID("treasury_intent_id", uuid.UUID{}).Optional().Nillable(),
+	}
+}
+
+func (ManualPayment) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("tenant_id", "status", "created_at"),
+		index.Fields("tenant_id", "unit_account_id", "created_at"),
+		// One slip once: a rejected entry can be corrected and submitted again.
+		index.Fields("tenant_id", "method", "reference").Unique().Annotations(entsql.IndexWhere("status <> 'rejected'")),
+	}
+}

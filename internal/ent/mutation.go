@@ -42,6 +42,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/maintenanceschedule"
+	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
 	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
@@ -131,6 +132,7 @@ const (
 	TypeInstalment          = "Instalment"
 	TypeInstalmentSchedule  = "InstalmentSchedule"
 	TypeMaintenanceSchedule = "MaintenanceSchedule"
+	TypeManualPayment       = "ManualPayment"
 	TypeMaskaniPermission   = "MaskaniPermission"
 	TypeMaskaniRole         = "MaskaniRole"
 	TypeMaskaniUser         = "MaskaniUser"
@@ -39239,6 +39241,1647 @@ func (m *MaintenanceScheduleMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *MaintenanceScheduleMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown MaintenanceSchedule edge %s", name)
+}
+
+// ManualPaymentMutation represents an operation that mutates the ManualPayment nodes in the graph.
+type ManualPaymentMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *uuid.UUID
+	tenant_id          *uuid.UUID
+	created_at         *time.Time
+	updated_at         *time.Time
+	metadata           *map[string]interface{}
+	unit_account_id    *uuid.UUID
+	property_id        *uuid.UUID
+	amount             *decimal.Decimal
+	addamount          *decimal.Decimal
+	method             *manualpayment.Method
+	reference          *string
+	paid_on            *time.Time
+	payer_name         *string
+	note               *string
+	evidence_key       *string
+	status             *manualpayment.Status
+	submitted_by       *uuid.UUID
+	submitted_by_name  *string
+	reviewed_by        *uuid.UUID
+	reviewed_by_name   *string
+	reviewed_at        *time.Time
+	review_note        *string
+	treasury_intent_id *uuid.UUID
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*ManualPayment, error)
+	predicates         []predicate.ManualPayment
+}
+
+var _ ent.Mutation = (*ManualPaymentMutation)(nil)
+
+// manualpaymentOption allows management of the mutation configuration using functional options.
+type manualpaymentOption func(*ManualPaymentMutation)
+
+// newManualPaymentMutation creates new mutation for the ManualPayment entity.
+func newManualPaymentMutation(c config, op Op, opts ...manualpaymentOption) *ManualPaymentMutation {
+	m := &ManualPaymentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeManualPayment,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withManualPaymentID sets the ID field of the mutation.
+func withManualPaymentID(id uuid.UUID) manualpaymentOption {
+	return func(m *ManualPaymentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ManualPayment
+		)
+		m.oldValue = func(ctx context.Context) (*ManualPayment, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ManualPayment.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withManualPayment sets the old ManualPayment of the mutation.
+func withManualPayment(node *ManualPayment) manualpaymentOption {
+	return func(m *ManualPaymentMutation) {
+		m.oldValue = func(context.Context) (*ManualPayment, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ManualPaymentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ManualPaymentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ManualPayment entities.
+func (m *ManualPaymentMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ManualPaymentMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ManualPaymentMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ManualPayment.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *ManualPaymentMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *ManualPaymentMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *ManualPaymentMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ManualPaymentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ManualPaymentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ManualPaymentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ManualPaymentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ManualPaymentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ManualPaymentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetMetadata sets the "metadata" field.
+func (m *ManualPaymentMutation) SetMetadata(value map[string]interface{}) {
+	m.metadata = &value
+}
+
+// Metadata returns the value of the "metadata" field in the mutation.
+func (m *ManualPaymentMutation) Metadata() (r map[string]interface{}, exists bool) {
+	v := m.metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadata returns the old "metadata" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldMetadata(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadata: %w", err)
+	}
+	return oldValue.Metadata, nil
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (m *ManualPaymentMutation) ClearMetadata() {
+	m.metadata = nil
+	m.clearedFields[manualpayment.FieldMetadata] = struct{}{}
+}
+
+// MetadataCleared returns if the "metadata" field was cleared in this mutation.
+func (m *ManualPaymentMutation) MetadataCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldMetadata]
+	return ok
+}
+
+// ResetMetadata resets all changes to the "metadata" field.
+func (m *ManualPaymentMutation) ResetMetadata() {
+	m.metadata = nil
+	delete(m.clearedFields, manualpayment.FieldMetadata)
+}
+
+// SetUnitAccountID sets the "unit_account_id" field.
+func (m *ManualPaymentMutation) SetUnitAccountID(u uuid.UUID) {
+	m.unit_account_id = &u
+}
+
+// UnitAccountID returns the value of the "unit_account_id" field in the mutation.
+func (m *ManualPaymentMutation) UnitAccountID() (r uuid.UUID, exists bool) {
+	v := m.unit_account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitAccountID returns the old "unit_account_id" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldUnitAccountID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitAccountID: %w", err)
+	}
+	return oldValue.UnitAccountID, nil
+}
+
+// ResetUnitAccountID resets all changes to the "unit_account_id" field.
+func (m *ManualPaymentMutation) ResetUnitAccountID() {
+	m.unit_account_id = nil
+}
+
+// SetPropertyID sets the "property_id" field.
+func (m *ManualPaymentMutation) SetPropertyID(u uuid.UUID) {
+	m.property_id = &u
+}
+
+// PropertyID returns the value of the "property_id" field in the mutation.
+func (m *ManualPaymentMutation) PropertyID() (r uuid.UUID, exists bool) {
+	v := m.property_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPropertyID returns the old "property_id" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldPropertyID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPropertyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPropertyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPropertyID: %w", err)
+	}
+	return oldValue.PropertyID, nil
+}
+
+// ResetPropertyID resets all changes to the "property_id" field.
+func (m *ManualPaymentMutation) ResetPropertyID() {
+	m.property_id = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *ManualPaymentMutation) SetAmount(d decimal.Decimal) {
+	m.amount = &d
+	m.addamount = nil
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *ManualPaymentMutation) Amount() (r decimal.Decimal, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldAmount(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// AddAmount adds d to the "amount" field.
+func (m *ManualPaymentMutation) AddAmount(d decimal.Decimal) {
+	if m.addamount != nil {
+		*m.addamount = m.addamount.Add(d)
+	} else {
+		m.addamount = &d
+	}
+}
+
+// AddedAmount returns the value that was added to the "amount" field in this mutation.
+func (m *ManualPaymentMutation) AddedAmount() (r decimal.Decimal, exists bool) {
+	v := m.addamount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *ManualPaymentMutation) ResetAmount() {
+	m.amount = nil
+	m.addamount = nil
+}
+
+// SetMethod sets the "method" field.
+func (m *ManualPaymentMutation) SetMethod(value manualpayment.Method) {
+	m.method = &value
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *ManualPaymentMutation) Method() (r manualpayment.Method, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldMethod(ctx context.Context) (v manualpayment.Method, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *ManualPaymentMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetReference sets the "reference" field.
+func (m *ManualPaymentMutation) SetReference(s string) {
+	m.reference = &s
+}
+
+// Reference returns the value of the "reference" field in the mutation.
+func (m *ManualPaymentMutation) Reference() (r string, exists bool) {
+	v := m.reference
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReference returns the old "reference" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldReference(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReference is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReference requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReference: %w", err)
+	}
+	return oldValue.Reference, nil
+}
+
+// ResetReference resets all changes to the "reference" field.
+func (m *ManualPaymentMutation) ResetReference() {
+	m.reference = nil
+}
+
+// SetPaidOn sets the "paid_on" field.
+func (m *ManualPaymentMutation) SetPaidOn(t time.Time) {
+	m.paid_on = &t
+}
+
+// PaidOn returns the value of the "paid_on" field in the mutation.
+func (m *ManualPaymentMutation) PaidOn() (r time.Time, exists bool) {
+	v := m.paid_on
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaidOn returns the old "paid_on" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldPaidOn(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaidOn is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaidOn requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaidOn: %w", err)
+	}
+	return oldValue.PaidOn, nil
+}
+
+// ResetPaidOn resets all changes to the "paid_on" field.
+func (m *ManualPaymentMutation) ResetPaidOn() {
+	m.paid_on = nil
+}
+
+// SetPayerName sets the "payer_name" field.
+func (m *ManualPaymentMutation) SetPayerName(s string) {
+	m.payer_name = &s
+}
+
+// PayerName returns the value of the "payer_name" field in the mutation.
+func (m *ManualPaymentMutation) PayerName() (r string, exists bool) {
+	v := m.payer_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayerName returns the old "payer_name" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldPayerName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayerName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayerName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayerName: %w", err)
+	}
+	return oldValue.PayerName, nil
+}
+
+// ClearPayerName clears the value of the "payer_name" field.
+func (m *ManualPaymentMutation) ClearPayerName() {
+	m.payer_name = nil
+	m.clearedFields[manualpayment.FieldPayerName] = struct{}{}
+}
+
+// PayerNameCleared returns if the "payer_name" field was cleared in this mutation.
+func (m *ManualPaymentMutation) PayerNameCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldPayerName]
+	return ok
+}
+
+// ResetPayerName resets all changes to the "payer_name" field.
+func (m *ManualPaymentMutation) ResetPayerName() {
+	m.payer_name = nil
+	delete(m.clearedFields, manualpayment.FieldPayerName)
+}
+
+// SetNote sets the "note" field.
+func (m *ManualPaymentMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *ManualPaymentMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *ManualPaymentMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[manualpayment.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *ManualPaymentMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *ManualPaymentMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, manualpayment.FieldNote)
+}
+
+// SetEvidenceKey sets the "evidence_key" field.
+func (m *ManualPaymentMutation) SetEvidenceKey(s string) {
+	m.evidence_key = &s
+}
+
+// EvidenceKey returns the value of the "evidence_key" field in the mutation.
+func (m *ManualPaymentMutation) EvidenceKey() (r string, exists bool) {
+	v := m.evidence_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEvidenceKey returns the old "evidence_key" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldEvidenceKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEvidenceKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEvidenceKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEvidenceKey: %w", err)
+	}
+	return oldValue.EvidenceKey, nil
+}
+
+// ClearEvidenceKey clears the value of the "evidence_key" field.
+func (m *ManualPaymentMutation) ClearEvidenceKey() {
+	m.evidence_key = nil
+	m.clearedFields[manualpayment.FieldEvidenceKey] = struct{}{}
+}
+
+// EvidenceKeyCleared returns if the "evidence_key" field was cleared in this mutation.
+func (m *ManualPaymentMutation) EvidenceKeyCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldEvidenceKey]
+	return ok
+}
+
+// ResetEvidenceKey resets all changes to the "evidence_key" field.
+func (m *ManualPaymentMutation) ResetEvidenceKey() {
+	m.evidence_key = nil
+	delete(m.clearedFields, manualpayment.FieldEvidenceKey)
+}
+
+// SetStatus sets the "status" field.
+func (m *ManualPaymentMutation) SetStatus(value manualpayment.Status) {
+	m.status = &value
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ManualPaymentMutation) Status() (r manualpayment.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldStatus(ctx context.Context) (v manualpayment.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ManualPaymentMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetSubmittedBy sets the "submitted_by" field.
+func (m *ManualPaymentMutation) SetSubmittedBy(u uuid.UUID) {
+	m.submitted_by = &u
+}
+
+// SubmittedBy returns the value of the "submitted_by" field in the mutation.
+func (m *ManualPaymentMutation) SubmittedBy() (r uuid.UUID, exists bool) {
+	v := m.submitted_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubmittedBy returns the old "submitted_by" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldSubmittedBy(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubmittedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubmittedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubmittedBy: %w", err)
+	}
+	return oldValue.SubmittedBy, nil
+}
+
+// ResetSubmittedBy resets all changes to the "submitted_by" field.
+func (m *ManualPaymentMutation) ResetSubmittedBy() {
+	m.submitted_by = nil
+}
+
+// SetSubmittedByName sets the "submitted_by_name" field.
+func (m *ManualPaymentMutation) SetSubmittedByName(s string) {
+	m.submitted_by_name = &s
+}
+
+// SubmittedByName returns the value of the "submitted_by_name" field in the mutation.
+func (m *ManualPaymentMutation) SubmittedByName() (r string, exists bool) {
+	v := m.submitted_by_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubmittedByName returns the old "submitted_by_name" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldSubmittedByName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubmittedByName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubmittedByName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubmittedByName: %w", err)
+	}
+	return oldValue.SubmittedByName, nil
+}
+
+// ClearSubmittedByName clears the value of the "submitted_by_name" field.
+func (m *ManualPaymentMutation) ClearSubmittedByName() {
+	m.submitted_by_name = nil
+	m.clearedFields[manualpayment.FieldSubmittedByName] = struct{}{}
+}
+
+// SubmittedByNameCleared returns if the "submitted_by_name" field was cleared in this mutation.
+func (m *ManualPaymentMutation) SubmittedByNameCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldSubmittedByName]
+	return ok
+}
+
+// ResetSubmittedByName resets all changes to the "submitted_by_name" field.
+func (m *ManualPaymentMutation) ResetSubmittedByName() {
+	m.submitted_by_name = nil
+	delete(m.clearedFields, manualpayment.FieldSubmittedByName)
+}
+
+// SetReviewedBy sets the "reviewed_by" field.
+func (m *ManualPaymentMutation) SetReviewedBy(u uuid.UUID) {
+	m.reviewed_by = &u
+}
+
+// ReviewedBy returns the value of the "reviewed_by" field in the mutation.
+func (m *ManualPaymentMutation) ReviewedBy() (r uuid.UUID, exists bool) {
+	v := m.reviewed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReviewedBy returns the old "reviewed_by" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldReviewedBy(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReviewedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReviewedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReviewedBy: %w", err)
+	}
+	return oldValue.ReviewedBy, nil
+}
+
+// ClearReviewedBy clears the value of the "reviewed_by" field.
+func (m *ManualPaymentMutation) ClearReviewedBy() {
+	m.reviewed_by = nil
+	m.clearedFields[manualpayment.FieldReviewedBy] = struct{}{}
+}
+
+// ReviewedByCleared returns if the "reviewed_by" field was cleared in this mutation.
+func (m *ManualPaymentMutation) ReviewedByCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldReviewedBy]
+	return ok
+}
+
+// ResetReviewedBy resets all changes to the "reviewed_by" field.
+func (m *ManualPaymentMutation) ResetReviewedBy() {
+	m.reviewed_by = nil
+	delete(m.clearedFields, manualpayment.FieldReviewedBy)
+}
+
+// SetReviewedByName sets the "reviewed_by_name" field.
+func (m *ManualPaymentMutation) SetReviewedByName(s string) {
+	m.reviewed_by_name = &s
+}
+
+// ReviewedByName returns the value of the "reviewed_by_name" field in the mutation.
+func (m *ManualPaymentMutation) ReviewedByName() (r string, exists bool) {
+	v := m.reviewed_by_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReviewedByName returns the old "reviewed_by_name" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldReviewedByName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReviewedByName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReviewedByName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReviewedByName: %w", err)
+	}
+	return oldValue.ReviewedByName, nil
+}
+
+// ClearReviewedByName clears the value of the "reviewed_by_name" field.
+func (m *ManualPaymentMutation) ClearReviewedByName() {
+	m.reviewed_by_name = nil
+	m.clearedFields[manualpayment.FieldReviewedByName] = struct{}{}
+}
+
+// ReviewedByNameCleared returns if the "reviewed_by_name" field was cleared in this mutation.
+func (m *ManualPaymentMutation) ReviewedByNameCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldReviewedByName]
+	return ok
+}
+
+// ResetReviewedByName resets all changes to the "reviewed_by_name" field.
+func (m *ManualPaymentMutation) ResetReviewedByName() {
+	m.reviewed_by_name = nil
+	delete(m.clearedFields, manualpayment.FieldReviewedByName)
+}
+
+// SetReviewedAt sets the "reviewed_at" field.
+func (m *ManualPaymentMutation) SetReviewedAt(t time.Time) {
+	m.reviewed_at = &t
+}
+
+// ReviewedAt returns the value of the "reviewed_at" field in the mutation.
+func (m *ManualPaymentMutation) ReviewedAt() (r time.Time, exists bool) {
+	v := m.reviewed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReviewedAt returns the old "reviewed_at" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldReviewedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReviewedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReviewedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReviewedAt: %w", err)
+	}
+	return oldValue.ReviewedAt, nil
+}
+
+// ClearReviewedAt clears the value of the "reviewed_at" field.
+func (m *ManualPaymentMutation) ClearReviewedAt() {
+	m.reviewed_at = nil
+	m.clearedFields[manualpayment.FieldReviewedAt] = struct{}{}
+}
+
+// ReviewedAtCleared returns if the "reviewed_at" field was cleared in this mutation.
+func (m *ManualPaymentMutation) ReviewedAtCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldReviewedAt]
+	return ok
+}
+
+// ResetReviewedAt resets all changes to the "reviewed_at" field.
+func (m *ManualPaymentMutation) ResetReviewedAt() {
+	m.reviewed_at = nil
+	delete(m.clearedFields, manualpayment.FieldReviewedAt)
+}
+
+// SetReviewNote sets the "review_note" field.
+func (m *ManualPaymentMutation) SetReviewNote(s string) {
+	m.review_note = &s
+}
+
+// ReviewNote returns the value of the "review_note" field in the mutation.
+func (m *ManualPaymentMutation) ReviewNote() (r string, exists bool) {
+	v := m.review_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReviewNote returns the old "review_note" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldReviewNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReviewNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReviewNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReviewNote: %w", err)
+	}
+	return oldValue.ReviewNote, nil
+}
+
+// ClearReviewNote clears the value of the "review_note" field.
+func (m *ManualPaymentMutation) ClearReviewNote() {
+	m.review_note = nil
+	m.clearedFields[manualpayment.FieldReviewNote] = struct{}{}
+}
+
+// ReviewNoteCleared returns if the "review_note" field was cleared in this mutation.
+func (m *ManualPaymentMutation) ReviewNoteCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldReviewNote]
+	return ok
+}
+
+// ResetReviewNote resets all changes to the "review_note" field.
+func (m *ManualPaymentMutation) ResetReviewNote() {
+	m.review_note = nil
+	delete(m.clearedFields, manualpayment.FieldReviewNote)
+}
+
+// SetTreasuryIntentID sets the "treasury_intent_id" field.
+func (m *ManualPaymentMutation) SetTreasuryIntentID(u uuid.UUID) {
+	m.treasury_intent_id = &u
+}
+
+// TreasuryIntentID returns the value of the "treasury_intent_id" field in the mutation.
+func (m *ManualPaymentMutation) TreasuryIntentID() (r uuid.UUID, exists bool) {
+	v := m.treasury_intent_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTreasuryIntentID returns the old "treasury_intent_id" field's value of the ManualPayment entity.
+// If the ManualPayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManualPaymentMutation) OldTreasuryIntentID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTreasuryIntentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTreasuryIntentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTreasuryIntentID: %w", err)
+	}
+	return oldValue.TreasuryIntentID, nil
+}
+
+// ClearTreasuryIntentID clears the value of the "treasury_intent_id" field.
+func (m *ManualPaymentMutation) ClearTreasuryIntentID() {
+	m.treasury_intent_id = nil
+	m.clearedFields[manualpayment.FieldTreasuryIntentID] = struct{}{}
+}
+
+// TreasuryIntentIDCleared returns if the "treasury_intent_id" field was cleared in this mutation.
+func (m *ManualPaymentMutation) TreasuryIntentIDCleared() bool {
+	_, ok := m.clearedFields[manualpayment.FieldTreasuryIntentID]
+	return ok
+}
+
+// ResetTreasuryIntentID resets all changes to the "treasury_intent_id" field.
+func (m *ManualPaymentMutation) ResetTreasuryIntentID() {
+	m.treasury_intent_id = nil
+	delete(m.clearedFields, manualpayment.FieldTreasuryIntentID)
+}
+
+// Where appends a list predicates to the ManualPaymentMutation builder.
+func (m *ManualPaymentMutation) Where(ps ...predicate.ManualPayment) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ManualPaymentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ManualPaymentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ManualPayment, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ManualPaymentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ManualPaymentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ManualPayment).
+func (m *ManualPaymentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ManualPaymentMutation) Fields() []string {
+	fields := make([]string, 0, 21)
+	if m.tenant_id != nil {
+		fields = append(fields, manualpayment.FieldTenantID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, manualpayment.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, manualpayment.FieldUpdatedAt)
+	}
+	if m.metadata != nil {
+		fields = append(fields, manualpayment.FieldMetadata)
+	}
+	if m.unit_account_id != nil {
+		fields = append(fields, manualpayment.FieldUnitAccountID)
+	}
+	if m.property_id != nil {
+		fields = append(fields, manualpayment.FieldPropertyID)
+	}
+	if m.amount != nil {
+		fields = append(fields, manualpayment.FieldAmount)
+	}
+	if m.method != nil {
+		fields = append(fields, manualpayment.FieldMethod)
+	}
+	if m.reference != nil {
+		fields = append(fields, manualpayment.FieldReference)
+	}
+	if m.paid_on != nil {
+		fields = append(fields, manualpayment.FieldPaidOn)
+	}
+	if m.payer_name != nil {
+		fields = append(fields, manualpayment.FieldPayerName)
+	}
+	if m.note != nil {
+		fields = append(fields, manualpayment.FieldNote)
+	}
+	if m.evidence_key != nil {
+		fields = append(fields, manualpayment.FieldEvidenceKey)
+	}
+	if m.status != nil {
+		fields = append(fields, manualpayment.FieldStatus)
+	}
+	if m.submitted_by != nil {
+		fields = append(fields, manualpayment.FieldSubmittedBy)
+	}
+	if m.submitted_by_name != nil {
+		fields = append(fields, manualpayment.FieldSubmittedByName)
+	}
+	if m.reviewed_by != nil {
+		fields = append(fields, manualpayment.FieldReviewedBy)
+	}
+	if m.reviewed_by_name != nil {
+		fields = append(fields, manualpayment.FieldReviewedByName)
+	}
+	if m.reviewed_at != nil {
+		fields = append(fields, manualpayment.FieldReviewedAt)
+	}
+	if m.review_note != nil {
+		fields = append(fields, manualpayment.FieldReviewNote)
+	}
+	if m.treasury_intent_id != nil {
+		fields = append(fields, manualpayment.FieldTreasuryIntentID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ManualPaymentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case manualpayment.FieldTenantID:
+		return m.TenantID()
+	case manualpayment.FieldCreatedAt:
+		return m.CreatedAt()
+	case manualpayment.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case manualpayment.FieldMetadata:
+		return m.Metadata()
+	case manualpayment.FieldUnitAccountID:
+		return m.UnitAccountID()
+	case manualpayment.FieldPropertyID:
+		return m.PropertyID()
+	case manualpayment.FieldAmount:
+		return m.Amount()
+	case manualpayment.FieldMethod:
+		return m.Method()
+	case manualpayment.FieldReference:
+		return m.Reference()
+	case manualpayment.FieldPaidOn:
+		return m.PaidOn()
+	case manualpayment.FieldPayerName:
+		return m.PayerName()
+	case manualpayment.FieldNote:
+		return m.Note()
+	case manualpayment.FieldEvidenceKey:
+		return m.EvidenceKey()
+	case manualpayment.FieldStatus:
+		return m.Status()
+	case manualpayment.FieldSubmittedBy:
+		return m.SubmittedBy()
+	case manualpayment.FieldSubmittedByName:
+		return m.SubmittedByName()
+	case manualpayment.FieldReviewedBy:
+		return m.ReviewedBy()
+	case manualpayment.FieldReviewedByName:
+		return m.ReviewedByName()
+	case manualpayment.FieldReviewedAt:
+		return m.ReviewedAt()
+	case manualpayment.FieldReviewNote:
+		return m.ReviewNote()
+	case manualpayment.FieldTreasuryIntentID:
+		return m.TreasuryIntentID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ManualPaymentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case manualpayment.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case manualpayment.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case manualpayment.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case manualpayment.FieldMetadata:
+		return m.OldMetadata(ctx)
+	case manualpayment.FieldUnitAccountID:
+		return m.OldUnitAccountID(ctx)
+	case manualpayment.FieldPropertyID:
+		return m.OldPropertyID(ctx)
+	case manualpayment.FieldAmount:
+		return m.OldAmount(ctx)
+	case manualpayment.FieldMethod:
+		return m.OldMethod(ctx)
+	case manualpayment.FieldReference:
+		return m.OldReference(ctx)
+	case manualpayment.FieldPaidOn:
+		return m.OldPaidOn(ctx)
+	case manualpayment.FieldPayerName:
+		return m.OldPayerName(ctx)
+	case manualpayment.FieldNote:
+		return m.OldNote(ctx)
+	case manualpayment.FieldEvidenceKey:
+		return m.OldEvidenceKey(ctx)
+	case manualpayment.FieldStatus:
+		return m.OldStatus(ctx)
+	case manualpayment.FieldSubmittedBy:
+		return m.OldSubmittedBy(ctx)
+	case manualpayment.FieldSubmittedByName:
+		return m.OldSubmittedByName(ctx)
+	case manualpayment.FieldReviewedBy:
+		return m.OldReviewedBy(ctx)
+	case manualpayment.FieldReviewedByName:
+		return m.OldReviewedByName(ctx)
+	case manualpayment.FieldReviewedAt:
+		return m.OldReviewedAt(ctx)
+	case manualpayment.FieldReviewNote:
+		return m.OldReviewNote(ctx)
+	case manualpayment.FieldTreasuryIntentID:
+		return m.OldTreasuryIntentID(ctx)
+	}
+	return nil, fmt.Errorf("unknown ManualPayment field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ManualPaymentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case manualpayment.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case manualpayment.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case manualpayment.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case manualpayment.FieldMetadata:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadata(v)
+		return nil
+	case manualpayment.FieldUnitAccountID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitAccountID(v)
+		return nil
+	case manualpayment.FieldPropertyID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPropertyID(v)
+		return nil
+	case manualpayment.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case manualpayment.FieldMethod:
+		v, ok := value.(manualpayment.Method)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case manualpayment.FieldReference:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReference(v)
+		return nil
+	case manualpayment.FieldPaidOn:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaidOn(v)
+		return nil
+	case manualpayment.FieldPayerName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayerName(v)
+		return nil
+	case manualpayment.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case manualpayment.FieldEvidenceKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEvidenceKey(v)
+		return nil
+	case manualpayment.FieldStatus:
+		v, ok := value.(manualpayment.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case manualpayment.FieldSubmittedBy:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubmittedBy(v)
+		return nil
+	case manualpayment.FieldSubmittedByName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubmittedByName(v)
+		return nil
+	case manualpayment.FieldReviewedBy:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReviewedBy(v)
+		return nil
+	case manualpayment.FieldReviewedByName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReviewedByName(v)
+		return nil
+	case manualpayment.FieldReviewedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReviewedAt(v)
+		return nil
+	case manualpayment.FieldReviewNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReviewNote(v)
+		return nil
+	case manualpayment.FieldTreasuryIntentID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTreasuryIntentID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ManualPayment field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ManualPaymentMutation) AddedFields() []string {
+	var fields []string
+	if m.addamount != nil {
+		fields = append(fields, manualpayment.FieldAmount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ManualPaymentMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case manualpayment.FieldAmount:
+		return m.AddedAmount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ManualPaymentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case manualpayment.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ManualPayment numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ManualPaymentMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(manualpayment.FieldMetadata) {
+		fields = append(fields, manualpayment.FieldMetadata)
+	}
+	if m.FieldCleared(manualpayment.FieldPayerName) {
+		fields = append(fields, manualpayment.FieldPayerName)
+	}
+	if m.FieldCleared(manualpayment.FieldNote) {
+		fields = append(fields, manualpayment.FieldNote)
+	}
+	if m.FieldCleared(manualpayment.FieldEvidenceKey) {
+		fields = append(fields, manualpayment.FieldEvidenceKey)
+	}
+	if m.FieldCleared(manualpayment.FieldSubmittedByName) {
+		fields = append(fields, manualpayment.FieldSubmittedByName)
+	}
+	if m.FieldCleared(manualpayment.FieldReviewedBy) {
+		fields = append(fields, manualpayment.FieldReviewedBy)
+	}
+	if m.FieldCleared(manualpayment.FieldReviewedByName) {
+		fields = append(fields, manualpayment.FieldReviewedByName)
+	}
+	if m.FieldCleared(manualpayment.FieldReviewedAt) {
+		fields = append(fields, manualpayment.FieldReviewedAt)
+	}
+	if m.FieldCleared(manualpayment.FieldReviewNote) {
+		fields = append(fields, manualpayment.FieldReviewNote)
+	}
+	if m.FieldCleared(manualpayment.FieldTreasuryIntentID) {
+		fields = append(fields, manualpayment.FieldTreasuryIntentID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ManualPaymentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ManualPaymentMutation) ClearField(name string) error {
+	switch name {
+	case manualpayment.FieldMetadata:
+		m.ClearMetadata()
+		return nil
+	case manualpayment.FieldPayerName:
+		m.ClearPayerName()
+		return nil
+	case manualpayment.FieldNote:
+		m.ClearNote()
+		return nil
+	case manualpayment.FieldEvidenceKey:
+		m.ClearEvidenceKey()
+		return nil
+	case manualpayment.FieldSubmittedByName:
+		m.ClearSubmittedByName()
+		return nil
+	case manualpayment.FieldReviewedBy:
+		m.ClearReviewedBy()
+		return nil
+	case manualpayment.FieldReviewedByName:
+		m.ClearReviewedByName()
+		return nil
+	case manualpayment.FieldReviewedAt:
+		m.ClearReviewedAt()
+		return nil
+	case manualpayment.FieldReviewNote:
+		m.ClearReviewNote()
+		return nil
+	case manualpayment.FieldTreasuryIntentID:
+		m.ClearTreasuryIntentID()
+		return nil
+	}
+	return fmt.Errorf("unknown ManualPayment nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ManualPaymentMutation) ResetField(name string) error {
+	switch name {
+	case manualpayment.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case manualpayment.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case manualpayment.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case manualpayment.FieldMetadata:
+		m.ResetMetadata()
+		return nil
+	case manualpayment.FieldUnitAccountID:
+		m.ResetUnitAccountID()
+		return nil
+	case manualpayment.FieldPropertyID:
+		m.ResetPropertyID()
+		return nil
+	case manualpayment.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case manualpayment.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case manualpayment.FieldReference:
+		m.ResetReference()
+		return nil
+	case manualpayment.FieldPaidOn:
+		m.ResetPaidOn()
+		return nil
+	case manualpayment.FieldPayerName:
+		m.ResetPayerName()
+		return nil
+	case manualpayment.FieldNote:
+		m.ResetNote()
+		return nil
+	case manualpayment.FieldEvidenceKey:
+		m.ResetEvidenceKey()
+		return nil
+	case manualpayment.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case manualpayment.FieldSubmittedBy:
+		m.ResetSubmittedBy()
+		return nil
+	case manualpayment.FieldSubmittedByName:
+		m.ResetSubmittedByName()
+		return nil
+	case manualpayment.FieldReviewedBy:
+		m.ResetReviewedBy()
+		return nil
+	case manualpayment.FieldReviewedByName:
+		m.ResetReviewedByName()
+		return nil
+	case manualpayment.FieldReviewedAt:
+		m.ResetReviewedAt()
+		return nil
+	case manualpayment.FieldReviewNote:
+		m.ResetReviewNote()
+		return nil
+	case manualpayment.FieldTreasuryIntentID:
+		m.ResetTreasuryIntentID()
+		return nil
+	}
+	return fmt.Errorf("unknown ManualPayment field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ManualPaymentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ManualPaymentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ManualPaymentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ManualPaymentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ManualPaymentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ManualPaymentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ManualPaymentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ManualPayment unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ManualPaymentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ManualPayment edge %s", name)
 }
 
 // MaskaniPermissionMutation represents an operation that mutates the MaskaniPermission nodes in the graph.

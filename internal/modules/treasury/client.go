@@ -362,3 +362,28 @@ func (c *Client) Ledger(ctx context.Context, tenantID uuid.UUID, accountRef stri
 	}
 	return &out, nil
 }
+
+// ManualPaymentRequest books a verified bank, cash, cheque or typed M-Pesa payment against an
+// account (POST /s2s/{tenant}/accounts/{ref}/manual-payments).
+type ManualPaymentRequest struct {
+	AccountID     string          `json:"account_id"`
+	Fund          string          `json:"fund"`
+	Amount        decimal.Decimal `json:"amount"`
+	Method        string          `json:"method"`
+	Reference     string          `json:"reference"`
+	PayerName     string          `json:"payer_name,omitempty"`
+	SourceService string          `json:"source_service"`
+}
+
+// RecordManualPayment books a verified manual payment; treasury settles it through the paybill
+// path (oldest due first) and is idempotent on method and reference. Returns the intent id.
+func (c *Client) RecordManualPayment(ctx context.Context, tenantID uuid.UUID, accountRef string, req ManualPaymentRequest) (uuid.UUID, error) {
+	req.SourceService = "maskani-api"
+	var out struct {
+		IntentID uuid.UUID `json:"intent_id"`
+	}
+	if err := c.post(ctx, tenantID, "/accounts/"+url.PathEscape(accountRef)+"/manual-payments", "manual-"+req.Method+"-"+req.Reference, req, &out); err != nil {
+		return uuid.Nil, err
+	}
+	return out.IntentID, nil
+}

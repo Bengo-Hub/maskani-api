@@ -46,6 +46,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/maintenanceschedule"
+	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
 	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
@@ -158,6 +159,8 @@ type Client struct {
 	InstalmentSchedule *InstalmentScheduleClient
 	// MaintenanceSchedule is the client for interacting with the MaintenanceSchedule builders.
 	MaintenanceSchedule *MaintenanceScheduleClient
+	// ManualPayment is the client for interacting with the ManualPayment builders.
+	ManualPayment *ManualPaymentClient
 	// MaskaniPermission is the client for interacting with the MaskaniPermission builders.
 	MaskaniPermission *MaskaniPermissionClient
 	// MaskaniRole is the client for interacting with the MaskaniRole builders.
@@ -289,6 +292,7 @@ func (c *Client) init() {
 	c.Instalment = NewInstalmentClient(c.config)
 	c.InstalmentSchedule = NewInstalmentScheduleClient(c.config)
 	c.MaintenanceSchedule = NewMaintenanceScheduleClient(c.config)
+	c.ManualPayment = NewManualPaymentClient(c.config)
 	c.MaskaniPermission = NewMaskaniPermissionClient(c.config)
 	c.MaskaniRole = NewMaskaniRoleClient(c.config)
 	c.MaskaniUser = NewMaskaniUserClient(c.config)
@@ -456,6 +460,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Instalment:          NewInstalmentClient(cfg),
 		InstalmentSchedule:  NewInstalmentScheduleClient(cfg),
 		MaintenanceSchedule: NewMaintenanceScheduleClient(cfg),
+		ManualPayment:       NewManualPaymentClient(cfg),
 		MaskaniPermission:   NewMaskaniPermissionClient(cfg),
 		MaskaniRole:         NewMaskaniRoleClient(cfg),
 		MaskaniUser:         NewMaskaniUserClient(cfg),
@@ -550,6 +555,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Instalment:          NewInstalmentClient(cfg),
 		InstalmentSchedule:  NewInstalmentScheduleClient(cfg),
 		MaintenanceSchedule: NewMaintenanceScheduleClient(cfg),
+		ManualPayment:       NewManualPaymentClient(cfg),
 		MaskaniPermission:   NewMaskaniPermissionClient(cfg),
 		MaskaniRole:         NewMaskaniRoleClient(cfg),
 		MaskaniUser:         NewMaskaniUserClient(cfg),
@@ -630,16 +636,16 @@ func (c *Client) Use(hooks ...Hook) {
 		c.DocumentAccessLog, c.DocumentSequence, c.DocumentSignature,
 		c.DocumentTemplate, c.Enquiry, c.Fund, c.GateDevice, c.GateEvent, c.GuardPost,
 		c.Handover, c.ImportJob, c.Incident, c.Instalment, c.InstalmentSchedule,
-		c.MaintenanceSchedule, c.MaskaniPermission, c.MaskaniRole, c.MaskaniUser,
-		c.MaskaniUserOutlet, c.Meter, c.MeterReading, c.Notice, c.NoticeDelivery,
-		c.OccurrenceEntry, c.OutboxEvent, c.Outlet, c.Party, c.PatrolCheckpoint,
-		c.PatrolScan, c.Portfolio, c.PriceList, c.PriceListItem, c.PrivacyRequest,
-		c.Property, c.ReadingRound, c.ReminderSchedule, c.Reservation,
-		c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule, c.ServiceVisit,
-		c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount,
-		c.UnitCharge, c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor,
-		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.Visitor,
-		c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
+		c.MaintenanceSchedule, c.ManualPayment, c.MaskaniPermission, c.MaskaniRole,
+		c.MaskaniUser, c.MaskaniUserOutlet, c.Meter, c.MeterReading, c.Notice,
+		c.NoticeDelivery, c.OccurrenceEntry, c.OutboxEvent, c.Outlet, c.Party,
+		c.PatrolCheckpoint, c.PatrolScan, c.Portfolio, c.PriceList, c.PriceListItem,
+		c.PrivacyRequest, c.Property, c.ReadingRound, c.ReminderSchedule,
+		c.Reservation, c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule,
+		c.ServiceVisit, c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage,
+		c.Unit, c.UnitAccount, c.UnitCharge, c.UnitParty, c.UserRoleAssignment,
+		c.Vehicle, c.Vendor, c.VendorContract, c.VendorDocument, c.VendorPersonnel,
+		c.Visitor, c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -655,16 +661,16 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.DocumentAccessLog, c.DocumentSequence, c.DocumentSignature,
 		c.DocumentTemplate, c.Enquiry, c.Fund, c.GateDevice, c.GateEvent, c.GuardPost,
 		c.Handover, c.ImportJob, c.Incident, c.Instalment, c.InstalmentSchedule,
-		c.MaintenanceSchedule, c.MaskaniPermission, c.MaskaniRole, c.MaskaniUser,
-		c.MaskaniUserOutlet, c.Meter, c.MeterReading, c.Notice, c.NoticeDelivery,
-		c.OccurrenceEntry, c.OutboxEvent, c.Outlet, c.Party, c.PatrolCheckpoint,
-		c.PatrolScan, c.Portfolio, c.PriceList, c.PriceListItem, c.PrivacyRequest,
-		c.Property, c.ReadingRound, c.ReminderSchedule, c.Reservation,
-		c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule, c.ServiceVisit,
-		c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount,
-		c.UnitCharge, c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor,
-		c.VendorContract, c.VendorDocument, c.VendorPersonnel, c.Visitor,
-		c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
+		c.MaintenanceSchedule, c.ManualPayment, c.MaskaniPermission, c.MaskaniRole,
+		c.MaskaniUser, c.MaskaniUserOutlet, c.Meter, c.MeterReading, c.Notice,
+		c.NoticeDelivery, c.OccurrenceEntry, c.OutboxEvent, c.Outlet, c.Party,
+		c.PatrolCheckpoint, c.PatrolScan, c.Portfolio, c.PriceList, c.PriceListItem,
+		c.PrivacyRequest, c.Property, c.ReadingRound, c.ReminderSchedule,
+		c.Reservation, c.RolePermission, c.Roster, c.SaleContract, c.ServiceSchedule,
+		c.ServiceVisit, c.Tenant, c.TenantModule, c.TenantSetting, c.TitleStage,
+		c.Unit, c.UnitAccount, c.UnitCharge, c.UnitParty, c.UserRoleAssignment,
+		c.Vehicle, c.Vendor, c.VendorContract, c.VendorDocument, c.VendorPersonnel,
+		c.Visitor, c.VisitorPass, c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -733,6 +739,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.InstalmentSchedule.mutate(ctx, m)
 	case *MaintenanceScheduleMutation:
 		return c.MaintenanceSchedule.mutate(ctx, m)
+	case *ManualPaymentMutation:
+		return c.ManualPayment.mutate(ctx, m)
 	case *MaskaniPermissionMutation:
 		return c.MaskaniPermission.mutate(ctx, m)
 	case *MaskaniRoleMutation:
@@ -5025,6 +5033,141 @@ func (c *MaintenanceScheduleClient) mutate(ctx context.Context, m *MaintenanceSc
 		return (&MaintenanceScheduleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown MaintenanceSchedule mutation op: %q", m.Op())
+	}
+}
+
+// ManualPaymentClient is a client for the ManualPayment schema.
+type ManualPaymentClient struct {
+	config
+}
+
+// NewManualPaymentClient returns a client for the ManualPayment from the given config.
+func NewManualPaymentClient(c config) *ManualPaymentClient {
+	return &ManualPaymentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `manualpayment.Hooks(f(g(h())))`.
+func (c *ManualPaymentClient) Use(hooks ...Hook) {
+	c.hooks.ManualPayment = append(c.hooks.ManualPayment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `manualpayment.Intercept(f(g(h())))`.
+func (c *ManualPaymentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ManualPayment = append(c.inters.ManualPayment, interceptors...)
+}
+
+// Create returns a builder for creating a ManualPayment entity.
+func (c *ManualPaymentClient) Create() *ManualPaymentCreate {
+	mutation := newManualPaymentMutation(c.config, OpCreate)
+	return &ManualPaymentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ManualPayment entities.
+func (c *ManualPaymentClient) CreateBulk(builders ...*ManualPaymentCreate) *ManualPaymentCreateBulk {
+	return &ManualPaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ManualPaymentClient) MapCreateBulk(slice any, setFunc func(*ManualPaymentCreate, int)) *ManualPaymentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ManualPaymentCreateBulk{err: fmt.Errorf("calling to ManualPaymentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ManualPaymentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ManualPaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ManualPayment.
+func (c *ManualPaymentClient) Update() *ManualPaymentUpdate {
+	mutation := newManualPaymentMutation(c.config, OpUpdate)
+	return &ManualPaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ManualPaymentClient) UpdateOne(_m *ManualPayment) *ManualPaymentUpdateOne {
+	mutation := newManualPaymentMutation(c.config, OpUpdateOne, withManualPayment(_m))
+	return &ManualPaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ManualPaymentClient) UpdateOneID(id uuid.UUID) *ManualPaymentUpdateOne {
+	mutation := newManualPaymentMutation(c.config, OpUpdateOne, withManualPaymentID(id))
+	return &ManualPaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ManualPayment.
+func (c *ManualPaymentClient) Delete() *ManualPaymentDelete {
+	mutation := newManualPaymentMutation(c.config, OpDelete)
+	return &ManualPaymentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ManualPaymentClient) DeleteOne(_m *ManualPayment) *ManualPaymentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ManualPaymentClient) DeleteOneID(id uuid.UUID) *ManualPaymentDeleteOne {
+	builder := c.Delete().Where(manualpayment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ManualPaymentDeleteOne{builder}
+}
+
+// Query returns a query builder for ManualPayment.
+func (c *ManualPaymentClient) Query() *ManualPaymentQuery {
+	return &ManualPaymentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeManualPayment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ManualPayment entity by its id.
+func (c *ManualPaymentClient) Get(ctx context.Context, id uuid.UUID) (*ManualPayment, error) {
+	return c.Query().Where(manualpayment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ManualPaymentClient) GetX(ctx context.Context, id uuid.UUID) *ManualPayment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ManualPaymentClient) Hooks() []Hook {
+	hooks := c.hooks.ManualPayment
+	return append(hooks[:len(hooks):len(hooks)], manualpayment.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ManualPaymentClient) Interceptors() []Interceptor {
+	inters := c.inters.ManualPayment
+	return append(inters[:len(inters):len(inters)], manualpayment.Interceptors[:]...)
+}
+
+func (c *ManualPaymentClient) mutate(ctx context.Context, m *ManualPaymentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ManualPaymentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ManualPaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ManualPaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ManualPaymentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ManualPayment mutation op: %q", m.Op())
 	}
 }
 
@@ -11797,8 +11940,8 @@ type (
 		CustomFieldDef, DailyStat, Document, DocumentAccessLog, DocumentSequence,
 		DocumentSignature, DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent,
 		GuardPost, Handover, ImportJob, Incident, Instalment, InstalmentSchedule,
-		MaintenanceSchedule, MaskaniPermission, MaskaniRole, MaskaniUser,
-		MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
+		MaintenanceSchedule, ManualPayment, MaskaniPermission, MaskaniRole,
+		MaskaniUser, MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
 		OccurrenceEntry, OutboxEvent, Outlet, Party, PatrolCheckpoint, PatrolScan,
 		Portfolio, PriceList, PriceListItem, PrivacyRequest, Property, ReadingRound,
 		ReminderSchedule, Reservation, RolePermission, Roster, SaleContract,
@@ -11813,8 +11956,8 @@ type (
 		CustomFieldDef, DailyStat, Document, DocumentAccessLog, DocumentSequence,
 		DocumentSignature, DocumentTemplate, Enquiry, Fund, GateDevice, GateEvent,
 		GuardPost, Handover, ImportJob, Incident, Instalment, InstalmentSchedule,
-		MaintenanceSchedule, MaskaniPermission, MaskaniRole, MaskaniUser,
-		MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
+		MaintenanceSchedule, ManualPayment, MaskaniPermission, MaskaniRole,
+		MaskaniUser, MaskaniUserOutlet, Meter, MeterReading, Notice, NoticeDelivery,
 		OccurrenceEntry, OutboxEvent, Outlet, Party, PatrolCheckpoint, PatrolScan,
 		Portfolio, PriceList, PriceListItem, PrivacyRequest, Property, ReadingRound,
 		ReminderSchedule, Reservation, RolePermission, Roster, SaleContract,

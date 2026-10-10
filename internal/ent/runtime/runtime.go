@@ -35,6 +35,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/maintenanceschedule"
+	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskanipermission"
 	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
@@ -1183,6 +1184,37 @@ func init() {
 	maintenancescheduleDescID := maintenancescheduleMixinFields0[0].Descriptor()
 	// maintenanceschedule.DefaultID holds the default value on creation for the id field.
 	maintenanceschedule.DefaultID = maintenancescheduleDescID.Default.(func() uuid.UUID)
+	manualpaymentMixin := schema.ManualPayment{}.Mixin()
+	manualpaymentMixinHooks0 := manualpaymentMixin[0].Hooks()
+	manualpayment.Hooks[0] = manualpaymentMixinHooks0[0]
+	manualpaymentMixinInters0 := manualpaymentMixin[0].Interceptors()
+	manualpayment.Interceptors[0] = manualpaymentMixinInters0[0]
+	manualpaymentMixinFields0 := manualpaymentMixin[0].Fields()
+	_ = manualpaymentMixinFields0
+	manualpaymentFields := schema.ManualPayment{}.Fields()
+	_ = manualpaymentFields
+	// manualpaymentDescCreatedAt is the schema descriptor for created_at field.
+	manualpaymentDescCreatedAt := manualpaymentMixinFields0[2].Descriptor()
+	// manualpayment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	manualpayment.DefaultCreatedAt = manualpaymentDescCreatedAt.Default.(func() time.Time)
+	// manualpaymentDescUpdatedAt is the schema descriptor for updated_at field.
+	manualpaymentDescUpdatedAt := manualpaymentMixinFields0[3].Descriptor()
+	// manualpayment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	manualpayment.DefaultUpdatedAt = manualpaymentDescUpdatedAt.Default.(func() time.Time)
+	// manualpayment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	manualpayment.UpdateDefaultUpdatedAt = manualpaymentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// manualpaymentDescAmount is the schema descriptor for amount field.
+	manualpaymentDescAmount := manualpaymentFields[2].Descriptor()
+	// manualpayment.DefaultAmount holds the default value on creation for the amount field.
+	manualpayment.DefaultAmount = manualpaymentDescAmount.Default.(func() decimal.Decimal)
+	// manualpaymentDescReference is the schema descriptor for reference field.
+	manualpaymentDescReference := manualpaymentFields[4].Descriptor()
+	// manualpayment.ReferenceValidator is a validator for the "reference" field. It is called by the builders before save.
+	manualpayment.ReferenceValidator = manualpaymentDescReference.Validators[0].(func(string) error)
+	// manualpaymentDescID is the schema descriptor for id field.
+	manualpaymentDescID := manualpaymentMixinFields0[0].Descriptor()
+	// manualpayment.DefaultID holds the default value on creation for the id field.
+	manualpayment.DefaultID = manualpaymentDescID.Default.(func() uuid.UUID)
 	maskanipermissionFields := schema.MaskaniPermission{}.Fields()
 	_ = maskanipermissionFields
 	// maskanipermissionDescPermissionCode is the schema descriptor for permission_code field.

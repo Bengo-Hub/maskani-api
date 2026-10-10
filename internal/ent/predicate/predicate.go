@@ -96,6 +96,9 @@ type InstalmentSchedule func(*sql.Selector)
 // MaintenanceSchedule is the predicate function for maintenanceschedule builders.
 type MaintenanceSchedule func(*sql.Selector)
 
+// ManualPayment is the predicate function for manualpayment builders.
+type ManualPayment func(*sql.Selector)
+
 // MaskaniPermission is the predicate function for maskanipermission builders.
 type MaskaniPermission func(*sql.Selector)
 

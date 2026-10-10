@@ -1182,6 +1182,57 @@ var (
 			},
 		},
 	}
+	// ManualPaymentsColumns holds the columns for the "manual_payments" table.
+	ManualPaymentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "unit_account_id", Type: field.TypeUUID},
+		{Name: "property_id", Type: field.TypeUUID},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
+		{Name: "method", Type: field.TypeEnum, Enums: []string{"bank_transfer", "cash", "cheque", "mpesa"}},
+		{Name: "reference", Type: field.TypeString},
+		{Name: "paid_on", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "date"}},
+		{Name: "payer_name", Type: field.TypeString, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "evidence_key", Type: field.TypeString, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "approved", "rejected"}, Default: "pending"},
+		{Name: "submitted_by", Type: field.TypeUUID},
+		{Name: "submitted_by_name", Type: field.TypeString, Nullable: true},
+		{Name: "reviewed_by", Type: field.TypeUUID, Nullable: true},
+		{Name: "reviewed_by_name", Type: field.TypeString, Nullable: true},
+		{Name: "reviewed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "review_note", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "treasury_intent_id", Type: field.TypeUUID, Nullable: true},
+	}
+	// ManualPaymentsTable holds the schema information for the "manual_payments" table.
+	ManualPaymentsTable = &schema.Table{
+		Name:       "manual_payments",
+		Columns:    ManualPaymentsColumns,
+		PrimaryKey: []*schema.Column{ManualPaymentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "manualpayment_tenant_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ManualPaymentsColumns[1], ManualPaymentsColumns[14], ManualPaymentsColumns[2]},
+			},
+			{
+				Name:    "manualpayment_tenant_id_unit_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ManualPaymentsColumns[1], ManualPaymentsColumns[5], ManualPaymentsColumns[2]},
+			},
+			{
+				Name:    "manualpayment_tenant_id_method_reference",
+				Unique:  true,
+				Columns: []*schema.Column{ManualPaymentsColumns[1], ManualPaymentsColumns[8], ManualPaymentsColumns[9]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status <> 'rejected'",
+				},
+			},
+		},
+	}
 	// MaskaniPermissionsColumns holds the columns for the "maskani_permissions" table.
 	MaskaniPermissionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -3172,6 +3223,7 @@ var (
 		InstalmentsTable,
 		InstalmentSchedulesTable,
 		MaintenanceSchedulesTable,
+		ManualPaymentsTable,
 		MaskaniPermissionsTable,
 		MaskaniRolesTable,
 		MaskaniUsersTable,

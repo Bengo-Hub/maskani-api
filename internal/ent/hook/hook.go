@@ -369,6 +369,18 @@ func (f MaintenanceScheduleFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MaintenanceScheduleMutation", m)
 }
 
+// The ManualPaymentFunc type is an adapter to allow the use of ordinary
+// function as ManualPayment mutator.
+type ManualPaymentFunc func(context.Context, *ent.ManualPaymentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ManualPaymentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ManualPaymentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ManualPaymentMutation", m)
+}
+
 // The MaskaniPermissionFunc type is an adapter to allow the use of ordinary
 // function as MaskaniPermission mutator.
 type MaskaniPermissionFunc func(context.Context, *ent.MaskaniPermissionMutation) (ent.Value, error)
