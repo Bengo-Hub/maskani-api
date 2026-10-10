@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
+	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
@@ -150,6 +151,7 @@ func checkColumn(t, c string) error {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			accountcollection.Table:   accountcollection.ValidColumn,
 			adjustment.Table:          adjustment.ValidColumn,
+			approvalrequest.Table:     approvalrequest.ValidColumn,
 			approvalrule.Table:        approvalrule.ValidColumn,
 			auditlog.Table:            auditlog.ValidColumn,
 			billquery.Table:           billquery.ValidColumn,

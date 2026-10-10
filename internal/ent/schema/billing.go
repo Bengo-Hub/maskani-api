@@ -264,7 +264,8 @@ func (BillingRunLine) Indexes() []ent.Index {
 	}
 }
 
-// Adjustment is a credit note, waiver, debit or write-off on an account, under approval rules.
+// Adjustment is a credit note, waiver, debit or write-off on an account. Its approval runs on the
+// central approvals engine (ApprovalRequest with object_id = the adjustment).
 // Metadata keeps what the queue shows (account_ref, unit_code, invoice_number, requested_by_name).
 type Adjustment struct{ ent.Schema }
 
@@ -281,7 +282,6 @@ func (Adjustment) Fields() []ent.Field {
 		field.UUID("treasury_credit_note_id", uuid.UUID{}).Optional().Nillable(),
 		field.Enum("status").Values("pending_approval", "approved", "rejected", "applied").Default("pending_approval"),
 		field.UUID("requested_by", uuid.UUID{}),
-		field.JSON("approvals", []map[string]any{}).Optional(),
 	}
 }
 

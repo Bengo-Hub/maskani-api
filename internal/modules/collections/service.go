@@ -19,6 +19,8 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
+	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -27,15 +29,32 @@ import (
 
 // Service is the collections service.
 type Service struct {
-	client   *ent.Client
-	treasury *treasury.Client
-	accounts *accounts.Service
-	log      *zap.Logger
+	client    *ent.Client
+	treasury  *treasury.Client
+	accounts  *accounts.Service
+	approvals *approvals.Service
+	log       *zap.Logger
 }
 
-// NewService creates the collections service.
-func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, log *zap.Logger) *Service {
-	return &Service{client: client, treasury: tc, accounts: acc, log: log.Named("collections")}
+// NewService creates the collections service and registers the default approval steps of its
+// workflows on the central engine: one approval by someone who may approve credits, and one
+// verification of a manual payment. An estate's rules replace them per amount band.
+func NewService(client *ent.Client, tc *treasury.Client, acc *accounts.Service, ap *approvals.Service, log *zap.Logger) *Service {
+	ap.SetDefault("credit_note", approvals.Step{Sequence: 1, Name: "Approve the credit", Permission: rbac.PermBillingApprove})
+	ap.SetDefault("adjustment", approvals.Step{Sequence: 1, Name: "Approve the waiver", Permission: rbac.PermBillingApprove})
+	ap.SetDefault("manual_payment", approvals.Step{Sequence: 1, Name: "Verify the payment", Permission: rbac.PermBillingVerify})
+	s := &Service{client: client, treasury: tc, accounts: acc, approvals: ap, log: log.Named("collections")}
+	credit := func(ctx context.Context, req *ent.ApprovalRequest) error {
+		_, err := s.AfterDecision(ctx, req)
+		return err
+	}
+	ap.OnDecision("credit_note", credit)
+	ap.OnDecision("adjustment", credit)
+	ap.OnDecision("manual_payment", func(ctx context.Context, req *ent.ApprovalRequest) error {
+		_, err := s.AfterManualDecision(ctx, req)
+		return err
+	})
+	return s
 }
 
 // ListAccounts returns a keyset page of accounts (newest first) for a property or the caller's

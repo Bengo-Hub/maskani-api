@@ -49,16 +49,30 @@ func (_u *ApprovalRuleUpdate) ClearMetadata() *ApprovalRuleUpdate {
 	return _u
 }
 
-// SetAction sets the "action" field.
-func (_u *ApprovalRuleUpdate) SetAction(v approvalrule.Action) *ApprovalRuleUpdate {
-	_u.mutation.SetAction(v)
+// SetModule sets the "module" field.
+func (_u *ApprovalRuleUpdate) SetModule(v approvalrule.Module) *ApprovalRuleUpdate {
+	_u.mutation.SetModule(v)
 	return _u
 }
 
-// SetNillableAction sets the "action" field if the given value is not nil.
-func (_u *ApprovalRuleUpdate) SetNillableAction(v *approvalrule.Action) *ApprovalRuleUpdate {
+// SetNillableModule sets the "module" field if the given value is not nil.
+func (_u *ApprovalRuleUpdate) SetNillableModule(v *approvalrule.Module) *ApprovalRuleUpdate {
 	if v != nil {
-		_u.SetAction(*v)
+		_u.SetModule(*v)
+	}
+	return _u
+}
+
+// SetName sets the "name" field.
+func (_u *ApprovalRuleUpdate) SetName(v string) *ApprovalRuleUpdate {
+	_u.mutation.SetName(v)
+	return _u
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_u *ApprovalRuleUpdate) SetNillableName(v *string) *ApprovalRuleUpdate {
+	if v != nil {
+		_u.SetName(*v)
 	}
 	return _u
 }
@@ -111,42 +125,15 @@ func (_u *ApprovalRuleUpdate) ClearMaxAmount() *ApprovalRuleUpdate {
 	return _u
 }
 
-// SetLevels sets the "levels" field.
-func (_u *ApprovalRuleUpdate) SetLevels(v int) *ApprovalRuleUpdate {
-	_u.mutation.ResetLevels()
-	_u.mutation.SetLevels(v)
+// SetSteps sets the "steps" field.
+func (_u *ApprovalRuleUpdate) SetSteps(v []map[string]interface{}) *ApprovalRuleUpdate {
+	_u.mutation.SetSteps(v)
 	return _u
 }
 
-// SetNillableLevels sets the "levels" field if the given value is not nil.
-func (_u *ApprovalRuleUpdate) SetNillableLevels(v *int) *ApprovalRuleUpdate {
-	if v != nil {
-		_u.SetLevels(*v)
-	}
-	return _u
-}
-
-// AddLevels adds value to the "levels" field.
-func (_u *ApprovalRuleUpdate) AddLevels(v int) *ApprovalRuleUpdate {
-	_u.mutation.AddLevels(v)
-	return _u
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (_u *ApprovalRuleUpdate) SetApproverRoles(v []string) *ApprovalRuleUpdate {
-	_u.mutation.SetApproverRoles(v)
-	return _u
-}
-
-// AppendApproverRoles appends value to the "approver_roles" field.
-func (_u *ApprovalRuleUpdate) AppendApproverRoles(v []string) *ApprovalRuleUpdate {
-	_u.mutation.AppendApproverRoles(v)
-	return _u
-}
-
-// ClearApproverRoles clears the value of the "approver_roles" field.
-func (_u *ApprovalRuleUpdate) ClearApproverRoles() *ApprovalRuleUpdate {
-	_u.mutation.ClearApproverRoles()
+// AppendSteps appends value to the "steps" field.
+func (_u *ApprovalRuleUpdate) AppendSteps(v []map[string]interface{}) *ApprovalRuleUpdate {
+	_u.mutation.AppendSteps(v)
 	return _u
 }
 
@@ -164,16 +151,16 @@ func (_u *ApprovalRuleUpdate) SetNillableRequireOtp(v *bool) *ApprovalRuleUpdate
 	return _u
 }
 
-// SetActive sets the "active" field.
-func (_u *ApprovalRuleUpdate) SetActive(v bool) *ApprovalRuleUpdate {
-	_u.mutation.SetActive(v)
+// SetIsActive sets the "is_active" field.
+func (_u *ApprovalRuleUpdate) SetIsActive(v bool) *ApprovalRuleUpdate {
+	_u.mutation.SetIsActive(v)
 	return _u
 }
 
-// SetNillableActive sets the "active" field if the given value is not nil.
-func (_u *ApprovalRuleUpdate) SetNillableActive(v *bool) *ApprovalRuleUpdate {
+// SetNillableIsActive sets the "is_active" field if the given value is not nil.
+func (_u *ApprovalRuleUpdate) SetNillableIsActive(v *bool) *ApprovalRuleUpdate {
 	if v != nil {
-		_u.SetActive(*v)
+		_u.SetIsActive(*v)
 	}
 	return _u
 }
@@ -227,9 +214,9 @@ func (_u *ApprovalRuleUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ApprovalRuleUpdate) check() error {
-	if v, ok := _u.mutation.Action(); ok {
-		if err := approvalrule.ActionValidator(v); err != nil {
-			return &ValidationError{Name: "action", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.action": %w`, err)}
+	if v, ok := _u.mutation.Module(); ok {
+		if err := approvalrule.ModuleValidator(v); err != nil {
+			return &ValidationError{Name: "module", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.module": %w`, err)}
 		}
 	}
 	return nil
@@ -262,8 +249,11 @@ func (_u *ApprovalRuleUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.MetadataCleared() {
 		_spec.ClearField(approvalrule.FieldMetadata, field.TypeJSON)
 	}
-	if value, ok := _u.mutation.Action(); ok {
-		_spec.SetField(approvalrule.FieldAction, field.TypeEnum, value)
+	if value, ok := _u.mutation.Module(); ok {
+		_spec.SetField(approvalrule.FieldModule, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Name(); ok {
+		_spec.SetField(approvalrule.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.MinAmount(); ok {
 		_spec.SetField(approvalrule.FieldMinAmount, field.TypeFloat64, value)
@@ -280,28 +270,19 @@ func (_u *ApprovalRuleUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.MaxAmountCleared() {
 		_spec.ClearField(approvalrule.FieldMaxAmount, field.TypeFloat64)
 	}
-	if value, ok := _u.mutation.Levels(); ok {
-		_spec.SetField(approvalrule.FieldLevels, field.TypeInt, value)
+	if value, ok := _u.mutation.Steps(); ok {
+		_spec.SetField(approvalrule.FieldSteps, field.TypeJSON, value)
 	}
-	if value, ok := _u.mutation.AddedLevels(); ok {
-		_spec.AddField(approvalrule.FieldLevels, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.ApproverRoles(); ok {
-		_spec.SetField(approvalrule.FieldApproverRoles, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedApproverRoles(); ok {
+	if value, ok := _u.mutation.AppendedSteps(); ok {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, approvalrule.FieldApproverRoles, value)
+			sqljson.Append(u, approvalrule.FieldSteps, value)
 		})
-	}
-	if _u.mutation.ApproverRolesCleared() {
-		_spec.ClearField(approvalrule.FieldApproverRoles, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.RequireOtp(); ok {
 		_spec.SetField(approvalrule.FieldRequireOtp, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.Active(); ok {
-		_spec.SetField(approvalrule.FieldActive, field.TypeBool, value)
+	if value, ok := _u.mutation.IsActive(); ok {
+		_spec.SetField(approvalrule.FieldIsActive, field.TypeBool, value)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -343,16 +324,30 @@ func (_u *ApprovalRuleUpdateOne) ClearMetadata() *ApprovalRuleUpdateOne {
 	return _u
 }
 
-// SetAction sets the "action" field.
-func (_u *ApprovalRuleUpdateOne) SetAction(v approvalrule.Action) *ApprovalRuleUpdateOne {
-	_u.mutation.SetAction(v)
+// SetModule sets the "module" field.
+func (_u *ApprovalRuleUpdateOne) SetModule(v approvalrule.Module) *ApprovalRuleUpdateOne {
+	_u.mutation.SetModule(v)
 	return _u
 }
 
-// SetNillableAction sets the "action" field if the given value is not nil.
-func (_u *ApprovalRuleUpdateOne) SetNillableAction(v *approvalrule.Action) *ApprovalRuleUpdateOne {
+// SetNillableModule sets the "module" field if the given value is not nil.
+func (_u *ApprovalRuleUpdateOne) SetNillableModule(v *approvalrule.Module) *ApprovalRuleUpdateOne {
 	if v != nil {
-		_u.SetAction(*v)
+		_u.SetModule(*v)
+	}
+	return _u
+}
+
+// SetName sets the "name" field.
+func (_u *ApprovalRuleUpdateOne) SetName(v string) *ApprovalRuleUpdateOne {
+	_u.mutation.SetName(v)
+	return _u
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_u *ApprovalRuleUpdateOne) SetNillableName(v *string) *ApprovalRuleUpdateOne {
+	if v != nil {
+		_u.SetName(*v)
 	}
 	return _u
 }
@@ -405,42 +400,15 @@ func (_u *ApprovalRuleUpdateOne) ClearMaxAmount() *ApprovalRuleUpdateOne {
 	return _u
 }
 
-// SetLevels sets the "levels" field.
-func (_u *ApprovalRuleUpdateOne) SetLevels(v int) *ApprovalRuleUpdateOne {
-	_u.mutation.ResetLevels()
-	_u.mutation.SetLevels(v)
+// SetSteps sets the "steps" field.
+func (_u *ApprovalRuleUpdateOne) SetSteps(v []map[string]interface{}) *ApprovalRuleUpdateOne {
+	_u.mutation.SetSteps(v)
 	return _u
 }
 
-// SetNillableLevels sets the "levels" field if the given value is not nil.
-func (_u *ApprovalRuleUpdateOne) SetNillableLevels(v *int) *ApprovalRuleUpdateOne {
-	if v != nil {
-		_u.SetLevels(*v)
-	}
-	return _u
-}
-
-// AddLevels adds value to the "levels" field.
-func (_u *ApprovalRuleUpdateOne) AddLevels(v int) *ApprovalRuleUpdateOne {
-	_u.mutation.AddLevels(v)
-	return _u
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (_u *ApprovalRuleUpdateOne) SetApproverRoles(v []string) *ApprovalRuleUpdateOne {
-	_u.mutation.SetApproverRoles(v)
-	return _u
-}
-
-// AppendApproverRoles appends value to the "approver_roles" field.
-func (_u *ApprovalRuleUpdateOne) AppendApproverRoles(v []string) *ApprovalRuleUpdateOne {
-	_u.mutation.AppendApproverRoles(v)
-	return _u
-}
-
-// ClearApproverRoles clears the value of the "approver_roles" field.
-func (_u *ApprovalRuleUpdateOne) ClearApproverRoles() *ApprovalRuleUpdateOne {
-	_u.mutation.ClearApproverRoles()
+// AppendSteps appends value to the "steps" field.
+func (_u *ApprovalRuleUpdateOne) AppendSteps(v []map[string]interface{}) *ApprovalRuleUpdateOne {
+	_u.mutation.AppendSteps(v)
 	return _u
 }
 
@@ -458,16 +426,16 @@ func (_u *ApprovalRuleUpdateOne) SetNillableRequireOtp(v *bool) *ApprovalRuleUpd
 	return _u
 }
 
-// SetActive sets the "active" field.
-func (_u *ApprovalRuleUpdateOne) SetActive(v bool) *ApprovalRuleUpdateOne {
-	_u.mutation.SetActive(v)
+// SetIsActive sets the "is_active" field.
+func (_u *ApprovalRuleUpdateOne) SetIsActive(v bool) *ApprovalRuleUpdateOne {
+	_u.mutation.SetIsActive(v)
 	return _u
 }
 
-// SetNillableActive sets the "active" field if the given value is not nil.
-func (_u *ApprovalRuleUpdateOne) SetNillableActive(v *bool) *ApprovalRuleUpdateOne {
+// SetNillableIsActive sets the "is_active" field if the given value is not nil.
+func (_u *ApprovalRuleUpdateOne) SetNillableIsActive(v *bool) *ApprovalRuleUpdateOne {
 	if v != nil {
-		_u.SetActive(*v)
+		_u.SetIsActive(*v)
 	}
 	return _u
 }
@@ -534,9 +502,9 @@ func (_u *ApprovalRuleUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ApprovalRuleUpdateOne) check() error {
-	if v, ok := _u.mutation.Action(); ok {
-		if err := approvalrule.ActionValidator(v); err != nil {
-			return &ValidationError{Name: "action", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.action": %w`, err)}
+	if v, ok := _u.mutation.Module(); ok {
+		if err := approvalrule.ModuleValidator(v); err != nil {
+			return &ValidationError{Name: "module", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.module": %w`, err)}
 		}
 	}
 	return nil
@@ -586,8 +554,11 @@ func (_u *ApprovalRuleUpdateOne) sqlSave(ctx context.Context) (_node *ApprovalRu
 	if _u.mutation.MetadataCleared() {
 		_spec.ClearField(approvalrule.FieldMetadata, field.TypeJSON)
 	}
-	if value, ok := _u.mutation.Action(); ok {
-		_spec.SetField(approvalrule.FieldAction, field.TypeEnum, value)
+	if value, ok := _u.mutation.Module(); ok {
+		_spec.SetField(approvalrule.FieldModule, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Name(); ok {
+		_spec.SetField(approvalrule.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.MinAmount(); ok {
 		_spec.SetField(approvalrule.FieldMinAmount, field.TypeFloat64, value)
@@ -604,28 +575,19 @@ func (_u *ApprovalRuleUpdateOne) sqlSave(ctx context.Context) (_node *ApprovalRu
 	if _u.mutation.MaxAmountCleared() {
 		_spec.ClearField(approvalrule.FieldMaxAmount, field.TypeFloat64)
 	}
-	if value, ok := _u.mutation.Levels(); ok {
-		_spec.SetField(approvalrule.FieldLevels, field.TypeInt, value)
+	if value, ok := _u.mutation.Steps(); ok {
+		_spec.SetField(approvalrule.FieldSteps, field.TypeJSON, value)
 	}
-	if value, ok := _u.mutation.AddedLevels(); ok {
-		_spec.AddField(approvalrule.FieldLevels, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.ApproverRoles(); ok {
-		_spec.SetField(approvalrule.FieldApproverRoles, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedApproverRoles(); ok {
+	if value, ok := _u.mutation.AppendedSteps(); ok {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, approvalrule.FieldApproverRoles, value)
+			sqljson.Append(u, approvalrule.FieldSteps, value)
 		})
-	}
-	if _u.mutation.ApproverRolesCleared() {
-		_spec.ClearField(approvalrule.FieldApproverRoles, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.RequireOtp(); ok {
 		_spec.SetField(approvalrule.FieldRequireOtp, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.Active(); ok {
-		_spec.SetField(approvalrule.FieldActive, field.TypeBool, value)
+	if value, ok := _u.mutation.IsActive(); ok {
+		_spec.SetField(approvalrule.FieldIsActive, field.TypeBool, value)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	_node = &ApprovalRule{config: _u.config}

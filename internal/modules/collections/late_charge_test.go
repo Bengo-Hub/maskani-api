@@ -16,8 +16,8 @@ func TestLateChargeNeverCompounds(t *testing.T) {
 	today := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
 	led := &treasury.AccountLedger{Invoices: []treasury.LedgerInvoice{
 		{DueDate: today.AddDate(0, 0, -45), TotalAmount: d(10000), AmountPaid: d(2000), AmountCredited: d(1000)}, // 7,000 overdue
-		{DueDate: today.AddDate(0, 0, -45), TotalAmount: d(140), Kind: KindLateCharge},                            // last month's charge
-		{DueDate: today.AddDate(0, 0, -10), TotalAmount: d(5000)},                                                 // inside grace
+		{DueDate: today.AddDate(0, 0, -45), TotalAmount: d(140), Kind: KindLateCharge},                           // last month's charge
+		{DueDate: today.AddDate(0, 0, -10), TotalAmount: d(5000)},                                                // inside grace
 		{DueDate: today.AddDate(0, 0, -60), TotalAmount: d(3000), AmountPaid: d(3000)},                           // paid
 	}}
 	base := OverdueBase(led, today, 30)

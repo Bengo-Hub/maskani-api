@@ -10,6 +10,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
+	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
@@ -195,6 +196,33 @@ func (f TraverseAdjustment) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.AdjustmentQuery", q)
+}
+
+// The ApprovalRequestFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ApprovalRequestFunc func(context.Context, *ent.ApprovalRequestQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ApprovalRequestFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ApprovalRequestQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ApprovalRequestQuery", q)
+}
+
+// The TraverseApprovalRequest type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseApprovalRequest func(context.Context, *ent.ApprovalRequestQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseApprovalRequest) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseApprovalRequest) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ApprovalRequestQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ApprovalRequestQuery", q)
 }
 
 // The ApprovalRuleFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -2202,6 +2230,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.AccountCollectionQuery, predicate.AccountCollection, accountcollection.OrderOption]{typ: ent.TypeAccountCollection, tq: q}, nil
 	case *ent.AdjustmentQuery:
 		return &query[*ent.AdjustmentQuery, predicate.Adjustment, adjustment.OrderOption]{typ: ent.TypeAdjustment, tq: q}, nil
+	case *ent.ApprovalRequestQuery:
+		return &query[*ent.ApprovalRequestQuery, predicate.ApprovalRequest, approvalrequest.OrderOption]{typ: ent.TypeApprovalRequest, tq: q}, nil
 	case *ent.ApprovalRuleQuery:
 		return &query[*ent.ApprovalRuleQuery, predicate.ApprovalRule, approvalrule.OrderOption]{typ: ent.TypeApprovalRule, tq: q}, nil
 	case *ent.AuditLogQuery:

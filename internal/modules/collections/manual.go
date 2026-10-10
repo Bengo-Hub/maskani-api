@@ -9,11 +9,13 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/manualpayment"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuseroutlet"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
@@ -100,6 +102,14 @@ func (s *Service) SubmitManual(ctx context.Context, accountID uuid.UUID, by Subm
 		}
 		return nil, err
 	}
+	pid := acc.Edges.Unit.PropertyID
+	if _, _, err := s.approvals.Submit(ctx, approvals.Submission{Module: "manual_payment", ObjectID: mp.ID, Reference: in.Reference,
+		Amount: in.Amount, PropertyID: &pid, By: by.UserID, ByName: by.Name,
+		Meta: map[string]any{"account_ref": acc.AccountRef, "unit_code": acc.Edges.Unit.Code, "account_id": acc.ID.String(),
+			"label": manualLabel(in.Method) + " " + in.Reference, "portal": by.Portal}}); err != nil {
+		_ = s.client.ManualPayment.DeleteOneID(mp.ID).Exec(ctx)
+		return nil, err
+	}
 	tenantID, _ := tenantguard.TenantID(ctx)
 	payload := map[string]any{"manual_payment_id": mp.ID, "account_id": acc.ID, "account_ref": acc.AccountRef,
 		"unit_code": acc.Edges.Unit.Code, "amount": in.Amount.StringFixed(2), "method": in.Method, "reference": in.Reference,
@@ -146,15 +156,28 @@ func (s *Service) ManualPropertyID(ctx context.Context, id uuid.UUID) (uuid.UUID
 	return mp.PropertyID, nil
 }
 
-// Reviewer is who verifies a manual payment.
+// Reviewer is who answers a bill query.
 type Reviewer struct {
 	UserID uuid.UUID
 	Name   string
 }
 
-// ApproveManual books a verified payment in treasury and closes it. The person who recorded it
-// cannot approve it. A failure to book leaves it pending so it can be approved again.
-func (s *Service) ApproveManual(ctx context.Context, id uuid.UUID, by Reviewer, note string) (*ent.ManualPayment, error) {
+func manualLabel(method string) string {
+	switch method {
+	case "bank_transfer":
+		return "Bank transfer"
+	case "cheque":
+		return "Cheque"
+	case "cash":
+		return "Cash"
+	}
+	return "M-Pesa"
+}
+
+// ApproveManual decides the current step of the payment's verification on the central engine. The
+// last step books it in treasury and closes it; a failure to book leaves it pending with the
+// approval done, so approving again retries the booking. The recorder never verifies their own.
+func (s *Service) ApproveManual(ctx context.Context, id uuid.UUID, by approvals.Actor, note string) (*ent.ManualPayment, error) {
 	mp, err := s.client.ManualPayment.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -162,8 +185,57 @@ func (s *Service) ApproveManual(ctx context.Context, id uuid.UUID, by Reviewer, 
 	if mp.Status != manualpayment.StatusPending {
 		return nil, httpx.Conflict("this payment has already been reviewed")
 	}
-	if mp.SubmittedBy == by.UserID {
-		return nil, httpx.Forbidden("someone other than the person who recorded it must verify this payment")
+	req, err := s.approvals.Latest(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if req == nil {
+		return nil, httpx.Conflict("this payment has no verification waiting")
+	}
+	if req.Status == approvalrequest.StatusPending {
+		if _, err := s.approvals.Decide(ctx, req.ID, by, approvals.Approve, note); err != nil {
+			return nil, err
+		}
+	} else if err := s.approvals.Retry(ctx, req); err != nil {
+		return nil, err
+	}
+	return s.client.ManualPayment.Get(ctx, id)
+}
+
+// AfterManualDecision moves a manual payment on once its verification is decided: approved books it
+// in treasury, rejected closes it with the reason. Called by ApproveManual, RejectManual and the
+// central approvals inbox.
+func (s *Service) AfterManualDecision(ctx context.Context, req *ent.ApprovalRequest) (*ent.ManualPayment, error) {
+	mp, err := s.client.ManualPayment.Get(ctx, req.ObjectID)
+	if err != nil {
+		return nil, err
+	}
+	if mp.Status != manualpayment.StatusPending {
+		return mp, nil
+	}
+	acts := approvals.Actions(req)
+	var last approvals.Action
+	for _, a := range acts {
+		if a.Status == "approved" || a.Status == "rejected" {
+			last = a
+		}
+	}
+	reviewer, name := uuid.Nil, last.ActedByName
+	if last.ActedBy != nil {
+		reviewer = *last.ActedBy
+	}
+	switch req.Status {
+	case approvalrequest.StatusRejected:
+		_, err := s.client.ManualPayment.Update().Where(manualpayment.ID(mp.ID), manualpayment.StatusEQ(manualpayment.StatusPending)).
+			SetStatus(manualpayment.StatusRejected).SetReviewedBy(reviewer).SetReviewedByName(name).SetReviewedAt(time.Now()).
+			SetReviewNote(last.Comment).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return s.client.ManualPayment.Get(ctx, mp.ID)
+	case approvalrequest.StatusApproved:
+	default:
+		return mp, nil // more steps to go
 	}
 	acc, err := s.client.UnitAccount.Query().Where(unitaccount.ID(mp.UnitAccountID)).WithFund().Only(ctx)
 	if err != nil {
@@ -179,38 +251,31 @@ func (s *Service) ApproveManual(ctx context.Context, id uuid.UUID, by Reviewer, 
 		PayerName: mp.PayerName,
 	})
 	if err != nil {
-		return nil, httpx.Unavailable("the payment could not be booked in the accounts; try again shortly")
+		return nil, httpx.Unavailable("verified, but the payment could not be booked in the accounts; verify again shortly to retry")
 	}
-	// Only the first reviewer closes it, even if two approve at the same moment.
-	n, err := s.client.ManualPayment.Update().Where(manualpayment.ID(id), manualpayment.StatusEQ(manualpayment.StatusPending)).
-		SetStatus(manualpayment.StatusApproved).SetReviewedBy(by.UserID).SetReviewedByName(by.Name).SetReviewedAt(time.Now()).
-		SetReviewNote(strings.TrimSpace(note)).SetTreasuryIntentID(intentID).Save(ctx)
-	if err != nil {
+	// Only the first booking closes it, even if two retries land at the same moment.
+	if _, err := s.client.ManualPayment.Update().Where(manualpayment.ID(mp.ID), manualpayment.StatusEQ(manualpayment.StatusPending)).
+		SetStatus(manualpayment.StatusApproved).SetReviewedBy(reviewer).SetReviewedByName(name).SetReviewedAt(time.Now()).
+		SetReviewNote(last.Comment).SetTreasuryIntentID(intentID).Save(ctx); err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, httpx.Conflict("this payment has already been reviewed")
 	}
 	if _, err := s.accounts.Refresh(ctx, acc); err != nil {
 		s.log.Warn("balance refresh after manual payment")
 	}
-	return s.client.ManualPayment.Get(ctx, id)
+	return s.client.ManualPayment.Get(ctx, mp.ID)
 }
 
-// RejectManual closes a manual payment without booking it; the reason is required.
-func (s *Service) RejectManual(ctx context.Context, id uuid.UUID, by Reviewer, reason string) (*ent.ManualPayment, error) {
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return nil, httpx.Invalid("say why the payment is rejected")
-	}
-	n, err := s.client.ManualPayment.Update().Where(manualpayment.ID(id), manualpayment.StatusEQ(manualpayment.StatusPending)).
-		SetStatus(manualpayment.StatusRejected).SetReviewedBy(by.UserID).SetReviewedByName(by.Name).SetReviewedAt(time.Now()).
-		SetReviewNote(reason).Save(ctx)
+// RejectManual rejects the payment's verification; the reason is required.
+func (s *Service) RejectManual(ctx context.Context, id uuid.UUID, by approvals.Actor, reason string) (*ent.ManualPayment, error) {
+	req, err := s.approvals.Latest(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
+	if req == nil || req.Status != approvalrequest.StatusPending {
 		return nil, httpx.Conflict("this payment has already been reviewed")
+	}
+	if _, err := s.approvals.Decide(ctx, req.ID, by, approvals.Reject, reason); err != nil {
+		return nil, err
 	}
 	return s.client.ManualPayment.Get(ctx, id)
 }

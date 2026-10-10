@@ -6,7 +6,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
@@ -223,7 +225,18 @@ func (h *H) ActWorkOrder(w http.ResponseWriter, r *http.Request) {
 	if !h.scopeOf(w, r, register.RecordWorkOrder, id) {
 		return
 	}
-	wo, err := h.Works.Act(r.Context(), id, h.staffActor(r), in)
+	var wo *ent.WorkOrder
+	var err error
+	switch in.Action {
+	case "approve_quote", "reject_quote":
+		d := approvals.Approve
+		if in.Action == "reject_quote" {
+			d = approvals.Reject
+		}
+		wo, err = h.Works.DecideQuote(r.Context(), id, approver(r), d, in.Note)
+	default:
+		wo, err = h.Works.Act(r.Context(), id, h.staffActor(r), in)
+	}
 	if err != nil {
 		httpx.Fail(w, err)
 		return

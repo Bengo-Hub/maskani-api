@@ -151,12 +151,6 @@ func (_c *AdjustmentCreate) SetRequestedBy(v uuid.UUID) *AdjustmentCreate {
 	return _c
 }
 
-// SetApprovals sets the "approvals" field.
-func (_c *AdjustmentCreate) SetApprovals(v []map[string]interface{}) *AdjustmentCreate {
-	_c.mutation.SetApprovals(v)
-	return _c
-}
-
 // SetID sets the "id" field.
 func (_c *AdjustmentCreate) SetID(v uuid.UUID) *AdjustmentCreate {
 	_c.mutation.SetID(v)
@@ -373,10 +367,6 @@ func (_c *AdjustmentCreate) createSpec() (*Adjustment, *sqlgraph.CreateSpec) {
 		_spec.SetField(adjustment.FieldRequestedBy, field.TypeUUID, value)
 		_node.RequestedBy = value
 	}
-	if value, ok := _c.mutation.Approvals(); ok {
-		_spec.SetField(adjustment.FieldApprovals, field.TypeJSON, value)
-		_node.Approvals = value
-	}
 	return _node, _spec
 }
 
@@ -582,24 +572,6 @@ func (u *AdjustmentUpsert) SetRequestedBy(v uuid.UUID) *AdjustmentUpsert {
 // UpdateRequestedBy sets the "requested_by" field to the value that was provided on create.
 func (u *AdjustmentUpsert) UpdateRequestedBy() *AdjustmentUpsert {
 	u.SetExcluded(adjustment.FieldRequestedBy)
-	return u
-}
-
-// SetApprovals sets the "approvals" field.
-func (u *AdjustmentUpsert) SetApprovals(v []map[string]interface{}) *AdjustmentUpsert {
-	u.Set(adjustment.FieldApprovals, v)
-	return u
-}
-
-// UpdateApprovals sets the "approvals" field to the value that was provided on create.
-func (u *AdjustmentUpsert) UpdateApprovals() *AdjustmentUpsert {
-	u.SetExcluded(adjustment.FieldApprovals)
-	return u
-}
-
-// ClearApprovals clears the value of the "approvals" field.
-func (u *AdjustmentUpsert) ClearApprovals() *AdjustmentUpsert {
-	u.SetNull(adjustment.FieldApprovals)
 	return u
 }
 
@@ -836,27 +808,6 @@ func (u *AdjustmentUpsertOne) SetRequestedBy(v uuid.UUID) *AdjustmentUpsertOne {
 func (u *AdjustmentUpsertOne) UpdateRequestedBy() *AdjustmentUpsertOne {
 	return u.Update(func(s *AdjustmentUpsert) {
 		s.UpdateRequestedBy()
-	})
-}
-
-// SetApprovals sets the "approvals" field.
-func (u *AdjustmentUpsertOne) SetApprovals(v []map[string]interface{}) *AdjustmentUpsertOne {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.SetApprovals(v)
-	})
-}
-
-// UpdateApprovals sets the "approvals" field to the value that was provided on create.
-func (u *AdjustmentUpsertOne) UpdateApprovals() *AdjustmentUpsertOne {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.UpdateApprovals()
-	})
-}
-
-// ClearApprovals clears the value of the "approvals" field.
-func (u *AdjustmentUpsertOne) ClearApprovals() *AdjustmentUpsertOne {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.ClearApprovals()
 	})
 }
 
@@ -1260,27 +1211,6 @@ func (u *AdjustmentUpsertBulk) SetRequestedBy(v uuid.UUID) *AdjustmentUpsertBulk
 func (u *AdjustmentUpsertBulk) UpdateRequestedBy() *AdjustmentUpsertBulk {
 	return u.Update(func(s *AdjustmentUpsert) {
 		s.UpdateRequestedBy()
-	})
-}
-
-// SetApprovals sets the "approvals" field.
-func (u *AdjustmentUpsertBulk) SetApprovals(v []map[string]interface{}) *AdjustmentUpsertBulk {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.SetApprovals(v)
-	})
-}
-
-// UpdateApprovals sets the "approvals" field to the value that was provided on create.
-func (u *AdjustmentUpsertBulk) UpdateApprovals() *AdjustmentUpsertBulk {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.UpdateApprovals()
-	})
-}
-
-// ClearApprovals clears the value of the "approvals" field.
-func (u *AdjustmentUpsertBulk) ClearApprovals() *AdjustmentUpsertBulk {
-	return u.Update(func(s *AdjustmentUpsert) {
-		s.ClearApprovals()
 	})
 }
 

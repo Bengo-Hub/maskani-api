@@ -7,6 +7,7 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent/accountcollection"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
+	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
 	"github.com/bengobox/maskani-api/internal/ent/auditlog"
 	"github.com/bengobox/maskani-api/internal/ent/billingrun"
@@ -147,6 +148,49 @@ func init() {
 	adjustmentDescID := adjustmentMixinFields0[0].Descriptor()
 	// adjustment.DefaultID holds the default value on creation for the id field.
 	adjustment.DefaultID = adjustmentDescID.Default.(func() uuid.UUID)
+	approvalrequestMixin := schema.ApprovalRequest{}.Mixin()
+	approvalrequestMixinHooks0 := approvalrequestMixin[0].Hooks()
+	approvalrequest.Hooks[0] = approvalrequestMixinHooks0[0]
+	approvalrequestMixinInters0 := approvalrequestMixin[0].Interceptors()
+	approvalrequest.Interceptors[0] = approvalrequestMixinInters0[0]
+	approvalrequestMixinFields0 := approvalrequestMixin[0].Fields()
+	_ = approvalrequestMixinFields0
+	approvalrequestFields := schema.ApprovalRequest{}.Fields()
+	_ = approvalrequestFields
+	// approvalrequestDescCreatedAt is the schema descriptor for created_at field.
+	approvalrequestDescCreatedAt := approvalrequestMixinFields0[2].Descriptor()
+	// approvalrequest.DefaultCreatedAt holds the default value on creation for the created_at field.
+	approvalrequest.DefaultCreatedAt = approvalrequestDescCreatedAt.Default.(func() time.Time)
+	// approvalrequestDescUpdatedAt is the schema descriptor for updated_at field.
+	approvalrequestDescUpdatedAt := approvalrequestMixinFields0[3].Descriptor()
+	// approvalrequest.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	approvalrequest.DefaultUpdatedAt = approvalrequestDescUpdatedAt.Default.(func() time.Time)
+	// approvalrequest.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	approvalrequest.UpdateDefaultUpdatedAt = approvalrequestDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// approvalrequestDescObjectReference is the schema descriptor for object_reference field.
+	approvalrequestDescObjectReference := approvalrequestFields[2].Descriptor()
+	// approvalrequest.DefaultObjectReference holds the default value on creation for the object_reference field.
+	approvalrequest.DefaultObjectReference = approvalrequestDescObjectReference.Default.(string)
+	// approvalrequestDescAmount is the schema descriptor for amount field.
+	approvalrequestDescAmount := approvalrequestFields[3].Descriptor()
+	// approvalrequest.DefaultAmount holds the default value on creation for the amount field.
+	approvalrequest.DefaultAmount = approvalrequestDescAmount.Default.(func() decimal.Decimal)
+	// approvalrequestDescCurrentSequence is the schema descriptor for current_sequence field.
+	approvalrequestDescCurrentSequence := approvalrequestFields[7].Descriptor()
+	// approvalrequest.DefaultCurrentSequence holds the default value on creation for the current_sequence field.
+	approvalrequest.DefaultCurrentSequence = approvalrequestDescCurrentSequence.Default.(int)
+	// approvalrequestDescCurrentApprover is the schema descriptor for current_approver field.
+	approvalrequestDescCurrentApprover := approvalrequestFields[8].Descriptor()
+	// approvalrequest.DefaultCurrentApprover holds the default value on creation for the current_approver field.
+	approvalrequest.DefaultCurrentApprover = approvalrequestDescCurrentApprover.Default.(string)
+	// approvalrequestDescSubmittedByName is the schema descriptor for submitted_by_name field.
+	approvalrequestDescSubmittedByName := approvalrequestFields[11].Descriptor()
+	// approvalrequest.DefaultSubmittedByName holds the default value on creation for the submitted_by_name field.
+	approvalrequest.DefaultSubmittedByName = approvalrequestDescSubmittedByName.Default.(string)
+	// approvalrequestDescID is the schema descriptor for id field.
+	approvalrequestDescID := approvalrequestMixinFields0[0].Descriptor()
+	// approvalrequest.DefaultID holds the default value on creation for the id field.
+	approvalrequest.DefaultID = approvalrequestDescID.Default.(func() uuid.UUID)
 	approvalruleMixin := schema.ApprovalRule{}.Mixin()
 	approvalruleMixinHooks0 := approvalruleMixin[0].Hooks()
 	approvalrule.Hooks[0] = approvalruleMixinHooks0[0]
@@ -166,22 +210,22 @@ func init() {
 	approvalrule.DefaultUpdatedAt = approvalruleDescUpdatedAt.Default.(func() time.Time)
 	// approvalrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	approvalrule.UpdateDefaultUpdatedAt = approvalruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// approvalruleDescName is the schema descriptor for name field.
+	approvalruleDescName := approvalruleFields[1].Descriptor()
+	// approvalrule.DefaultName holds the default value on creation for the name field.
+	approvalrule.DefaultName = approvalruleDescName.Default.(string)
 	// approvalruleDescMinAmount is the schema descriptor for min_amount field.
-	approvalruleDescMinAmount := approvalruleFields[1].Descriptor()
+	approvalruleDescMinAmount := approvalruleFields[2].Descriptor()
 	// approvalrule.DefaultMinAmount holds the default value on creation for the min_amount field.
 	approvalrule.DefaultMinAmount = approvalruleDescMinAmount.Default.(func() decimal.Decimal)
-	// approvalruleDescLevels is the schema descriptor for levels field.
-	approvalruleDescLevels := approvalruleFields[3].Descriptor()
-	// approvalrule.DefaultLevels holds the default value on creation for the levels field.
-	approvalrule.DefaultLevels = approvalruleDescLevels.Default.(int)
 	// approvalruleDescRequireOtp is the schema descriptor for require_otp field.
 	approvalruleDescRequireOtp := approvalruleFields[5].Descriptor()
 	// approvalrule.DefaultRequireOtp holds the default value on creation for the require_otp field.
 	approvalrule.DefaultRequireOtp = approvalruleDescRequireOtp.Default.(bool)
-	// approvalruleDescActive is the schema descriptor for active field.
-	approvalruleDescActive := approvalruleFields[6].Descriptor()
-	// approvalrule.DefaultActive holds the default value on creation for the active field.
-	approvalrule.DefaultActive = approvalruleDescActive.Default.(bool)
+	// approvalruleDescIsActive is the schema descriptor for is_active field.
+	approvalruleDescIsActive := approvalruleFields[6].Descriptor()
+	// approvalrule.DefaultIsActive holds the default value on creation for the is_active field.
+	approvalrule.DefaultIsActive = approvalruleDescIsActive.Default.(bool)
 	// approvalruleDescID is the schema descriptor for id field.
 	approvalruleDescID := approvalruleMixinFields0[0].Descriptor()
 	// approvalrule.DefaultID holds the default value on creation for the id field.

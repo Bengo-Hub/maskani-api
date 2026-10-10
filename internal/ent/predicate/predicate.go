@@ -12,6 +12,9 @@ type AccountCollection func(*sql.Selector)
 // Adjustment is the predicate function for adjustment builders.
 type Adjustment func(*sql.Selector)
 
+// ApprovalRequest is the predicate function for approvalrequest builders.
+type ApprovalRequest func(*sql.Selector)
+
 // ApprovalRule is the predicate function for approvalrule builders.
 type ApprovalRule func(*sql.Selector)
 

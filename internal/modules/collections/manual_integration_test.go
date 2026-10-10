@@ -14,8 +14,10 @@ import (
 	"github.com/bengobox/maskani-api/internal/config"
 	"github.com/bengobox/maskani-api/internal/ent"
 	_ "github.com/bengobox/maskani-api/internal/ent/runtime"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/platform/database"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
 // TestManualPaymentsOnPostgres covers the review rules that run before treasury is called: one
@@ -51,7 +53,9 @@ func TestManualPaymentsOnPostgres(t *testing.T) {
 	must(err)
 	acc, err := client.UnitAccount.Create().SetUnitID(u.ID).SetFundID(f.ID).SetAccountRef("A01").Save(tctx)
 	must(err)
-	s := NewService(client, nil, nil, zap.NewNop())
+	ap := approvals.NewService(client)
+	s := NewService(client, nil, nil, ap, zap.NewNop())
+	anyone := func(string) bool { return true }
 	clerk := Submitter{UserID: uuid.New(), Name: "Clerk"}
 	in := ManualInput{Amount: decimal.NewFromInt(300000), Method: "bank_transfer", Reference: "ft-001"}
 
@@ -66,10 +70,10 @@ func TestManualPaymentsOnPostgres(t *testing.T) {
 	if _, err := s.SubmitManual(tctx, acc.ID, Submitter{UserID: uuid.New(), Portal: true}, ManualInput{Amount: decimal.NewFromInt(10), Method: "cash", Reference: "X1"}); err == nil {
 		t.Fatal("a resident should not record cash")
 	}
-	if _, err := s.ApproveManual(tctx, mp.ID, Reviewer{UserID: clerk.UserID}, ""); err == nil {
+	if _, err := s.ApproveManual(tctx, mp.ID, approvals.Actor{UserID: clerk.UserID, HasPerm: anyone}, ""); err == nil {
 		t.Fatal("the person who recorded it should not approve it")
 	}
-	if _, err := s.RejectManual(tctx, mp.ID, Reviewer{UserID: uuid.New(), Name: "Manager"}, "slip unreadable"); err != nil {
+	if _, err := s.RejectManual(tctx, mp.ID, approvals.Actor{UserID: uuid.New(), Name: "Manager", HasPerm: anyone}, "slip unreadable"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SubmitManual(tctx, acc.ID, clerk, in); err != nil {
@@ -123,30 +127,59 @@ func TestManualPaymentsOnPostgres(t *testing.T) {
 		t.Fatal("an answered query should not be answered again")
 	}
 
-	// Adjustments: a two-level rule above 10,000 for named roles; the requester cannot approve.
-	_, err = client.ApprovalRule.Create().SetAction("credit_note").SetMinAmount(decimal.NewFromInt(10000)).SetLevels(2).
-		SetApproverRoles([]string{"tenant_admin"}).Save(tctx)
+	// The recorder cannot verify; a manual payment without the permission cannot be verified either.
+	mp2, err := s.SubmitManual(tctx, acc.ID, clerk, ManualInput{Amount: decimal.NewFromInt(5000), Method: "cheque", Reference: "CHQ-9"})
+	must(err)
+	if _, err := s.ApproveManual(tctx, mp2.ID, approvals.Actor{UserID: uuid.New(), HasPerm: func(string) bool { return false }}, ""); err == nil {
+		t.Fatal("someone without billing.verify should not verify")
+	}
+	if req, _ := ap.Latest(tctx, mp2.ID); req == nil || req.CurrentApprover != "perm:maskani.billing.verify" {
+		t.Fatalf("manual payment request: %+v", req)
+	}
+
+	// Adjustments: a two-step rule above 10,000 (tenant admin, then finance officer); the requester
+	// cannot approve, a role the step does not name cannot, one person approves one step only.
+	_, err = ap.CreateRule(tctx, approvals.RuleInput{Module: "credit_note", Name: "Large credits", MinAmount: decimal.NewFromInt(10000),
+		Steps: []approvals.Step{{ApproverRole: "tenant_admin"}, {ApproverRole: "finance_officer"}}})
 	must(err)
 	asker := uuid.New()
 	adj, err := client.Adjustment.Create().SetUnitAccountID(acc.ID).SetPropertyID(p.ID).SetKind("credit_note").
 		SetAmount(decimal.NewFromInt(12000)).SetReason("double billed").SetRequestedBy(asker).Save(tctx)
 	must(err)
-	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: asker, Roles: []string{"tenant_admin"}}, ""); err == nil {
+	pid := p.ID
+	_, required, err := ap.Submit(tctx, approvals.Submission{Module: "credit_note", ObjectID: adj.ID, Amount: adj.Amount, PropertyID: &pid, By: asker})
+	must(err)
+	if !required {
+		t.Fatal("a rule matched, so approval is required")
+	}
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, approvals.Actor{UserID: asker, Roles: []string{"tenant_admin"}}, ""); err == nil {
 		t.Fatal("the requester should not approve their own credit")
 	}
-	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: uuid.New(), Roles: []string{"finance_officer"}}, ""); err == nil {
-		t.Fatal("a role the rule does not name should not approve")
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, approvals.Actor{UserID: uuid.New(), Roles: []string{"finance_officer"}}, ""); err == nil {
+		t.Fatal("step one names the tenant admin, not finance")
 	}
 	first := uuid.New()
-	one, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: first, Name: "A", Roles: []string{"tenant_admin"}}, "")
+	one, err := s.ApproveAdjustment(tctx, adj.ID, approvals.Actor{UserID: first, Name: "A", Roles: []string{"tenant_admin", "finance_officer"}}, "")
 	must(err)
-	if one.Status != "pending_approval" || len(one.Approvals) != 1 {
-		t.Fatalf("after one of two approvals: %s %d", one.Status, len(one.Approvals))
+	req, _ := ap.Latest(tctx, adj.ID)
+	if one.Status != "pending_approval" || req.CurrentApprover != "finance_officer" {
+		t.Fatalf("after step one: %s, next %s", one.Status, req.CurrentApprover)
 	}
-	if _, err := s.ApproveAdjustment(tctx, adj.ID, Approver{UserID: first, Roles: []string{"tenant_admin"}}, ""); err == nil {
-		t.Fatal("one person should not approve twice")
+	if _, err := s.ApproveAdjustment(tctx, adj.ID, approvals.Actor{UserID: first, Roles: []string{"finance_officer"}}, ""); err == nil {
+		t.Fatal("one person should not approve two steps")
 	}
-	if _, err := s.RejectAdjustment(tctx, adj.ID, Approver{UserID: uuid.New(), Name: "B"}, "not a billing error"); err != nil {
+	inbox, err := ap.List(tctx, approvals.Filter{Status: "pending", All: true, Approvers: []string{"finance_officer"}}, page.Params{Limit: 10})
+	must(err)
+	if len(inbox.Data) != 1 || inbox.Data[0].ObjectID != adj.ID {
+		t.Fatalf("finance inbox: %d", len(inbox.Data))
+	}
+	if _, err := s.RejectAdjustment(tctx, adj.ID, approvals.Actor{UserID: uuid.New(), Name: "B", Roles: []string{"finance_officer"}}, "not a billing error"); err != nil {
 		t.Fatal(err)
+	}
+	if got, _ := client.Adjustment.Get(tctx, adj.ID); got.Status != "rejected" || got.Metadata["rejected_reason"] != "not a billing error" {
+		t.Fatalf("rejected: %+v", got)
+	}
+	if _, err := ap.CreateRule(tctx, approvals.RuleInput{Module: "credit_note", MinAmount: decimal.NewFromInt(50000), Steps: []approvals.Step{{ApproverRole: "x"}}}); err == nil {
+		t.Fatal("an overlapping band should be refused")
 	}
 }

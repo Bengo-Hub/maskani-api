@@ -28,20 +28,20 @@ type ApprovalRule struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// Metadata holds the value of the "metadata" field.
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	// Action holds the value of the "action" field.
-	Action approvalrule.Action `json:"action,omitempty"`
+	// Module holds the value of the "module" field.
+	Module approvalrule.Module `json:"module,omitempty"`
+	// Name holds the value of the "name" field.
+	Name string `json:"name,omitempty"`
 	// MinAmount holds the value of the "min_amount" field.
 	MinAmount decimal.Decimal `json:"min_amount,omitempty"`
 	// MaxAmount holds the value of the "max_amount" field.
 	MaxAmount *decimal.Decimal `json:"max_amount,omitempty"`
-	// Levels holds the value of the "levels" field.
-	Levels int `json:"levels,omitempty"`
-	// ApproverRoles holds the value of the "approver_roles" field.
-	ApproverRoles []string `json:"approver_roles,omitempty"`
+	// Steps holds the value of the "steps" field.
+	Steps []map[string]interface{} `json:"steps,omitempty"`
 	// RequireOtp holds the value of the "require_otp" field.
 	RequireOtp bool `json:"require_otp,omitempty"`
-	// Active holds the value of the "active" field.
-	Active       bool `json:"active,omitempty"`
+	// IsActive holds the value of the "is_active" field.
+	IsActive     bool `json:"is_active,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -52,15 +52,13 @@ func (*ApprovalRule) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case approvalrule.FieldMaxAmount:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case approvalrule.FieldMetadata, approvalrule.FieldApproverRoles:
+		case approvalrule.FieldMetadata, approvalrule.FieldSteps:
 			values[i] = new([]byte)
 		case approvalrule.FieldMinAmount:
 			values[i] = new(decimal.Decimal)
-		case approvalrule.FieldRequireOtp, approvalrule.FieldActive:
+		case approvalrule.FieldRequireOtp, approvalrule.FieldIsActive:
 			values[i] = new(sql.NullBool)
-		case approvalrule.FieldLevels:
-			values[i] = new(sql.NullInt64)
-		case approvalrule.FieldAction:
+		case approvalrule.FieldModule, approvalrule.FieldName:
 			values[i] = new(sql.NullString)
 		case approvalrule.FieldCreatedAt, approvalrule.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -113,11 +111,17 @@ func (_m *ApprovalRule) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field metadata: %w", err)
 				}
 			}
-		case approvalrule.FieldAction:
+		case approvalrule.FieldModule:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field action", values[i])
+				return fmt.Errorf("unexpected type %T for field module", values[i])
 			} else if value.Valid {
-				_m.Action = approvalrule.Action(value.String)
+				_m.Module = approvalrule.Module(value.String)
+			}
+		case approvalrule.FieldName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field name", values[i])
+			} else if value.Valid {
+				_m.Name = value.String
 			}
 		case approvalrule.FieldMinAmount:
 			if value, ok := values[i].(*decimal.Decimal); !ok {
@@ -132,18 +136,12 @@ func (_m *ApprovalRule) assignValues(columns []string, values []any) error {
 				_m.MaxAmount = new(decimal.Decimal)
 				*_m.MaxAmount = *value.S.(*decimal.Decimal)
 			}
-		case approvalrule.FieldLevels:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field levels", values[i])
-			} else if value.Valid {
-				_m.Levels = int(value.Int64)
-			}
-		case approvalrule.FieldApproverRoles:
+		case approvalrule.FieldSteps:
 			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field approver_roles", values[i])
+				return fmt.Errorf("unexpected type %T for field steps", values[i])
 			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.ApproverRoles); err != nil {
-					return fmt.Errorf("unmarshal field approver_roles: %w", err)
+				if err := json.Unmarshal(*value, &_m.Steps); err != nil {
+					return fmt.Errorf("unmarshal field steps: %w", err)
 				}
 			}
 		case approvalrule.FieldRequireOtp:
@@ -152,11 +150,11 @@ func (_m *ApprovalRule) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.RequireOtp = value.Bool
 			}
-		case approvalrule.FieldActive:
+		case approvalrule.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field active", values[i])
+				return fmt.Errorf("unexpected type %T for field is_active", values[i])
 			} else if value.Valid {
-				_m.Active = value.Bool
+				_m.IsActive = value.Bool
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -206,8 +204,11 @@ func (_m *ApprovalRule) String() string {
 	builder.WriteString("metadata=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Metadata))
 	builder.WriteString(", ")
-	builder.WriteString("action=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Action))
+	builder.WriteString("module=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Module))
+	builder.WriteString(", ")
+	builder.WriteString("name=")
+	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
 	builder.WriteString("min_amount=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MinAmount))
@@ -217,17 +218,14 @@ func (_m *ApprovalRule) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	builder.WriteString("levels=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Levels))
-	builder.WriteString(", ")
-	builder.WriteString("approver_roles=")
-	builder.WriteString(fmt.Sprintf("%v", _m.ApproverRoles))
+	builder.WriteString("steps=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Steps))
 	builder.WriteString(", ")
 	builder.WriteString("require_otp=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequireOtp))
 	builder.WriteString(", ")
-	builder.WriteString("active=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Active))
+	builder.WriteString("is_active=")
+	builder.WriteString(fmt.Sprintf("%v", _m.IsActive))
 	builder.WriteByte(')')
 	return builder.String()
 }

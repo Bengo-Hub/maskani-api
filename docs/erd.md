@@ -38,7 +38,8 @@ Data owned elsewhere is referenced by ID only:
 | `tenant_modules` | module, enabled, enabled_at, disabled_at, enabled_by | unique (tenant_id, module) |
 | `catalog_entries` | tenant_id nullable (null = platform default), kind (property_type, unit_use, unit_type, amenity, wo_category, vendor_category, vendor_doc_type, pass_type, incident_type, notice_category, title_stage, checklist), code, name, description, parent_code, sort, active, attrs jsonb | unique (kind, code) where tenant null; unique (tenant_id, kind, code) |
 | `custom_field_defs` | entity (property, unit, party, sale_contract, work_order, vendor), key, label, field_type, options, required, show_in_list, sort, active | unique (tenant_id, entity, key) |
-| `approval_rules` | action (credit_note, adjustment, restructure, vendor_bill, refund, work_order_quote, deposit_deduction, remittance), min_amount, max_amount, levels, approver_roles, require_otp, active | index (tenant_id, action) |
+| `approval_rules` | module (credit_note, adjustment, manual_payment, restructure, vendor_bill, refund, work_order_quote, deposit_deduction, remittance, write_off), name, min_amount, max_amount, steps (JSON: sequence, name, approver_role), require_otp, is_active | index (tenant_id, module, is_active) |
+| `approval_requests` | module, object_id, object_reference, amount, property_id, rule_id, status (pending, approved, rejected, cancelled), current_sequence, current_approver, actions (JSON: each step with status, acted_by, acted_by_name, acted_at, comment), submitted_by, submitted_by_name, decided_at; metadata for the inbox label | index (tenant_id, object_id, created_at), (tenant_id, status, created_at), (tenant_id, property_id, status, created_at), (tenant_id, status, current_approver) |
 | `reminder_schedules` | kind (bill, instalment, document_expiry, licence, lease_end), offsets_days, channels, template_code, active | unique (tenant_id, kind) |
 
 ## Register

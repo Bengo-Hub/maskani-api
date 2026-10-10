@@ -65,9 +65,23 @@ func (_c *ApprovalRuleCreate) SetMetadata(v map[string]interface{}) *ApprovalRul
 	return _c
 }
 
-// SetAction sets the "action" field.
-func (_c *ApprovalRuleCreate) SetAction(v approvalrule.Action) *ApprovalRuleCreate {
-	_c.mutation.SetAction(v)
+// SetModule sets the "module" field.
+func (_c *ApprovalRuleCreate) SetModule(v approvalrule.Module) *ApprovalRuleCreate {
+	_c.mutation.SetModule(v)
+	return _c
+}
+
+// SetName sets the "name" field.
+func (_c *ApprovalRuleCreate) SetName(v string) *ApprovalRuleCreate {
+	_c.mutation.SetName(v)
+	return _c
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_c *ApprovalRuleCreate) SetNillableName(v *string) *ApprovalRuleCreate {
+	if v != nil {
+		_c.SetName(*v)
+	}
 	return _c
 }
 
@@ -99,23 +113,9 @@ func (_c *ApprovalRuleCreate) SetNillableMaxAmount(v *decimal.Decimal) *Approval
 	return _c
 }
 
-// SetLevels sets the "levels" field.
-func (_c *ApprovalRuleCreate) SetLevels(v int) *ApprovalRuleCreate {
-	_c.mutation.SetLevels(v)
-	return _c
-}
-
-// SetNillableLevels sets the "levels" field if the given value is not nil.
-func (_c *ApprovalRuleCreate) SetNillableLevels(v *int) *ApprovalRuleCreate {
-	if v != nil {
-		_c.SetLevels(*v)
-	}
-	return _c
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (_c *ApprovalRuleCreate) SetApproverRoles(v []string) *ApprovalRuleCreate {
-	_c.mutation.SetApproverRoles(v)
+// SetSteps sets the "steps" field.
+func (_c *ApprovalRuleCreate) SetSteps(v []map[string]interface{}) *ApprovalRuleCreate {
+	_c.mutation.SetSteps(v)
 	return _c
 }
 
@@ -133,16 +133,16 @@ func (_c *ApprovalRuleCreate) SetNillableRequireOtp(v *bool) *ApprovalRuleCreate
 	return _c
 }
 
-// SetActive sets the "active" field.
-func (_c *ApprovalRuleCreate) SetActive(v bool) *ApprovalRuleCreate {
-	_c.mutation.SetActive(v)
+// SetIsActive sets the "is_active" field.
+func (_c *ApprovalRuleCreate) SetIsActive(v bool) *ApprovalRuleCreate {
+	_c.mutation.SetIsActive(v)
 	return _c
 }
 
-// SetNillableActive sets the "active" field if the given value is not nil.
-func (_c *ApprovalRuleCreate) SetNillableActive(v *bool) *ApprovalRuleCreate {
+// SetNillableIsActive sets the "is_active" field if the given value is not nil.
+func (_c *ApprovalRuleCreate) SetNillableIsActive(v *bool) *ApprovalRuleCreate {
 	if v != nil {
-		_c.SetActive(*v)
+		_c.SetIsActive(*v)
 	}
 	return _c
 }
@@ -212,6 +212,10 @@ func (_c *ApprovalRuleCreate) defaults() error {
 		v := approvalrule.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Name(); !ok {
+		v := approvalrule.DefaultName
+		_c.mutation.SetName(v)
+	}
 	if _, ok := _c.mutation.MinAmount(); !ok {
 		if approvalrule.DefaultMinAmount == nil {
 			return fmt.Errorf("ent: uninitialized approvalrule.DefaultMinAmount (forgotten import ent/runtime?)")
@@ -219,17 +223,13 @@ func (_c *ApprovalRuleCreate) defaults() error {
 		v := approvalrule.DefaultMinAmount()
 		_c.mutation.SetMinAmount(v)
 	}
-	if _, ok := _c.mutation.Levels(); !ok {
-		v := approvalrule.DefaultLevels
-		_c.mutation.SetLevels(v)
-	}
 	if _, ok := _c.mutation.RequireOtp(); !ok {
 		v := approvalrule.DefaultRequireOtp
 		_c.mutation.SetRequireOtp(v)
 	}
-	if _, ok := _c.mutation.Active(); !ok {
-		v := approvalrule.DefaultActive
-		_c.mutation.SetActive(v)
+	if _, ok := _c.mutation.IsActive(); !ok {
+		v := approvalrule.DefaultIsActive
+		_c.mutation.SetIsActive(v)
 	}
 	if _, ok := _c.mutation.ID(); !ok {
 		if approvalrule.DefaultID == nil {
@@ -252,25 +252,28 @@ func (_c *ApprovalRuleCreate) check() error {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "ApprovalRule.updated_at"`)}
 	}
-	if _, ok := _c.mutation.Action(); !ok {
-		return &ValidationError{Name: "action", err: errors.New(`ent: missing required field "ApprovalRule.action"`)}
+	if _, ok := _c.mutation.Module(); !ok {
+		return &ValidationError{Name: "module", err: errors.New(`ent: missing required field "ApprovalRule.module"`)}
 	}
-	if v, ok := _c.mutation.Action(); ok {
-		if err := approvalrule.ActionValidator(v); err != nil {
-			return &ValidationError{Name: "action", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.action": %w`, err)}
+	if v, ok := _c.mutation.Module(); ok {
+		if err := approvalrule.ModuleValidator(v); err != nil {
+			return &ValidationError{Name: "module", err: fmt.Errorf(`ent: validator failed for field "ApprovalRule.module": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.Name(); !ok {
+		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "ApprovalRule.name"`)}
 	}
 	if _, ok := _c.mutation.MinAmount(); !ok {
 		return &ValidationError{Name: "min_amount", err: errors.New(`ent: missing required field "ApprovalRule.min_amount"`)}
 	}
-	if _, ok := _c.mutation.Levels(); !ok {
-		return &ValidationError{Name: "levels", err: errors.New(`ent: missing required field "ApprovalRule.levels"`)}
+	if _, ok := _c.mutation.Steps(); !ok {
+		return &ValidationError{Name: "steps", err: errors.New(`ent: missing required field "ApprovalRule.steps"`)}
 	}
 	if _, ok := _c.mutation.RequireOtp(); !ok {
 		return &ValidationError{Name: "require_otp", err: errors.New(`ent: missing required field "ApprovalRule.require_otp"`)}
 	}
-	if _, ok := _c.mutation.Active(); !ok {
-		return &ValidationError{Name: "active", err: errors.New(`ent: missing required field "ApprovalRule.active"`)}
+	if _, ok := _c.mutation.IsActive(); !ok {
+		return &ValidationError{Name: "is_active", err: errors.New(`ent: missing required field "ApprovalRule.is_active"`)}
 	}
 	return nil
 }
@@ -324,9 +327,13 @@ func (_c *ApprovalRuleCreate) createSpec() (*ApprovalRule, *sqlgraph.CreateSpec)
 		_spec.SetField(approvalrule.FieldMetadata, field.TypeJSON, value)
 		_node.Metadata = value
 	}
-	if value, ok := _c.mutation.Action(); ok {
-		_spec.SetField(approvalrule.FieldAction, field.TypeEnum, value)
-		_node.Action = value
+	if value, ok := _c.mutation.Module(); ok {
+		_spec.SetField(approvalrule.FieldModule, field.TypeEnum, value)
+		_node.Module = value
+	}
+	if value, ok := _c.mutation.Name(); ok {
+		_spec.SetField(approvalrule.FieldName, field.TypeString, value)
+		_node.Name = value
 	}
 	if value, ok := _c.mutation.MinAmount(); ok {
 		_spec.SetField(approvalrule.FieldMinAmount, field.TypeFloat64, value)
@@ -336,21 +343,17 @@ func (_c *ApprovalRuleCreate) createSpec() (*ApprovalRule, *sqlgraph.CreateSpec)
 		_spec.SetField(approvalrule.FieldMaxAmount, field.TypeFloat64, value)
 		_node.MaxAmount = &value
 	}
-	if value, ok := _c.mutation.Levels(); ok {
-		_spec.SetField(approvalrule.FieldLevels, field.TypeInt, value)
-		_node.Levels = value
-	}
-	if value, ok := _c.mutation.ApproverRoles(); ok {
-		_spec.SetField(approvalrule.FieldApproverRoles, field.TypeJSON, value)
-		_node.ApproverRoles = value
+	if value, ok := _c.mutation.Steps(); ok {
+		_spec.SetField(approvalrule.FieldSteps, field.TypeJSON, value)
+		_node.Steps = value
 	}
 	if value, ok := _c.mutation.RequireOtp(); ok {
 		_spec.SetField(approvalrule.FieldRequireOtp, field.TypeBool, value)
 		_node.RequireOtp = value
 	}
-	if value, ok := _c.mutation.Active(); ok {
-		_spec.SetField(approvalrule.FieldActive, field.TypeBool, value)
-		_node.Active = value
+	if value, ok := _c.mutation.IsActive(); ok {
+		_spec.SetField(approvalrule.FieldIsActive, field.TypeBool, value)
+		_node.IsActive = value
 	}
 	return _node, _spec
 }
@@ -434,15 +437,27 @@ func (u *ApprovalRuleUpsert) ClearMetadata() *ApprovalRuleUpsert {
 	return u
 }
 
-// SetAction sets the "action" field.
-func (u *ApprovalRuleUpsert) SetAction(v approvalrule.Action) *ApprovalRuleUpsert {
-	u.Set(approvalrule.FieldAction, v)
+// SetModule sets the "module" field.
+func (u *ApprovalRuleUpsert) SetModule(v approvalrule.Module) *ApprovalRuleUpsert {
+	u.Set(approvalrule.FieldModule, v)
 	return u
 }
 
-// UpdateAction sets the "action" field to the value that was provided on create.
-func (u *ApprovalRuleUpsert) UpdateAction() *ApprovalRuleUpsert {
-	u.SetExcluded(approvalrule.FieldAction)
+// UpdateModule sets the "module" field to the value that was provided on create.
+func (u *ApprovalRuleUpsert) UpdateModule() *ApprovalRuleUpsert {
+	u.SetExcluded(approvalrule.FieldModule)
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *ApprovalRuleUpsert) SetName(v string) *ApprovalRuleUpsert {
+	u.Set(approvalrule.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ApprovalRuleUpsert) UpdateName() *ApprovalRuleUpsert {
+	u.SetExcluded(approvalrule.FieldName)
 	return u
 }
 
@@ -488,39 +503,15 @@ func (u *ApprovalRuleUpsert) ClearMaxAmount() *ApprovalRuleUpsert {
 	return u
 }
 
-// SetLevels sets the "levels" field.
-func (u *ApprovalRuleUpsert) SetLevels(v int) *ApprovalRuleUpsert {
-	u.Set(approvalrule.FieldLevels, v)
+// SetSteps sets the "steps" field.
+func (u *ApprovalRuleUpsert) SetSteps(v []map[string]interface{}) *ApprovalRuleUpsert {
+	u.Set(approvalrule.FieldSteps, v)
 	return u
 }
 
-// UpdateLevels sets the "levels" field to the value that was provided on create.
-func (u *ApprovalRuleUpsert) UpdateLevels() *ApprovalRuleUpsert {
-	u.SetExcluded(approvalrule.FieldLevels)
-	return u
-}
-
-// AddLevels adds v to the "levels" field.
-func (u *ApprovalRuleUpsert) AddLevels(v int) *ApprovalRuleUpsert {
-	u.Add(approvalrule.FieldLevels, v)
-	return u
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (u *ApprovalRuleUpsert) SetApproverRoles(v []string) *ApprovalRuleUpsert {
-	u.Set(approvalrule.FieldApproverRoles, v)
-	return u
-}
-
-// UpdateApproverRoles sets the "approver_roles" field to the value that was provided on create.
-func (u *ApprovalRuleUpsert) UpdateApproverRoles() *ApprovalRuleUpsert {
-	u.SetExcluded(approvalrule.FieldApproverRoles)
-	return u
-}
-
-// ClearApproverRoles clears the value of the "approver_roles" field.
-func (u *ApprovalRuleUpsert) ClearApproverRoles() *ApprovalRuleUpsert {
-	u.SetNull(approvalrule.FieldApproverRoles)
+// UpdateSteps sets the "steps" field to the value that was provided on create.
+func (u *ApprovalRuleUpsert) UpdateSteps() *ApprovalRuleUpsert {
+	u.SetExcluded(approvalrule.FieldSteps)
 	return u
 }
 
@@ -536,15 +527,15 @@ func (u *ApprovalRuleUpsert) UpdateRequireOtp() *ApprovalRuleUpsert {
 	return u
 }
 
-// SetActive sets the "active" field.
-func (u *ApprovalRuleUpsert) SetActive(v bool) *ApprovalRuleUpsert {
-	u.Set(approvalrule.FieldActive, v)
+// SetIsActive sets the "is_active" field.
+func (u *ApprovalRuleUpsert) SetIsActive(v bool) *ApprovalRuleUpsert {
+	u.Set(approvalrule.FieldIsActive, v)
 	return u
 }
 
-// UpdateActive sets the "active" field to the value that was provided on create.
-func (u *ApprovalRuleUpsert) UpdateActive() *ApprovalRuleUpsert {
-	u.SetExcluded(approvalrule.FieldActive)
+// UpdateIsActive sets the "is_active" field to the value that was provided on create.
+func (u *ApprovalRuleUpsert) UpdateIsActive() *ApprovalRuleUpsert {
+	u.SetExcluded(approvalrule.FieldIsActive)
 	return u
 }
 
@@ -637,17 +628,31 @@ func (u *ApprovalRuleUpsertOne) ClearMetadata() *ApprovalRuleUpsertOne {
 	})
 }
 
-// SetAction sets the "action" field.
-func (u *ApprovalRuleUpsertOne) SetAction(v approvalrule.Action) *ApprovalRuleUpsertOne {
+// SetModule sets the "module" field.
+func (u *ApprovalRuleUpsertOne) SetModule(v approvalrule.Module) *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetAction(v)
+		s.SetModule(v)
 	})
 }
 
-// UpdateAction sets the "action" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertOne) UpdateAction() *ApprovalRuleUpsertOne {
+// UpdateModule sets the "module" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertOne) UpdateModule() *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateAction()
+		s.UpdateModule()
+	})
+}
+
+// SetName sets the "name" field.
+func (u *ApprovalRuleUpsertOne) SetName(v string) *ApprovalRuleUpsertOne {
+	return u.Update(func(s *ApprovalRuleUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertOne) UpdateName() *ApprovalRuleUpsertOne {
+	return u.Update(func(s *ApprovalRuleUpsert) {
+		s.UpdateName()
 	})
 }
 
@@ -700,45 +705,17 @@ func (u *ApprovalRuleUpsertOne) ClearMaxAmount() *ApprovalRuleUpsertOne {
 	})
 }
 
-// SetLevels sets the "levels" field.
-func (u *ApprovalRuleUpsertOne) SetLevels(v int) *ApprovalRuleUpsertOne {
+// SetSteps sets the "steps" field.
+func (u *ApprovalRuleUpsertOne) SetSteps(v []map[string]interface{}) *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetLevels(v)
+		s.SetSteps(v)
 	})
 }
 
-// AddLevels adds v to the "levels" field.
-func (u *ApprovalRuleUpsertOne) AddLevels(v int) *ApprovalRuleUpsertOne {
+// UpdateSteps sets the "steps" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertOne) UpdateSteps() *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.AddLevels(v)
-	})
-}
-
-// UpdateLevels sets the "levels" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertOne) UpdateLevels() *ApprovalRuleUpsertOne {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateLevels()
-	})
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (u *ApprovalRuleUpsertOne) SetApproverRoles(v []string) *ApprovalRuleUpsertOne {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetApproverRoles(v)
-	})
-}
-
-// UpdateApproverRoles sets the "approver_roles" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertOne) UpdateApproverRoles() *ApprovalRuleUpsertOne {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateApproverRoles()
-	})
-}
-
-// ClearApproverRoles clears the value of the "approver_roles" field.
-func (u *ApprovalRuleUpsertOne) ClearApproverRoles() *ApprovalRuleUpsertOne {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.ClearApproverRoles()
+		s.UpdateSteps()
 	})
 }
 
@@ -756,17 +733,17 @@ func (u *ApprovalRuleUpsertOne) UpdateRequireOtp() *ApprovalRuleUpsertOne {
 	})
 }
 
-// SetActive sets the "active" field.
-func (u *ApprovalRuleUpsertOne) SetActive(v bool) *ApprovalRuleUpsertOne {
+// SetIsActive sets the "is_active" field.
+func (u *ApprovalRuleUpsertOne) SetIsActive(v bool) *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetActive(v)
+		s.SetIsActive(v)
 	})
 }
 
-// UpdateActive sets the "active" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertOne) UpdateActive() *ApprovalRuleUpsertOne {
+// UpdateIsActive sets the "is_active" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertOne) UpdateIsActive() *ApprovalRuleUpsertOne {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateActive()
+		s.UpdateIsActive()
 	})
 }
 
@@ -1026,17 +1003,31 @@ func (u *ApprovalRuleUpsertBulk) ClearMetadata() *ApprovalRuleUpsertBulk {
 	})
 }
 
-// SetAction sets the "action" field.
-func (u *ApprovalRuleUpsertBulk) SetAction(v approvalrule.Action) *ApprovalRuleUpsertBulk {
+// SetModule sets the "module" field.
+func (u *ApprovalRuleUpsertBulk) SetModule(v approvalrule.Module) *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetAction(v)
+		s.SetModule(v)
 	})
 }
 
-// UpdateAction sets the "action" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertBulk) UpdateAction() *ApprovalRuleUpsertBulk {
+// UpdateModule sets the "module" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertBulk) UpdateModule() *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateAction()
+		s.UpdateModule()
+	})
+}
+
+// SetName sets the "name" field.
+func (u *ApprovalRuleUpsertBulk) SetName(v string) *ApprovalRuleUpsertBulk {
+	return u.Update(func(s *ApprovalRuleUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertBulk) UpdateName() *ApprovalRuleUpsertBulk {
+	return u.Update(func(s *ApprovalRuleUpsert) {
+		s.UpdateName()
 	})
 }
 
@@ -1089,45 +1080,17 @@ func (u *ApprovalRuleUpsertBulk) ClearMaxAmount() *ApprovalRuleUpsertBulk {
 	})
 }
 
-// SetLevels sets the "levels" field.
-func (u *ApprovalRuleUpsertBulk) SetLevels(v int) *ApprovalRuleUpsertBulk {
+// SetSteps sets the "steps" field.
+func (u *ApprovalRuleUpsertBulk) SetSteps(v []map[string]interface{}) *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetLevels(v)
+		s.SetSteps(v)
 	})
 }
 
-// AddLevels adds v to the "levels" field.
-func (u *ApprovalRuleUpsertBulk) AddLevels(v int) *ApprovalRuleUpsertBulk {
+// UpdateSteps sets the "steps" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertBulk) UpdateSteps() *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.AddLevels(v)
-	})
-}
-
-// UpdateLevels sets the "levels" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertBulk) UpdateLevels() *ApprovalRuleUpsertBulk {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateLevels()
-	})
-}
-
-// SetApproverRoles sets the "approver_roles" field.
-func (u *ApprovalRuleUpsertBulk) SetApproverRoles(v []string) *ApprovalRuleUpsertBulk {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetApproverRoles(v)
-	})
-}
-
-// UpdateApproverRoles sets the "approver_roles" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertBulk) UpdateApproverRoles() *ApprovalRuleUpsertBulk {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateApproverRoles()
-	})
-}
-
-// ClearApproverRoles clears the value of the "approver_roles" field.
-func (u *ApprovalRuleUpsertBulk) ClearApproverRoles() *ApprovalRuleUpsertBulk {
-	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.ClearApproverRoles()
+		s.UpdateSteps()
 	})
 }
 
@@ -1145,17 +1108,17 @@ func (u *ApprovalRuleUpsertBulk) UpdateRequireOtp() *ApprovalRuleUpsertBulk {
 	})
 }
 
-// SetActive sets the "active" field.
-func (u *ApprovalRuleUpsertBulk) SetActive(v bool) *ApprovalRuleUpsertBulk {
+// SetIsActive sets the "is_active" field.
+func (u *ApprovalRuleUpsertBulk) SetIsActive(v bool) *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.SetActive(v)
+		s.SetIsActive(v)
 	})
 }
 
-// UpdateActive sets the "active" field to the value that was provided on create.
-func (u *ApprovalRuleUpsertBulk) UpdateActive() *ApprovalRuleUpsertBulk {
+// UpdateIsActive sets the "is_active" field to the value that was provided on create.
+func (u *ApprovalRuleUpsertBulk) UpdateIsActive() *ApprovalRuleUpsertBulk {
 	return u.Update(func(s *ApprovalRuleUpsert) {
-		s.UpdateActive()
+		s.UpdateIsActive()
 	})
 }
 

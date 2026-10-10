@@ -71,6 +71,11 @@ func UpdatedAt(v time.Time) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldEQ(FieldUpdatedAt, v))
 }
 
+// Name applies equality check predicate on the "name" field. It's identical to NameEQ.
+func Name(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEQ(FieldName, v))
+}
+
 // MinAmount applies equality check predicate on the "min_amount" field. It's identical to MinAmountEQ.
 func MinAmount(v decimal.Decimal) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldEQ(FieldMinAmount, v))
@@ -81,19 +86,14 @@ func MaxAmount(v decimal.Decimal) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldEQ(FieldMaxAmount, v))
 }
 
-// Levels applies equality check predicate on the "levels" field. It's identical to LevelsEQ.
-func Levels(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldEQ(FieldLevels, v))
-}
-
 // RequireOtp applies equality check predicate on the "require_otp" field. It's identical to RequireOtpEQ.
 func RequireOtp(v bool) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldEQ(FieldRequireOtp, v))
 }
 
-// Active applies equality check predicate on the "active" field. It's identical to ActiveEQ.
-func Active(v bool) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldEQ(FieldActive, v))
+// IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
+func IsActive(v bool) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEQ(FieldIsActive, v))
 }
 
 // TenantIDEQ applies the EQ predicate on the "tenant_id" field.
@@ -226,24 +226,89 @@ func MetadataNotNil() predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldNotNull(FieldMetadata))
 }
 
-// ActionEQ applies the EQ predicate on the "action" field.
-func ActionEQ(v Action) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldEQ(FieldAction, v))
+// ModuleEQ applies the EQ predicate on the "module" field.
+func ModuleEQ(v Module) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEQ(FieldModule, v))
 }
 
-// ActionNEQ applies the NEQ predicate on the "action" field.
-func ActionNEQ(v Action) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNEQ(FieldAction, v))
+// ModuleNEQ applies the NEQ predicate on the "module" field.
+func ModuleNEQ(v Module) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldNEQ(FieldModule, v))
 }
 
-// ActionIn applies the In predicate on the "action" field.
-func ActionIn(vs ...Action) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldIn(FieldAction, vs...))
+// ModuleIn applies the In predicate on the "module" field.
+func ModuleIn(vs ...Module) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldIn(FieldModule, vs...))
 }
 
-// ActionNotIn applies the NotIn predicate on the "action" field.
-func ActionNotIn(vs ...Action) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNotIn(FieldAction, vs...))
+// ModuleNotIn applies the NotIn predicate on the "module" field.
+func ModuleNotIn(vs ...Module) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldNotIn(FieldModule, vs...))
+}
+
+// NameEQ applies the EQ predicate on the "name" field.
+func NameEQ(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEQ(FieldName, v))
+}
+
+// NameNEQ applies the NEQ predicate on the "name" field.
+func NameNEQ(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldNEQ(FieldName, v))
+}
+
+// NameIn applies the In predicate on the "name" field.
+func NameIn(vs ...string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldIn(FieldName, vs...))
+}
+
+// NameNotIn applies the NotIn predicate on the "name" field.
+func NameNotIn(vs ...string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldNotIn(FieldName, vs...))
+}
+
+// NameGT applies the GT predicate on the "name" field.
+func NameGT(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldGT(FieldName, v))
+}
+
+// NameGTE applies the GTE predicate on the "name" field.
+func NameGTE(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldGTE(FieldName, v))
+}
+
+// NameLT applies the LT predicate on the "name" field.
+func NameLT(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldLT(FieldName, v))
+}
+
+// NameLTE applies the LTE predicate on the "name" field.
+func NameLTE(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldLTE(FieldName, v))
+}
+
+// NameContains applies the Contains predicate on the "name" field.
+func NameContains(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldContains(FieldName, v))
+}
+
+// NameHasPrefix applies the HasPrefix predicate on the "name" field.
+func NameHasPrefix(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldHasPrefix(FieldName, v))
+}
+
+// NameHasSuffix applies the HasSuffix predicate on the "name" field.
+func NameHasSuffix(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldHasSuffix(FieldName, v))
+}
+
+// NameEqualFold applies the EqualFold predicate on the "name" field.
+func NameEqualFold(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEqualFold(FieldName, v))
+}
+
+// NameContainsFold applies the ContainsFold predicate on the "name" field.
+func NameContainsFold(v string) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldContainsFold(FieldName, v))
 }
 
 // MinAmountEQ applies the EQ predicate on the "min_amount" field.
@@ -336,56 +401,6 @@ func MaxAmountNotNil() predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldNotNull(FieldMaxAmount))
 }
 
-// LevelsEQ applies the EQ predicate on the "levels" field.
-func LevelsEQ(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldEQ(FieldLevels, v))
-}
-
-// LevelsNEQ applies the NEQ predicate on the "levels" field.
-func LevelsNEQ(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNEQ(FieldLevels, v))
-}
-
-// LevelsIn applies the In predicate on the "levels" field.
-func LevelsIn(vs ...int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldIn(FieldLevels, vs...))
-}
-
-// LevelsNotIn applies the NotIn predicate on the "levels" field.
-func LevelsNotIn(vs ...int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNotIn(FieldLevels, vs...))
-}
-
-// LevelsGT applies the GT predicate on the "levels" field.
-func LevelsGT(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldGT(FieldLevels, v))
-}
-
-// LevelsGTE applies the GTE predicate on the "levels" field.
-func LevelsGTE(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldGTE(FieldLevels, v))
-}
-
-// LevelsLT applies the LT predicate on the "levels" field.
-func LevelsLT(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldLT(FieldLevels, v))
-}
-
-// LevelsLTE applies the LTE predicate on the "levels" field.
-func LevelsLTE(v int) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldLTE(FieldLevels, v))
-}
-
-// ApproverRolesIsNil applies the IsNil predicate on the "approver_roles" field.
-func ApproverRolesIsNil() predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldIsNull(FieldApproverRoles))
-}
-
-// ApproverRolesNotNil applies the NotNil predicate on the "approver_roles" field.
-func ApproverRolesNotNil() predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNotNull(FieldApproverRoles))
-}
-
 // RequireOtpEQ applies the EQ predicate on the "require_otp" field.
 func RequireOtpEQ(v bool) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldEQ(FieldRequireOtp, v))
@@ -396,14 +411,14 @@ func RequireOtpNEQ(v bool) predicate.ApprovalRule {
 	return predicate.ApprovalRule(sql.FieldNEQ(FieldRequireOtp, v))
 }
 
-// ActiveEQ applies the EQ predicate on the "active" field.
-func ActiveEQ(v bool) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldEQ(FieldActive, v))
+// IsActiveEQ applies the EQ predicate on the "is_active" field.
+func IsActiveEQ(v bool) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldEQ(FieldIsActive, v))
 }
 
-// ActiveNEQ applies the NEQ predicate on the "active" field.
-func ActiveNEQ(v bool) predicate.ApprovalRule {
-	return predicate.ApprovalRule(sql.FieldNEQ(FieldActive, v))
+// IsActiveNEQ applies the NEQ predicate on the "is_active" field.
+func IsActiveNEQ(v bool) predicate.ApprovalRule {
+	return predicate.ApprovalRule(sql.FieldNEQ(FieldIsActive, v))
 }
 
 // And groups predicates with the AND operator between them.

@@ -25,10 +25,6 @@ func scopeIDs(w http.ResponseWriter, r *http.Request) ([]uuid.UUID, bool, bool) 
 	return ids, all, true
 }
 
-func approver(r *http.Request) collections.Approver {
-	return collections.Approver{UserID: actor(r), Name: displayName(r), Roles: access(r).Roles}
-}
-
 // RequestAdjustment is POST /unit-accounts/{id}/adjustments {kind, invoice_id, amount, reason}: a
 // credit note or waiver on one unpaid bill, waiting for approval.
 func (h *H) RequestAdjustment(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +66,11 @@ func (h *H) ListAdjustments(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, res)
+	objIDs := make([]uuid.UUID, len(res.Data))
+	for i, a := range res.Data {
+		objIDs[i] = a.ID
+	}
+	h.withApprovals(w, r, res, objIDs)
 }
 
 func (h *H) adjustmentScope(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {

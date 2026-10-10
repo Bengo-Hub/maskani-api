@@ -10,7 +10,6 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
 	"github.com/bengobox/maskani-api/internal/ent/predicate"
@@ -195,24 +194,6 @@ func (_u *AdjustmentUpdate) SetNillableRequestedBy(v *uuid.UUID) *AdjustmentUpda
 	return _u
 }
 
-// SetApprovals sets the "approvals" field.
-func (_u *AdjustmentUpdate) SetApprovals(v []map[string]interface{}) *AdjustmentUpdate {
-	_u.mutation.SetApprovals(v)
-	return _u
-}
-
-// AppendApprovals appends value to the "approvals" field.
-func (_u *AdjustmentUpdate) AppendApprovals(v []map[string]interface{}) *AdjustmentUpdate {
-	_u.mutation.AppendApprovals(v)
-	return _u
-}
-
-// ClearApprovals clears the value of the "approvals" field.
-func (_u *AdjustmentUpdate) ClearApprovals() *AdjustmentUpdate {
-	_u.mutation.ClearApprovals()
-	return _u
-}
-
 // Mutation returns the AdjustmentMutation object of the builder.
 func (_u *AdjustmentUpdate) Mutation() *AdjustmentMutation {
 	return _u.mutation
@@ -337,17 +318,6 @@ func (_u *AdjustmentUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.RequestedBy(); ok {
 		_spec.SetField(adjustment.FieldRequestedBy, field.TypeUUID, value)
-	}
-	if value, ok := _u.mutation.Approvals(); ok {
-		_spec.SetField(adjustment.FieldApprovals, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedApprovals(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, adjustment.FieldApprovals, value)
-		})
-	}
-	if _u.mutation.ApprovalsCleared() {
-		_spec.ClearField(adjustment.FieldApprovals, field.TypeJSON)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -534,24 +504,6 @@ func (_u *AdjustmentUpdateOne) SetNillableRequestedBy(v *uuid.UUID) *AdjustmentU
 	return _u
 }
 
-// SetApprovals sets the "approvals" field.
-func (_u *AdjustmentUpdateOne) SetApprovals(v []map[string]interface{}) *AdjustmentUpdateOne {
-	_u.mutation.SetApprovals(v)
-	return _u
-}
-
-// AppendApprovals appends value to the "approvals" field.
-func (_u *AdjustmentUpdateOne) AppendApprovals(v []map[string]interface{}) *AdjustmentUpdateOne {
-	_u.mutation.AppendApprovals(v)
-	return _u
-}
-
-// ClearApprovals clears the value of the "approvals" field.
-func (_u *AdjustmentUpdateOne) ClearApprovals() *AdjustmentUpdateOne {
-	_u.mutation.ClearApprovals()
-	return _u
-}
-
 // Mutation returns the AdjustmentMutation object of the builder.
 func (_u *AdjustmentUpdateOne) Mutation() *AdjustmentMutation {
 	return _u.mutation
@@ -706,17 +658,6 @@ func (_u *AdjustmentUpdateOne) sqlSave(ctx context.Context) (_node *Adjustment, 
 	}
 	if value, ok := _u.mutation.RequestedBy(); ok {
 		_spec.SetField(adjustment.FieldRequestedBy, field.TypeUUID, value)
-	}
-	if value, ok := _u.mutation.Approvals(); ok {
-		_spec.SetField(adjustment.FieldApprovals, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedApprovals(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, adjustment.FieldApprovals, value)
-		})
-	}
-	if _u.mutation.ApprovalsCleared() {
-		_spec.ClearField(adjustment.FieldApprovals, field.TypeJSON)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	_node = &Adjustment{config: _u.config}

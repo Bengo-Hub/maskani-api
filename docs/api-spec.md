@@ -66,7 +66,8 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 | POST `/roles` `{code, name, description, permissions}`; POST `/roles/customize` `{code}`; PUT `/roles/{id}` `{name, description, permissions}`; DELETE `/roles/{id}` | Estate roles. A default role is changed by customising it (an estate copy that replaces it for this estate, holders moved over); deleting a copy returns its holders to the default; an estate role is deleted only when nobody holds it. The administrator role is locked to every permission. Nobody can write into a role, or grant a role with, a permission they do not hold | `users.manage` |
 | DELETE `/catalogues/{kind}/{code}` | Remove an override | planned (sprint 1) |
 | GET, POST, PUT `/settings/custom-fields` | Custom field definitions | planned (sprint 1) |
-| GET, POST `/settings/approval-rules`; PUT, DELETE `/settings/approval-rules/{id}` `{action: credit_note or adjustment, min_amount, max_amount, levels 1 to 3, approver_roles, active}` | Who approves credits by amount band; bands of active rules for one action may not overlap; with no rule a credit takes one `billing.approve` approval | `settings.view` or `billing.approve` / `settings.manage` |
+| GET `/approvals?status=&module=&property_id=&mine=true` (keyset); POST `/approvals/{id}/approve` `{comment}`; POST `/approvals/{id}/reject` `{comment}` | The central approvals inbox across every workflow (credit notes, waivers, manual payments, work order quotes, and the rest as they land). `mine` keeps requests whose current step the caller may act on. Deciding here has the same effect as on the workflow's own screen | `billing.approve`, `billing.verify` or `settings.view` to list; acting is checked against the step |
+| GET, POST `/approvals/rules`; PUT, DELETE `/approvals/rules/{id}` `{module, name, min_amount, max_amount, steps: [{name, approver_role}], is_active}` | Approval rules per workflow and amount band with 1 to 5 ordered role steps; active bands for one module may not overlap. Without a rule each workflow uses its default (one step by permission) | `settings.view` or `billing.approve` / `settings.manage` |
 | GET, PUT `/settings/reminders` | Reminder schedules beyond the collections ladder | planned |
 
 ## Register (module `properties`)
@@ -130,7 +131,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/collections/bank-lines` `{fund, property_id, lines: [{date, amount, reference, description, payer}]}` | Bank statement credits (up to 2,000) matched to the fund's accounts by a unit reference in the text (`TAN7`, `2362010#TAN7`; normalised like paybill references), else by the owner's phone (never a phone shared by two accounts), and queued for review as bank transfers. Each line comes back queued, duplicate (that bank reference is already queued), unmatched or invalid | `billing.collect` |
 | POST `/me/accounts/{id}/manual-payments` | Portal: a resident gives a bank transfer or cheque reference (M-Pesa prompts stop at KES 250,000); it waits for review | portal user |
 | GET `/collections/manual-payments?status=&property_id=&account_id=` (keyset) | The review queue and its history | `billing.collect` or `billing.verify` |
-| POST `/manual-payments/{id}/approve` `{note}`; POST `/manual-payments/{id}/reject` `{reason}` | Approve books it in treasury (S2S manual-payments, allocated oldest due first, ledger by method) and closes it; the person who recorded it cannot approve it; reject needs a reason | `billing.verify` (property managers, caretakers, administrators) |
+| POST `/manual-payments/{id}/approve` `{note}`; POST `/manual-payments/{id}/reject` `{reason}` | Decides the current step of the payment's approval (module `manual_payment`, default one `billing.verify` step); the last approval books it in treasury (S2S manual-payments, allocated oldest due first, ledger by method). The person who recorded it never verifies it. A booking failure leaves it pending with the approval done; approving again retries. The list carries `approvals` (object id to request) for progress | `billing.verify` (property managers, caretakers, administrators) |
 | GET `/unit-accounts/{id}/collections`; POST `/unit-accounts/{id}/collection-notes` `{outcome, promise_date, note}` | The account's place on the ladder (episode, steps done, call list, promise) and up to 20 notes. Outcomes: reached, no_answer, promised (needs a date; holds the demand letter and escalation until it passes), disputed, wrong_number, paid. A promise or paid takes it off the call list | `billing.view` / `billing.collect` |
 | PUT `/unit-accounts/{id}/payment-plan` `{instalments: [{due, amount}], note}`; DELETE to cancel | An agreed plan for the arrears, kept on the ladder (`plan`): 1 to 24 instalments from today, together no more than the balance. While active it holds back the demand letter and escalation and takes the account off the call list. A daily check counts payments since the start (`account_collections`): paid in full is completed; an instalment more than 3 days late and unpaid breaks it, releases the ladder and publishes `payment_plan.broken`. The agreement document is the `payment_plan` template | `billing.collect` |
 | GET `/reports/arrears` (keyset by balance, largest first; `property_id`) | `{account_id, account_ref, customer_name, customer_phone, balance, last_payment_at}` | `reports.view` |
@@ -138,7 +139,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/unit-accounts/{id}`; statement `?format=pdf` | | planned (sprint 2) |
 | POST `/unit-accounts/{id}/adjustments` `{kind: credit_note or waiver, invoice_id, amount, reason}` | Asks to credit part of one unpaid bill on the account (never more than it still owes; one open request per bill) | `billing.adjust` |
 | GET `/collections/adjustments?status=&property_id=&account_id=` (keyset) | Credits waiting for approval and their history | `billing.adjust` or `billing.approve` |
-| POST `/adjustments/{id}/approve` `{note}`; POST `/adjustments/{id}/reject` `{reason}` | The approval rule for the amount (`approval_rules`, action credit_note or adjustment) sets the levels and the roles; with no rule one approval. The requester never approves, one person once. The last approval raises the treasury credit note (S2S create-credit-note); a treasury failure leaves it approved and approving again retries | `billing.approve` |
+| POST `/adjustments/{id}/approve` `{note}`; POST `/adjustments/{id}/reject` `{reason}` | Decides the current step of the credit's approval on the central engine (module `credit_note` or `adjustment`; default one `billing.approve` step; rules add steps by amount). The requester never approves, one person decides one step, and the last approval raises the treasury credit note (S2S create-credit-note). A treasury failure leaves it approved; approving again retries. The list carries `approvals` | `billing.approve` |
 | GET `/collections/bill-queries?status=&property_id=` (keyset) | Residents' bill queries, answer due 7 days after raising | `billing.view` |
 | POST `/bill-queries/{id}/answer` `{status: in_review, resolved or rejected, resolution}` | Take a query, or answer it; the resident is told | `billing.adjust` or `billing.manage` |
 | POST `/me/accounts/{id}/bill-queries` `{invoice_id, subject, body}`; GET `/me/bill-queries` | Portal: query a bill within 30 days of its date (five open per account at most) and see the answers | portal user |
@@ -189,7 +190,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | Method and path | Purpose | Permission |
 |---|---|---|
 | GET `/work-orders` (keyset; `property_id`, `status` incl. `open`, `priority`, `overdue`); POST `/work-orders`; GET `/work-orders/{id}` | Work orders with timeline | `works.view` / `works.manage` |
-| POST `/work-orders/{id}/actions` `{action, vendor_id, erp_employee_id, assigned_user_id, quote_amount, cost_amount, recharge, photos, minutes_on_site, note}` | assign, quote, approve_quote, start, complete, confirm, reopen, cancel, close | `works.manage` |
+| POST `/work-orders/{id}/actions` `{action, vendor_id, erp_employee_id, assigned_user_id, quote_amount, cost_amount, recharge, photos, minutes_on_site, note}` | assign, quote (opens the quote approval), approve_quote and reject_quote (decide its current step on the central engine; the person who entered the quote never decides; reject needs a note), start, complete, confirm, reopen, cancel, close | `works.manage` |
 | GET `/vendors` (keyset; `status`) | Vendors with `documents`, `next_expiry`, `expired_documents`, `personnel` (each with `has_pin`) | `vendors.view` |
 | POST `/vendors` | Create a vendor | `vendors.manage` |
 | GET `/vendors/{id}` | Vendor with documents and personnel (`has_pin`, never the hash); personnel deployed only outside the caller's properties are left out | `vendors.view` |
@@ -303,3 +304,22 @@ uncredited part of bills more than `grace_days` past due, and leaves out earlier
 (treasury metadata `kind: late_charge`), so the charge never compounds. Each charge is a treasury
 invoice with reference type `maskani_late_charge` and a reference derived from the account and the
 month, so a retry finds the same invoice. It shows on the statement as "Late payment charge, Month".
+
+## Central approvals
+One engine (`internal/modules/approvals`), the same shape as treasury-api and inventory-api: rules per
+module and amount band with ordered role steps; submitting an object opens one `approval_requests`
+row whose `actions` hold each step's decision; approvers act on the current step in order; any
+rejection ends it. Each step is claimed with a compare-and-set on the request's status and current
+step. Maskani adds: the submitter never decides, one person decides at most one step, steps may name
+a permission (the built-in defaults), and requests carry the property for scoped inboxes
+(`current_approver` makes "waiting for me" a SQL filter).
+
+| Module | Object | Default without a rule | On approval | On rejection |
+|---|---|---|---|---|
+| `credit_note`, `adjustment` | adjustment | one step, `billing.approve` | treasury credit note raised, adjustment applied | adjustment rejected with the reason |
+| `manual_payment` | manual payment | one step, `billing.verify` | booked in treasury, account balance refreshed | closed with the reason |
+| `work_order_quote` | work order | one step, `works.manage` | work order approved, work can start | quote rejected, back to the assignee |
+| `restructure`, `vendor_bill`, `refund`, `deposit_deduction`, `remittance`, `write_off` | as those flows land | none yet | | |
+
+Not on the engine by design: the billing schedule's "run without missing readings" and document
+template publishing are operational sign-offs with no amount; each records who acted.

@@ -20,8 +20,8 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/http/handlers"
-	"github.com/bengobox/maskani-api/internal/modules/market"
 	mw "github.com/bengobox/maskani-api/internal/http/middleware"
+	"github.com/bengobox/maskani-api/internal/modules/market"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/modules/tenant"
@@ -247,10 +247,15 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings", h.UpdateSettings)
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
-	r.With(perm(rbac.PermSettingsView, rbac.PermBillingApprove)).Get("/settings/approval-rules", h.ListApprovalRules)
-	r.With(perm(rbac.PermSettingsManage)).Post("/settings/approval-rules", h.CreateApprovalRule)
-	r.With(perm(rbac.PermSettingsManage)).Put("/settings/approval-rules/{id}", h.UpdateApprovalRule)
-	r.With(perm(rbac.PermSettingsManage)).Delete("/settings/approval-rules/{id}", h.DeleteApprovalRule)
+	// Central approvals: one inbox and one rule set for every workflow that needs sign-off. Acting
+	// is checked inside the engine against the current step's role or permission.
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermSettingsView)).Get("/approvals", h.ListApprovals)
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify)).Post("/approvals/{id}/approve", h.ApproveRequest)
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify)).Post("/approvals/{id}/reject", h.RejectRequest)
+	r.With(perm(rbac.PermSettingsView, rbac.PermBillingApprove)).Get("/approvals/rules", h.ListApprovalRules)
+	r.With(perm(rbac.PermSettingsManage)).Post("/approvals/rules", h.CreateApprovalRule)
+	r.With(perm(rbac.PermSettingsManage)).Put("/approvals/rules/{id}", h.UpdateApprovalRule)
+	r.With(perm(rbac.PermSettingsManage)).Delete("/approvals/rules/{id}", h.DeleteApprovalRule)
 	r.With(perm(rbac.PermSettingsView)).Get("/document-sequences", h.ListSequences)
 	r.With(perm(rbac.PermSettingsManage)).Put("/document-sequences/{kind}", h.SaveSequence)
 	// Documents: templates (documents.manage approves), issuing and the files of issued ones.

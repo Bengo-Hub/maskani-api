@@ -58,7 +58,6 @@ var (
 		{Name: "treasury_credit_note_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending_approval", "approved", "rejected", "applied"}, Default: "pending_approval"},
 		{Name: "requested_by", Type: field.TypeUUID},
-		{Name: "approvals", Type: field.TypeJSON, Nullable: true},
 	}
 	// AdjustmentsTable holds the schema information for the "adjustments" table.
 	AdjustmentsTable = &schema.Table{
@@ -83,6 +82,55 @@ var (
 			},
 		},
 	}
+	// ApprovalRequestsColumns holds the columns for the "approval_requests" table.
+	ApprovalRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "module", Type: field.TypeEnum, Enums: []string{"credit_note", "adjustment", "manual_payment", "restructure", "vendor_bill", "refund", "work_order_quote", "deposit_deduction", "remittance", "write_off"}},
+		{Name: "object_id", Type: field.TypeUUID},
+		{Name: "object_reference", Type: field.TypeString, Default: ""},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
+		{Name: "property_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "rule_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "approved", "rejected", "cancelled"}, Default: "pending"},
+		{Name: "current_sequence", Type: field.TypeInt, Default: 1},
+		{Name: "current_approver", Type: field.TypeString, Default: ""},
+		{Name: "actions", Type: field.TypeJSON},
+		{Name: "submitted_by", Type: field.TypeUUID, Nullable: true},
+		{Name: "submitted_by_name", Type: field.TypeString, Default: ""},
+		{Name: "decided_at", Type: field.TypeTime, Nullable: true},
+	}
+	// ApprovalRequestsTable holds the schema information for the "approval_requests" table.
+	ApprovalRequestsTable = &schema.Table{
+		Name:       "approval_requests",
+		Columns:    ApprovalRequestsColumns,
+		PrimaryKey: []*schema.Column{ApprovalRequestsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "approvalrequest_tenant_id_object_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ApprovalRequestsColumns[1], ApprovalRequestsColumns[6], ApprovalRequestsColumns[2]},
+			},
+			{
+				Name:    "approvalrequest_tenant_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ApprovalRequestsColumns[1], ApprovalRequestsColumns[11], ApprovalRequestsColumns[2]},
+			},
+			{
+				Name:    "approvalrequest_tenant_id_property_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ApprovalRequestsColumns[1], ApprovalRequestsColumns[9], ApprovalRequestsColumns[11], ApprovalRequestsColumns[2]},
+			},
+			{
+				Name:    "approvalrequest_tenant_id_status_current_approver",
+				Unique:  false,
+				Columns: []*schema.Column{ApprovalRequestsColumns[1], ApprovalRequestsColumns[11], ApprovalRequestsColumns[13]},
+			},
+		},
+	}
 	// ApprovalRulesColumns holds the columns for the "approval_rules" table.
 	ApprovalRulesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -90,13 +138,13 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
-		{Name: "action", Type: field.TypeEnum, Enums: []string{"credit_note", "adjustment", "restructure", "vendor_bill", "refund", "work_order_quote", "deposit_deduction", "remittance", "write_off"}},
+		{Name: "module", Type: field.TypeEnum, Enums: []string{"credit_note", "adjustment", "manual_payment", "restructure", "vendor_bill", "refund", "work_order_quote", "deposit_deduction", "remittance", "write_off"}},
+		{Name: "name", Type: field.TypeString, Default: ""},
 		{Name: "min_amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
 		{Name: "max_amount", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
-		{Name: "levels", Type: field.TypeInt, Default: 1},
-		{Name: "approver_roles", Type: field.TypeJSON, Nullable: true},
+		{Name: "steps", Type: field.TypeJSON},
 		{Name: "require_otp", Type: field.TypeBool, Default: false},
-		{Name: "active", Type: field.TypeBool, Default: true},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
 	}
 	// ApprovalRulesTable holds the schema information for the "approval_rules" table.
 	ApprovalRulesTable = &schema.Table{
@@ -105,7 +153,7 @@ var (
 		PrimaryKey: []*schema.Column{ApprovalRulesColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "approvalrule_tenant_id_action_active",
+				Name:    "approvalrule_tenant_id_module_is_active",
 				Unique:  false,
 				Columns: []*schema.Column{ApprovalRulesColumns[1], ApprovalRulesColumns[5], ApprovalRulesColumns[11]},
 			},
@@ -3217,6 +3265,7 @@ var (
 	Tables = []*schema.Table{
 		AccountCollectionsTable,
 		AdjustmentsTable,
+		ApprovalRequestsTable,
 		ApprovalRulesTable,
 		AuditLogsTable,
 		BillQueriesTable,

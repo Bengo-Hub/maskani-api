@@ -18,6 +18,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/workorderevent"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
@@ -36,10 +37,11 @@ var SLA = map[workorder.Priority][2]time.Duration{
 
 // Service is the works service.
 type Service struct {
-	client *ent.Client
-	seq    *sequence.Allocator
-	log    *zap.Logger
-	rt     realtime.Publisher
+	client    *ent.Client
+	seq       *sequence.Allocator
+	log       *zap.Logger
+	rt        realtime.Publisher
+	approvals *approvals.Service
 }
 
 // SetRealtime sets the publisher for work order hints (nil disables them).
@@ -246,8 +248,9 @@ func (s *Service) Act(ctx context.Context, id uuid.UUID, a Actor, in ActionInput
 		to = workorder.StatusQuoted
 		u.SetQuoteAmount(decimal.NewFromFloat(*in.QuoteAmount)).SetQuoteStatus(workorder.QuoteStatusPending)
 	case "approve_quote":
-		to = workorder.StatusApproved
-		u.SetQuoteStatus(workorder.QuoteStatusApproved)
+		// Quotes are decided on the central approvals engine (DecideQuote), never directly.
+		_ = tx.Rollback()
+		return nil, httpx.Invalid("approve a quote through its approval")
 	case "start":
 		to = workorder.StatusInProgress
 		if wo.RespondedAt == nil {
@@ -303,6 +306,11 @@ func (s *Service) Act(ctx context.Context, id uuid.UUID, a Actor, in ActionInput
 		return nil, err
 	}
 	s.emit(ctx, wo)
+	if in.Action == "quote" {
+		if err := s.submitQuote(ctx, wo, a.UserID); err != nil {
+			return nil, err
+		}
+	}
 	return s.client.WorkOrder.Get(ctx, id)
 }
 

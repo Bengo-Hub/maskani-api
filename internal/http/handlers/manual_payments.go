@@ -87,7 +87,11 @@ func (h *H) ListManualPayments(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, res)
+	objIDs := make([]uuid.UUID, len(res.Data))
+	for i, m := range res.Data {
+		objIDs[i] = m.ID
+	}
+	h.withApprovals(w, r, res, objIDs)
 }
 
 func (h *H) manualScope(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
@@ -113,7 +117,7 @@ func (h *H) ApproveManualPayment(w http.ResponseWriter, r *http.Request) {
 		Note string `json:"note"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&in) // the note is optional; an empty body is fine
-	mp, err := h.Collections.ApproveManual(r.Context(), id, collections.Reviewer{UserID: actor(r), Name: displayName(r)}, in.Note)
+	mp, err := h.Collections.ApproveManual(r.Context(), id, approver(r), in.Note)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -134,7 +138,7 @@ func (h *H) RejectManualPayment(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
-	mp, err := h.Collections.RejectManual(r.Context(), id, collections.Reviewer{UserID: actor(r), Name: displayName(r)}, in.Reason)
+	mp, err := h.Collections.RejectManual(r.Context(), id, approver(r), in.Reason)
 	if err != nil {
 		httpx.Fail(w, err)
 		return

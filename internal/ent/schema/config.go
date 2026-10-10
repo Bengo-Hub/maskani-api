@@ -117,28 +117,6 @@ func (CustomFieldDef) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "entity", "key").Unique()}
 }
 
-// ApprovalRule says who must approve an action by amount band.
-type ApprovalRule struct{ ent.Schema }
-
-func (ApprovalRule) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
-
-func (ApprovalRule) Fields() []ent.Field {
-	return []ent.Field{
-		field.Enum("action").Values("credit_note", "adjustment", "restructure", "vendor_bill", "refund",
-			"work_order_quote", "deposit_deduction", "remittance", "write_off"),
-		money("min_amount"),
-		optMoney("max_amount"),
-		field.Int("levels").Default(1),
-		field.Strings("approver_roles").Optional(),
-		field.Bool("require_otp").Default(false),
-		field.Bool("active").Default(true),
-	}
-}
-
-func (ApprovalRule) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "action", "active")}
-}
-
 // ReminderSchedule sets when and how reminders go out for one reminder kind.
 type ReminderSchedule struct{ ent.Schema }
 

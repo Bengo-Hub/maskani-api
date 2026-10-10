@@ -601,16 +601,6 @@ func RequestedByLTE(v uuid.UUID) predicate.Adjustment {
 	return predicate.Adjustment(sql.FieldLTE(FieldRequestedBy, v))
 }
 
-// ApprovalsIsNil applies the IsNil predicate on the "approvals" field.
-func ApprovalsIsNil() predicate.Adjustment {
-	return predicate.Adjustment(sql.FieldIsNull(FieldApprovals))
-}
-
-// ApprovalsNotNil applies the NotNil predicate on the "approvals" field.
-func ApprovalsNotNil() predicate.Adjustment {
-	return predicate.Adjustment(sql.FieldNotNull(FieldApprovals))
-}
-
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Adjustment) predicate.Adjustment {
 	return predicate.Adjustment(sql.AndPredicates(predicates...))

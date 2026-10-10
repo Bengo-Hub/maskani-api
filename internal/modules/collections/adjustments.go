@@ -3,7 +3,6 @@ package collections
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -12,11 +11,12 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/adjustment"
-	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
+	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuseroutlet"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
@@ -36,37 +36,6 @@ type AdjustmentInput struct {
 	InvoiceID uuid.UUID       `json:"invoice_id"`
 	Amount    decimal.Decimal `json:"amount"`
 	Reason    string          `json:"reason"`
-}
-
-// Approver is who approves an adjustment, with their role codes for rules that name roles.
-type Approver struct {
-	UserID uuid.UUID
-	Name   string
-	Roles  []string
-}
-
-// ruleAction maps an adjustment kind to the approval rule action that governs it.
-func ruleAction(kind adjustment.Kind) approvalrule.Action {
-	if kind == adjustment.KindCreditNote {
-		return approvalrule.ActionCreditNote
-	}
-	return approvalrule.ActionAdjustment
-}
-
-// rule finds the active rule whose amount band holds the amount. No rule means one approval by
-// anyone who may approve (billing.approve), never the requester.
-func (s *Service) rule(ctx context.Context, kind adjustment.Kind, amount decimal.Decimal) (*ent.ApprovalRule, error) {
-	rules, err := s.client.ApprovalRule.Query().Where(approvalrule.ActionEQ(ruleAction(kind)), approvalrule.Active(true)).
-		Order(ent.Desc(approvalrule.FieldMinAmount)).Limit(20).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range rules {
-		if amount.GreaterThanOrEqual(r.MinAmount) && (r.MaxAmount == nil || amount.LessThanOrEqual(*r.MaxAmount)) {
-			return r, nil
-		}
-	}
-	return nil, nil
 }
 
 // RequestAdjustment records a credit for review. The bill must belong to the account and still owe
@@ -117,12 +86,28 @@ func (s *Service) RequestAdjustment(ctx context.Context, accountID uuid.UUID, by
 	}
 	adj, err := s.client.Adjustment.Create().SetUnitAccountID(acc.ID).SetPropertyID(acc.Edges.Unit.PropertyID).
 		SetKind(kind).SetAmount(in.Amount).SetReason(in.Reason).SetTreasuryInvoiceID(in.InvoiceID).
-		SetRequestedBy(by.UserID).SetApprovals([]map[string]any{}).
+		SetRequestedBy(by.UserID).
 		SetMetadata(map[string]any{"account_ref": acc.AccountRef, "unit_code": acc.Edges.Unit.Code,
 			"invoice_number": bill.InvoiceNumber, "requested_by_name": by.Name}).
 		Save(ctx)
 	if err != nil {
 		return nil, err
+	}
+	pid := acc.Edges.Unit.PropertyID
+	_, required, err := s.approvals.Submit(ctx, approvals.Submission{Module: adjustmentModule(kind), ObjectID: adj.ID,
+		Reference: bill.InvoiceNumber, Amount: in.Amount, PropertyID: &pid, By: by.UserID, ByName: by.Name,
+		Meta: map[string]any{"account_ref": acc.AccountRef, "unit_code": acc.Edges.Unit.Code, "account_id": acc.ID.String(),
+			"label": adjustmentLabel(kind) + " on " + bill.InvoiceNumber, "reason": in.Reason}})
+	if err != nil {
+		_ = s.client.Adjustment.DeleteOneID(adj.ID).Exec(ctx)
+		return nil, err
+	}
+	if !required {
+		// No rule and no default: nothing to approve, so it is applied straight away.
+		if err := s.client.Adjustment.UpdateOneID(adj.ID).SetStatus(adjustment.StatusApproved).Exec(ctx); err != nil {
+			return nil, err
+		}
+		return s.applyAdjustment(ctx, adj.ID)
 	}
 	payload := map[string]any{"adjustment_id": adj.ID, "account_id": acc.ID, "account_ref": acc.AccountRef,
 		"unit_code": acc.Edges.Unit.Code, "kind": string(kind), "amount": in.Amount.StringFixed(2), "reason": in.Reason,
@@ -166,59 +151,78 @@ func (s *Service) AdjustmentPropertyID(ctx context.Context, id uuid.UUID) (uuid.
 	return a.PropertyID, nil
 }
 
-// ApproveAdjustment adds the caller's approval. When the rule's levels are reached the credit note
-// is raised in treasury and the adjustment is applied. The requester never approves their own, one
-// person approves once, and a rule naming roles admits only those roles. A treasury failure leaves
-// it approved so approving again retries the credit note.
-func (s *Service) ApproveAdjustment(ctx context.Context, id uuid.UUID, by Approver, note string) (*ent.Adjustment, error) {
+// adjustmentModule is the approvals module that governs an adjustment kind.
+func adjustmentModule(kind adjustment.Kind) string {
+	if kind == adjustment.KindCreditNote {
+		return "credit_note"
+	}
+	return "adjustment"
+}
+
+func adjustmentLabel(kind adjustment.Kind) string {
+	if kind == adjustment.KindCreditNote {
+		return "Credit note"
+	}
+	return "Waiver"
+}
+
+// ApproveAdjustment decides the current step of the adjustment's approval on the central engine;
+// the last step raises the credit note in treasury. An approved adjustment whose credit note did
+// not go through is retried by approving again.
+func (s *Service) ApproveAdjustment(ctx context.Context, id uuid.UUID, by approvals.Actor, note string) (*ent.Adjustment, error) {
 	adj, err := s.client.Adjustment.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if adj.Status == adjustment.StatusRejected || adj.Status == adjustment.StatusApplied {
+	switch adj.Status {
+	case adjustment.StatusRejected, adjustment.StatusApplied:
 		return nil, httpx.Conflict("this adjustment has already been closed")
+	case adjustment.StatusApproved:
+		return s.applyAdjustment(ctx, id)
 	}
-	if adj.RequestedBy == by.UserID {
-		return nil, httpx.Forbidden("someone other than the person who asked for it must approve this credit")
-	}
-	levels := 1
-	r, err := s.rule(ctx, adj.Kind, adj.Amount)
+	req, err := s.approvals.Latest(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if r != nil {
-		levels = max(r.Levels, 1)
-		if len(r.ApproverRoles) > 0 && !slices.ContainsFunc(by.Roles, func(role string) bool { return slices.Contains(r.ApproverRoles, role) }) {
-			return nil, httpx.Forbidden("this amount needs approval by " + strings.Join(r.ApproverRoles, " or "))
-		}
+	if req == nil {
+		return nil, httpx.Conflict("this adjustment has no approval waiting")
 	}
-	approvals := adj.Approvals
-	if adj.Status == adjustment.StatusPendingApproval {
-		for _, a := range approvals {
-			if a["user_id"] == by.UserID.String() {
-				return nil, httpx.Conflict("you have already approved this; it needs another approver")
-			}
+	if _, err := s.approvals.Decide(ctx, req.ID, by, approvals.Approve, note); err != nil {
+		return nil, err
+	}
+	return s.client.Adjustment.Get(ctx, id)
+}
+
+// AfterDecision moves an adjustment on once its approval request is decided: approved raises the
+// credit note, rejected closes it. Called by ApproveAdjustment and by the central approvals inbox.
+func (s *Service) AfterDecision(ctx context.Context, req *ent.ApprovalRequest) (*ent.Adjustment, error) {
+	switch req.Status {
+	case approvalrequest.StatusApproved:
+		if _, err := s.client.Adjustment.Update().Where(adjustment.ID(req.ObjectID), adjustment.StatusEQ(adjustment.StatusPendingApproval)).
+			SetStatus(adjustment.StatusApproved).Save(ctx); err != nil {
+			return nil, err
 		}
-		approvals = append(approvals, map[string]any{"user_id": by.UserID.String(), "name": by.Name,
-			"at": time.Now().UTC().Format(time.RFC3339), "note": strings.TrimSpace(note)})
-		next := adjustment.StatusPendingApproval
-		if len(approvals) >= levels {
-			next = adjustment.StatusApproved
-		}
-		// Conditional on the approvals seen, so two approvers at once cannot both count as the last.
-		n, err := s.client.Adjustment.Update().Where(adjustment.ID(id), adjustment.StatusEQ(adjustment.StatusPendingApproval),
-			adjustment.UpdatedAt(adj.UpdatedAt)).SetApprovals(approvals).SetStatus(next).Save(ctx)
+		return s.applyAdjustment(ctx, req.ObjectID)
+	case approvalrequest.StatusRejected:
+		adj, err := s.client.Adjustment.Get(ctx, req.ObjectID)
 		if err != nil {
 			return nil, err
 		}
-		if n == 0 {
-			return nil, httpx.Conflict("someone else approved this at the same moment; reload and try again")
+		meta := map[string]any{}
+		for k, v := range adj.Metadata {
+			meta[k] = v
 		}
-		if next != adjustment.StatusApproved {
-			return s.client.Adjustment.Get(ctx, id)
+		for _, a := range approvals.Actions(req) {
+			if a.Status == "rejected" {
+				meta["rejected_by_name"], meta["rejected_reason"] = a.ActedByName, a.Comment
+			}
+		}
+		if _, err := s.client.Adjustment.Update().Where(adjustment.ID(adj.ID), adjustment.StatusEQ(adjustment.StatusPendingApproval)).
+			SetStatus(adjustment.StatusRejected).SetMetadata(meta).Save(ctx); err != nil {
+			return nil, err
 		}
 	}
-	return s.applyAdjustment(ctx, id)
+	return s.client.Adjustment.Get(ctx, req.ObjectID)
 }
 
 // applyAdjustment raises the credit note for an approved adjustment, once.
@@ -269,28 +273,17 @@ func (s *Service) applyAdjustment(ctx context.Context, id uuid.UUID) (*ent.Adjus
 	return s.client.Adjustment.Get(ctx, id)
 }
 
-// RejectAdjustment closes a request without crediting; the reason is required.
-func (s *Service) RejectAdjustment(ctx context.Context, id uuid.UUID, by Approver, reason string) (*ent.Adjustment, error) {
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return nil, httpx.Invalid("say why the credit is rejected")
-	}
-	adj, err := s.client.Adjustment.Get(ctx, id)
+// RejectAdjustment rejects the current step of the adjustment's approval; the reason is required.
+func (s *Service) RejectAdjustment(ctx context.Context, id uuid.UUID, by approvals.Actor, reason string) (*ent.Adjustment, error) {
+	req, err := s.approvals.Latest(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	meta := map[string]any{}
-	for k, v := range adj.Metadata {
-		meta[k] = v
-	}
-	meta["rejected_by_name"], meta["rejected_reason"], meta["rejected_at"] = by.Name, reason, time.Now().UTC().Format(time.RFC3339)
-	n, err := s.client.Adjustment.Update().Where(adjustment.ID(id), adjustment.StatusEQ(adjustment.StatusPendingApproval)).
-		SetStatus(adjustment.StatusRejected).SetMetadata(meta).Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if n == 0 {
+	if req == nil {
 		return nil, httpx.Conflict("only a credit waiting for approval can be rejected")
+	}
+	if _, err := s.approvals.Decide(ctx, req.ID, by, approvals.Reject, reason); err != nil {
+		return nil, err
 	}
 	return s.client.Adjustment.Get(ctx, id)
 }

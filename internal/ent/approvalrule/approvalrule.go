@@ -25,20 +25,20 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldMetadata holds the string denoting the metadata field in the database.
 	FieldMetadata = "metadata"
-	// FieldAction holds the string denoting the action field in the database.
-	FieldAction = "action"
+	// FieldModule holds the string denoting the module field in the database.
+	FieldModule = "module"
+	// FieldName holds the string denoting the name field in the database.
+	FieldName = "name"
 	// FieldMinAmount holds the string denoting the min_amount field in the database.
 	FieldMinAmount = "min_amount"
 	// FieldMaxAmount holds the string denoting the max_amount field in the database.
 	FieldMaxAmount = "max_amount"
-	// FieldLevels holds the string denoting the levels field in the database.
-	FieldLevels = "levels"
-	// FieldApproverRoles holds the string denoting the approver_roles field in the database.
-	FieldApproverRoles = "approver_roles"
+	// FieldSteps holds the string denoting the steps field in the database.
+	FieldSteps = "steps"
 	// FieldRequireOtp holds the string denoting the require_otp field in the database.
 	FieldRequireOtp = "require_otp"
-	// FieldActive holds the string denoting the active field in the database.
-	FieldActive = "active"
+	// FieldIsActive holds the string denoting the is_active field in the database.
+	FieldIsActive = "is_active"
 	// Table holds the table name of the approvalrule in the database.
 	Table = "approval_rules"
 )
@@ -50,13 +50,13 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldMetadata,
-	FieldAction,
+	FieldModule,
+	FieldName,
 	FieldMinAmount,
 	FieldMaxAmount,
-	FieldLevels,
-	FieldApproverRoles,
+	FieldSteps,
 	FieldRequireOtp,
-	FieldActive,
+	FieldIsActive,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -83,45 +83,46 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
+	// DefaultName holds the default value on creation for the "name" field.
+	DefaultName string
 	// DefaultMinAmount holds the default value on creation for the "min_amount" field.
 	DefaultMinAmount func() decimal.Decimal
-	// DefaultLevels holds the default value on creation for the "levels" field.
-	DefaultLevels int
 	// DefaultRequireOtp holds the default value on creation for the "require_otp" field.
 	DefaultRequireOtp bool
-	// DefaultActive holds the default value on creation for the "active" field.
-	DefaultActive bool
+	// DefaultIsActive holds the default value on creation for the "is_active" field.
+	DefaultIsActive bool
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
 
-// Action defines the type for the "action" enum field.
-type Action string
+// Module defines the type for the "module" enum field.
+type Module string
 
-// Action values.
+// Module values.
 const (
-	ActionCreditNote       Action = "credit_note"
-	ActionAdjustment       Action = "adjustment"
-	ActionRestructure      Action = "restructure"
-	ActionVendorBill       Action = "vendor_bill"
-	ActionRefund           Action = "refund"
-	ActionWorkOrderQuote   Action = "work_order_quote"
-	ActionDepositDeduction Action = "deposit_deduction"
-	ActionRemittance       Action = "remittance"
-	ActionWriteOff         Action = "write_off"
+	ModuleCreditNote       Module = "credit_note"
+	ModuleAdjustment       Module = "adjustment"
+	ModuleManualPayment    Module = "manual_payment"
+	ModuleRestructure      Module = "restructure"
+	ModuleVendorBill       Module = "vendor_bill"
+	ModuleRefund           Module = "refund"
+	ModuleWorkOrderQuote   Module = "work_order_quote"
+	ModuleDepositDeduction Module = "deposit_deduction"
+	ModuleRemittance       Module = "remittance"
+	ModuleWriteOff         Module = "write_off"
 )
 
-func (a Action) String() string {
-	return string(a)
+func (m Module) String() string {
+	return string(m)
 }
 
-// ActionValidator is a validator for the "action" field enum values. It is called by the builders before save.
-func ActionValidator(a Action) error {
-	switch a {
-	case ActionCreditNote, ActionAdjustment, ActionRestructure, ActionVendorBill, ActionRefund, ActionWorkOrderQuote, ActionDepositDeduction, ActionRemittance, ActionWriteOff:
+// ModuleValidator is a validator for the "module" field enum values. It is called by the builders before save.
+func ModuleValidator(m Module) error {
+	switch m {
+	case ModuleCreditNote, ModuleAdjustment, ModuleManualPayment, ModuleRestructure, ModuleVendorBill, ModuleRefund, ModuleWorkOrderQuote, ModuleDepositDeduction, ModuleRemittance, ModuleWriteOff:
 		return nil
 	default:
-		return fmt.Errorf("approvalrule: invalid enum value for action field: %q", a)
+		return fmt.Errorf("approvalrule: invalid enum value for module field: %q", m)
 	}
 }
 
@@ -148,9 +149,14 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByAction orders the results by the action field.
-func ByAction(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAction, opts...).ToFunc()
+// ByModule orders the results by the module field.
+func ByModule(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldModule, opts...).ToFunc()
+}
+
+// ByName orders the results by the name field.
+func ByName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
 // ByMinAmount orders the results by the min_amount field.
@@ -163,17 +169,12 @@ func ByMaxAmount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxAmount, opts...).ToFunc()
 }
 
-// ByLevels orders the results by the levels field.
-func ByLevels(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLevels, opts...).ToFunc()
-}
-
 // ByRequireOtp orders the results by the require_otp field.
 func ByRequireOtp(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequireOtp, opts...).ToFunc()
 }
 
-// ByActive orders the results by the active field.
-func ByActive(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldActive, opts...).ToFunc()
+// ByIsActive orders the results by the is_active field.
+func ByIsActive(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsActive, opts...).ToFunc()
 }

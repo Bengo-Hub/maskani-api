@@ -166,6 +166,14 @@ maskani-api never collects, holds or pays money.
 Funds never mix: each fund maps to its own paybill, bank account, cost centre and ledger accounts,
 and a payment to one account reference can only settle that account's invoices.
 
+## Approvals
+
+Every workflow that needs sign-off runs on one engine, `internal/modules/approvals`, with the same
+shape as treasury-api and inventory-api (rules per module and amount band with ordered role steps,
+one request per object, steps decided in order). Workflows register default steps and a decision
+hook (`SetDefault`, `OnDecision`); deciding from the central inbox (`/approvals`) or from the
+workflow's own screen runs the same hook. See "Central approvals" in api-spec.md.
+
 ## Background jobs
 
 All jobs run once per fleet per period through `cache.ClaimPeriod` / `RunOnce`. Session advisory

@@ -30,6 +30,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/router"
 	"github.com/bengobox/maskani-api/internal/jobs"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/authapi"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
@@ -169,10 +170,12 @@ func New(ctx context.Context) (*App, error) {
 	if rdb != nil {
 		billSvc.SetRedis(rdb)
 	}
-	collSvc := collections.NewService(orm, tc, accSvc, log)
+	approvalSvc := approvals.NewService(orm)
+	collSvc := collections.NewService(orm, tc, accSvc, approvalSvc, log)
 	utilSvc := utilities.NewService(orm, log)
 	salesSvc := sales.NewService(orm, tc, accSvc, seq, loc, log)
 	worksSvc := works.NewService(orm, seq, log)
+	worksSvc.SetApprovals(approvalSvc)
 	gateSvc := gate.NewService(orm, box, seq, log)
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
@@ -218,7 +221,7 @@ func New(ctx context.Context) (*App, error) {
 	// The collections ladder and instalment reminders (one engine per customer; treasury dunning stays off).
 	remindSvc := reminders.NewService(orm, sqlDB, docSvc, loc, log)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
-		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
+		Collections: collSvc, Approvals: approvalSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}

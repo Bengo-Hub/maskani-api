@@ -33,6 +33,18 @@ func (f AdjustmentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AdjustmentMutation", m)
 }
 
+// The ApprovalRequestFunc type is an adapter to allow the use of ordinary
+// function as ApprovalRequest mutator.
+type ApprovalRequestFunc func(context.Context, *ent.ApprovalRequestMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ApprovalRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ApprovalRequestMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ApprovalRequestMutation", m)
+}
+
 // The ApprovalRuleFunc type is an adapter to allow the use of ordinary
 // function as ApprovalRule mutator.
 type ApprovalRuleFunc func(context.Context, *ent.ApprovalRuleMutation) (ent.Value, error)

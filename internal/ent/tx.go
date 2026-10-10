@@ -16,6 +16,8 @@ type Tx struct {
 	AccountCollection *AccountCollectionClient
 	// Adjustment is the client for interacting with the Adjustment builders.
 	Adjustment *AdjustmentClient
+	// ApprovalRequest is the client for interacting with the ApprovalRequest builders.
+	ApprovalRequest *ApprovalRequestClient
 	// ApprovalRule is the client for interacting with the ApprovalRule builders.
 	ApprovalRule *ApprovalRuleClient
 	// AuditLog is the client for interacting with the AuditLog builders.
@@ -297,6 +299,7 @@ func (tx *Tx) Client() *Client {
 func (tx *Tx) init() {
 	tx.AccountCollection = NewAccountCollectionClient(tx.config)
 	tx.Adjustment = NewAdjustmentClient(tx.config)
+	tx.ApprovalRequest = NewApprovalRequestClient(tx.config)
 	tx.ApprovalRule = NewApprovalRuleClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
 	tx.BillQuery = NewBillQueryClient(tx.config)

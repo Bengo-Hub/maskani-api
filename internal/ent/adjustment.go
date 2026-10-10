@@ -45,9 +45,7 @@ type Adjustment struct {
 	// Status holds the value of the "status" field.
 	Status adjustment.Status `json:"status,omitempty"`
 	// RequestedBy holds the value of the "requested_by" field.
-	RequestedBy uuid.UUID `json:"requested_by,omitempty"`
-	// Approvals holds the value of the "approvals" field.
-	Approvals    []map[string]interface{} `json:"approvals,omitempty"`
+	RequestedBy  uuid.UUID `json:"requested_by,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -58,7 +56,7 @@ func (*Adjustment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case adjustment.FieldTreasuryInvoiceID, adjustment.FieldTreasuryCreditNoteID:
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
-		case adjustment.FieldMetadata, adjustment.FieldApprovals:
+		case adjustment.FieldMetadata:
 			values[i] = new([]byte)
 		case adjustment.FieldAmount:
 			values[i] = new(decimal.Decimal)
@@ -171,14 +169,6 @@ func (_m *Adjustment) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				_m.RequestedBy = *value
 			}
-		case adjustment.FieldApprovals:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field approvals", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.Approvals); err != nil {
-					return fmt.Errorf("unmarshal field approvals: %w", err)
-				}
-			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -257,9 +247,6 @@ func (_m *Adjustment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("requested_by=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequestedBy))
-	builder.WriteString(", ")
-	builder.WriteString("approvals=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Approvals))
 	builder.WriteByte(')')
 	return builder.String()
 }

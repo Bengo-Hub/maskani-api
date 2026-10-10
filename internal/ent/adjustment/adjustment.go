@@ -43,8 +43,6 @@ const (
 	FieldStatus = "status"
 	// FieldRequestedBy holds the string denoting the requested_by field in the database.
 	FieldRequestedBy = "requested_by"
-	// FieldApprovals holds the string denoting the approvals field in the database.
-	FieldApprovals = "approvals"
 	// Table holds the table name of the adjustment in the database.
 	Table = "adjustments"
 )
@@ -65,7 +63,6 @@ var Columns = []string{
 	FieldTreasuryCreditNoteID,
 	FieldStatus,
 	FieldRequestedBy,
-	FieldApprovals,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
