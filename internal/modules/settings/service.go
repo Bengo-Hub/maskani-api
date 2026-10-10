@@ -16,6 +16,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/fund"
 	"github.com/bengobox/maskani-api/internal/ent/tenantmodule"
 	"github.com/bengobox/maskani-api/internal/ent/tenantsetting"
+	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
 
@@ -329,6 +330,8 @@ type UpdateInput struct {
 	WalkInPolicy *string `json:"walk_in_policy"`
 	// ArrearsSteps replaces the collections ladder; an empty list goes back to the default.
 	ArrearsSteps *[]ArrearsStep `json:"arrears_steps"`
+	// LateCharge is kept in metadata ("late_charge"); off by default.
+	LateCharge *LateCharge `json:"late_charge"`
 }
 
 // Walk-in policies: by default the guard decides at the gate and the host is told who came in; an
@@ -370,7 +373,7 @@ func (s *Service) Update(ctx context.Context, tenantID uuid.UUID, in UpdateInput
 		set func(int) *ent.TenantSettingUpdateOne
 	}{{in.BillingDay, u.SetBillingDay}, {in.DueDay, u.SetDueDay}, {in.ReadingWindowStart, u.SetReadingWindowStart}, {in.ReadingWindowEnd, u.SetReadingWindowEnd}} {
 		if err := day(f.v, f.set); err != nil {
-			return nil, err
+			return nil, httpx.Invalid(err.Error())
 		}
 	}
 	if in.TenantType != nil {
@@ -405,19 +408,34 @@ func (s *Service) Update(ctx context.Context, tenantID uuid.UUID, in UpdateInput
 	}
 	if in.ArrearsSteps != nil {
 		if err := validateArrears(*in.ArrearsSteps); err != nil {
-			return nil, err
+			return nil, httpx.Invalid(err.Error())
 		}
 		u.SetArrearsSteps(arrearsJSON(*in.ArrearsSteps))
 	}
+	// Settings kept in metadata are merged into one copy, so two in one request both stick.
+	var meta map[string]any
+	setMeta := func(k string, v any) {
+		if meta == nil {
+			meta = map[string]any{}
+			for mk, mv := range cur.Metadata {
+				meta[mk] = mv
+			}
+		}
+		meta[k] = v
+	}
 	if in.WalkInPolicy != nil {
 		if *in.WalkInPolicy != WalkInGuardDecides && *in.WalkInPolicy != WalkInAskHost {
-			return nil, fmt.Errorf("walk-in policy must be guard_decides or ask_host")
+			return nil, httpx.Invalid("walk-in policy must be guard_decides or ask_host")
 		}
-		meta := map[string]any{}
-		for k, v := range cur.Metadata {
-			meta[k] = v
+		setMeta("walk_in_policy", *in.WalkInPolicy)
+	}
+	if in.LateCharge != nil {
+		if err := validateLateCharge(*in.LateCharge); err != nil {
+			return nil, httpx.Invalid(err.Error())
 		}
-		meta["walk_in_policy"] = *in.WalkInPolicy
+		setMeta("late_charge", lateChargeJSON(*in.LateCharge))
+	}
+	if meta != nil {
 		u.SetMetadata(meta)
 	}
 	return u.Save(ctx)

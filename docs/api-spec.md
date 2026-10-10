@@ -56,7 +56,7 @@ units. Delivery is best effort across pods; refetch after a reconnect.
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| GET `/settings`; PUT `/settings` | Tenant settings (type, billing day, due day, reading window, quiet hours, allocation order, terms versions, support contacts) | `settings.view` / `settings.manage` |
+| GET `/settings`; PUT `/settings` | Tenant settings (type, billing day, due day, reading window, quiet hours, allocation order, terms versions, support contacts, `arrears_steps`, `walk_in_policy`, `late_charge` `{enabled, percent, fixed, cap, grace_days, day, funds}` kept in metadata). Invalid values answer 422 with the reason | `settings.view` / `settings.manage` |
 | GET `/settings/modules`; PUT `/settings/modules` `{modules:[...]}` or `{preset}` | Module switches, presets, dependencies | `settings.view` / `settings.manage` |
 | GET `/document-sequences`; PUT `/document-sequences/{kind}` `{prefix, format, pad_width, reset_period, next_value}` | Numbering per kind (sale_contract, work_order, incident, document) with the next number; format tokens `{prefix} {seq} {yy} {yyyy} {mm}`; `reset_period` none, yearly or monthly, and a restarting series must show its year (and month) so numbers never repeat; `next_value` continues an existing series | `settings.view` / `settings.manage` |
 | GET `/catalogues/{kind}` | Platform defaults merged with tenant overrides | signed-in staff |
@@ -292,3 +292,12 @@ Estate and unit photos (`kind=properties` and `kind=units`) are published images
 them without a signature, with immutable caching, and the market projection returns them as absolute
 links. Every other kind (documents, readings, works, incidents, vendors, evidence) needs a signed
 link from `POST /media/sign` and is never cached by shared caches.
+
+## Late payment charge
+Off unless an estate switches it on (`late_charge.enabled`). The hourly job `maskani:late-charges`
+looks at each owing account in the chosen funds once a month, from `day`. The charge is `percent`
+of the overdue amount plus `fixed`, at most `cap` when set. The overdue amount is the unpaid,
+uncredited part of bills more than `grace_days` past due, and leaves out earlier late charges
+(treasury metadata `kind: late_charge`), so the charge never compounds. Each charge is a treasury
+invoice with reference type `maskani_late_charge` and a reference derived from the account and the
+month, so a retry finds the same invoice. It shows on the statement as "Late payment charge, Month".

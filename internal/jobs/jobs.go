@@ -112,6 +112,22 @@ func New(d Deps) *Runner {
 			}
 			return err
 		}},
+		// Late payment charge: estates that switched it on, once a month per owing account from the
+		// estate's day, 300 accounts an hour (one treasury ledger read each).
+		{"maskani:late-charges", time.Hour, func(ctx context.Context) error {
+			if d.Collections == nil {
+				return nil
+			}
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "billing")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			n, err := d.Collections.RunLateCharges(ctx, on, time.Now(), d.Loc, 300)
+			if n > 0 {
+				log.Info("late charges raised", zap.Int("charges", n))
+			}
+			return err
+		}},
 		// Collections ladder: one step a day at most per owing account, in working hours only.
 		{"maskani:collections-ladder", time.Hour, func(ctx context.Context) error {
 			if d.Reminders == nil {

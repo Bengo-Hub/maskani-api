@@ -34,7 +34,7 @@ Data owned elsewhere is referenced by ID only:
 
 | Table | Key fields | Keys and indexes |
 |---|---|---|
-| `tenant_settings` | tenant_type (estate_operator, property_manager, landlord, agent, owners_association), use_case_preset, currency, timezone, billing_day, reading_window (start, end day), due_day, quiet_hours, allocation_order (oldest_first, priority), arrears_steps, terms_version, privacy_version, branding overrides in metadata | unique tenant_id |
+| `tenant_settings` | tenant_type (estate_operator, property_manager, landlord, agent, owners_association), use_case_preset, currency, timezone, billing_day, reading_window (start, end day), due_day, quiet_hours, allocation_order (oldest_first, priority), arrears_steps, terms_version, privacy_version; metadata holds branding overrides, walk_in_policy and late_charge | unique tenant_id |
 | `tenant_modules` | module, enabled, enabled_at, disabled_at, enabled_by | unique (tenant_id, module) |
 | `catalog_entries` | tenant_id nullable (null = platform default), kind (property_type, unit_use, unit_type, amenity, wo_category, vendor_category, vendor_doc_type, pass_type, incident_type, notice_category, title_stage, checklist), code, name, description, parent_code, sort, active, attrs jsonb | unique (kind, code) where tenant null; unique (tenant_id, kind, code) |
 | `custom_field_defs` | entity (property, unit, party, sale_contract, work_order, vendor), key, label, field_type, options, required, show_in_list, sort, active | unique (tenant_id, entity, key) |

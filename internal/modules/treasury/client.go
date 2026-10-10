@@ -23,7 +23,8 @@ const (
 	RefInstalment     = "maskani_instalment" // reference_id = instalment id
 	RefReservationFee = "maskani_reservation"
 	RefAdhoc          = "maskani_adhoc"
-	RefAccountPayment = "account_payment" // payment intents and C2B routes: reference_id = unit account id
+	RefLateCharge     = "maskani_late_charge" // reference_id = SHA1(account id, "late:YYYY-MM")
+	RefAccountPayment = "account_payment"     // payment intents and C2B routes: reference_id = unit account id
 	SourceService     = "maskani"
 )
 
@@ -345,6 +346,8 @@ type LedgerInvoice struct {
 	PaymentStatus  string          `json:"payment_status"`
 	PublicToken    uuid.UUID       `json:"public_token"`
 	Description    string          `json:"description"`
+	// Kind is the bill kind maskani set in metadata (late_charge for a late payment charge).
+	Kind string `json:"kind,omitempty"`
 }
 
 // LedgerPayment is one payment applied to the account.
