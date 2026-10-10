@@ -327,6 +327,8 @@ type UpdateInput struct {
 	PortalSupportEmail *string  `json:"portal_support_email"`
 	// WalkInPolicy is kept in metadata: guard_decides (default) or ask_host.
 	WalkInPolicy *string `json:"walk_in_policy"`
+	// ArrearsSteps replaces the collections ladder; an empty list goes back to the default.
+	ArrearsSteps *[]ArrearsStep `json:"arrears_steps"`
 }
 
 // Walk-in policies: by default the guard decides at the gate and the host is told who came in; an
@@ -400,6 +402,12 @@ func (s *Service) Update(ctx context.Context, tenantID uuid.UUID, in UpdateInput
 	}
 	if in.PortalSupportEmail != nil {
 		u.SetPortalSupportEmail(*in.PortalSupportEmail)
+	}
+	if in.ArrearsSteps != nil {
+		if err := validateArrears(*in.ArrearsSteps); err != nil {
+			return nil, err
+		}
+		u.SetArrearsSteps(arrearsJSON(*in.ArrearsSteps))
 	}
 	if in.WalkInPolicy != nil {
 		if *in.WalkInPolicy != WalkInGuardDecides && *in.WalkInPolicy != WalkInAskHost {

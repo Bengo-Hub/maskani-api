@@ -43,6 +43,10 @@ const (
 	NoticePublished        = "notice.published"
 	PartyInvited           = "party.invited"
 	PassCreated            = "pass.created"
+	// Collections ladder and instalment reminders.
+	ArrearsReminder     = "arrears.reminder"
+	ArrearsDemandLetter = "arrears.demand_letter"
+	ArrearsEscalated    = "arrears.escalated"
 )
 
 // Publisher is client.OutboxEvent or tx.OutboxEvent.

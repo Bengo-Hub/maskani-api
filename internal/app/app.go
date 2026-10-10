@@ -42,6 +42,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/portal"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/register"
+	"github.com/bengobox/maskani-api/internal/modules/reminders"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
@@ -214,9 +215,11 @@ func New(ctx context.Context) (*App, error) {
 	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, reportSvc, loc)
 	// Issued documents are stored under the media root and checked on maskani-ui's public verify page.
 	docSvc.SetIssuing(docs.Storage{Root: cfg.Media.Root, VerifyURL: strings.TrimRight(cfg.HTTP.AppURL, "/") + "/verify/"}, seq)
+	// The collections ladder and instalment reminders (one engine per customer; treasury dunning stays off).
+	remindSvc := reminders.NewService(orm, sqlDB, docSvc, loc, log)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 
@@ -229,7 +232,7 @@ func New(ctx context.Context) (*App, error) {
 		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer,
 		InternalKey: cfg.Auth.APIKey})
 
-	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Settings: settingsSvc, Log: log})
+	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc, Settings: settingsSvc, Reminders: remindSvc, Log: log})
 
 	return &App{cfg: cfg, log: log, pool: pool, cache: rdb, nc: nc, orm: orm, roOrm: roOrm, outbox: outbox,
 		consumer: consumer, notices: noticeSvc, jobs: runner,

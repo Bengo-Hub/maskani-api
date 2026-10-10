@@ -19,6 +19,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/reminders"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
@@ -41,18 +42,19 @@ type Runner struct {
 
 // Deps are the services jobs call.
 type Deps struct {
-	Client   *ent.Client
-	SQL      *stdsql.DB // primary handle for set-based rollups
-	Loc      *time.Location
-	Accounts *accounts.Service
-	Billing  *billing.Service
-	Imports  *imports.Service
-	Sales    *sales.Service
-	Works    *works.Service
-	Gate     *gate.Service
-	Notices  *notices.Service
-	Settings *settings.Service
-	Log      *zap.Logger
+	Client    *ent.Client
+	SQL       *stdsql.DB // primary handle for set-based rollups
+	Loc       *time.Location
+	Accounts  *accounts.Service
+	Billing   *billing.Service
+	Imports   *imports.Service
+	Sales     *sales.Service
+	Works     *works.Service
+	Gate      *gate.Service
+	Notices   *notices.Service
+	Settings  *settings.Service
+	Reminders *reminders.Service
+	Log       *zap.Logger
 }
 
 // New builds the runner with the standard maskani jobs (docs/architecture.md, background jobs).
@@ -90,6 +92,34 @@ func New(d Deps) *Runner {
 			if n > 0 {
 				log.Info("scheduled billing runs started", zap.Int("runs", n))
 			}
+			return err
+		}},
+		// Collections ladder: one step a day at most per owing account, in working hours only.
+		{"maskani:collections-ladder", time.Hour, func(ctx context.Context) error {
+			if d.Reminders == nil {
+				return nil
+			}
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "billing")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			n, err := d.Reminders.RunLadder(ctx, on, time.Now())
+			if n > 0 {
+				log.Info("collections steps run", zap.Int("steps", n))
+			}
+			return err
+		}},
+		// Instalments: reminders 3 days before, on the day, 7 and 14 days late; overdue marking;
+		// contracts in and out of default after their grace days.
+		{"maskani:instalment-reminders", time.Hour, func(ctx context.Context) error {
+			if d.Reminders == nil {
+				return nil
+			}
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "sales")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			_, err = d.Reminders.RunInstalments(ctx, on, time.Now())
 			return err
 		}},
 		{"maskani:instalment-invoicing", time.Hour, func(ctx context.Context) error {

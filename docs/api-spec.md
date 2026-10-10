@@ -124,6 +124,8 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/unit-accounts/{id}/statement/export?format=pdf\|csv\|xlsx` | Branded statement download with up to 500 bills and 500 payments, oldest first, built on the shared `github.com/Bengo-Hub/reports` engine; `Cache-Control: private, no-store`; 20 per user per minute | `billing.view` |
 | POST `/unit-accounts/{id}/pay` | Staff-initiated STK for an owner | `billing.collect` |
 | GET `/collections/suspense?days=`; POST `/collections/suspense/{trans_id}/assign` `{unit_account_id}` | Unmatched paybill payments | `billing.collect` |
+| GET `/collections/call-list?property_id=` | Accounts the collections ladder put on the call list (day 30 by default) that still owe, largest first: account, customer, phone, unit, balance, last payment, oldest due, promise date, last note | `billing.collect` |
+| GET `/unit-accounts/{id}/collections`; POST `/unit-accounts/{id}/collection-notes` `{outcome, promise_date, note}` | The account's place on the ladder (episode, steps done, call list, promise) and up to 20 notes. Outcomes: reached, no_answer, promised (needs a date; holds the demand letter and escalation until it passes), disputed, wrong_number, paid. A promise or paid takes it off the call list | `billing.view` / `billing.collect` |
 | GET `/reports/arrears` (keyset by balance, largest first; `property_id`) | `{account_id, account_ref, customer_name, customer_phone, balance, last_payment_at}` | `reports.view` |
 | GET, POST `/units/{id}/charges`; PATCH `/unit-charges/{id}` | Opt-in charges per unit | planned (sprint 2) |
 | GET `/unit-accounts/{id}`; statement `?format=pdf` | | planned (sprint 2) |
