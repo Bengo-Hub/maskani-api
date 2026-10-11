@@ -184,26 +184,6 @@ func (_u *PrivacyRequestUpdate) ClearCompletedAt() *PrivacyRequestUpdate {
 	return _u
 }
 
-// SetExportFileKey sets the "export_file_key" field.
-func (_u *PrivacyRequestUpdate) SetExportFileKey(v string) *PrivacyRequestUpdate {
-	_u.mutation.SetExportFileKey(v)
-	return _u
-}
-
-// SetNillableExportFileKey sets the "export_file_key" field if the given value is not nil.
-func (_u *PrivacyRequestUpdate) SetNillableExportFileKey(v *string) *PrivacyRequestUpdate {
-	if v != nil {
-		_u.SetExportFileKey(*v)
-	}
-	return _u
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (_u *PrivacyRequestUpdate) ClearExportFileKey() *PrivacyRequestUpdate {
-	_u.mutation.ClearExportFileKey()
-	return _u
-}
-
 // SetNotes sets the "notes" field.
 func (_u *PrivacyRequestUpdate) SetNotes(v string) *PrivacyRequestUpdate {
 	_u.mutation.SetNotes(v)
@@ -348,12 +328,6 @@ func (_u *PrivacyRequestUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(privacyrequest.FieldCompletedAt, field.TypeTime)
-	}
-	if value, ok := _u.mutation.ExportFileKey(); ok {
-		_spec.SetField(privacyrequest.FieldExportFileKey, field.TypeString, value)
-	}
-	if _u.mutation.ExportFileKeyCleared() {
-		_spec.ClearField(privacyrequest.FieldExportFileKey, field.TypeString)
 	}
 	if value, ok := _u.mutation.Notes(); ok {
 		_spec.SetField(privacyrequest.FieldNotes, field.TypeString, value)
@@ -537,26 +511,6 @@ func (_u *PrivacyRequestUpdateOne) ClearCompletedAt() *PrivacyRequestUpdateOne {
 	return _u
 }
 
-// SetExportFileKey sets the "export_file_key" field.
-func (_u *PrivacyRequestUpdateOne) SetExportFileKey(v string) *PrivacyRequestUpdateOne {
-	_u.mutation.SetExportFileKey(v)
-	return _u
-}
-
-// SetNillableExportFileKey sets the "export_file_key" field if the given value is not nil.
-func (_u *PrivacyRequestUpdateOne) SetNillableExportFileKey(v *string) *PrivacyRequestUpdateOne {
-	if v != nil {
-		_u.SetExportFileKey(*v)
-	}
-	return _u
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (_u *PrivacyRequestUpdateOne) ClearExportFileKey() *PrivacyRequestUpdateOne {
-	_u.mutation.ClearExportFileKey()
-	return _u
-}
-
 // SetNotes sets the "notes" field.
 func (_u *PrivacyRequestUpdateOne) SetNotes(v string) *PrivacyRequestUpdateOne {
 	_u.mutation.SetNotes(v)
@@ -731,12 +685,6 @@ func (_u *PrivacyRequestUpdateOne) sqlSave(ctx context.Context) (_node *PrivacyR
 	}
 	if _u.mutation.CompletedAtCleared() {
 		_spec.ClearField(privacyrequest.FieldCompletedAt, field.TypeTime)
-	}
-	if value, ok := _u.mutation.ExportFileKey(); ok {
-		_spec.SetField(privacyrequest.FieldExportFileKey, field.TypeString, value)
-	}
-	if _u.mutation.ExportFileKeyCleared() {
-		_spec.ClearField(privacyrequest.FieldExportFileKey, field.TypeString)
 	}
 	if value, ok := _u.mutation.Notes(); ok {
 		_spec.SetField(privacyrequest.FieldNotes, field.TypeString, value)

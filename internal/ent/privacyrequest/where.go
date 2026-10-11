@@ -100,11 +100,6 @@ func CompletedAt(v time.Time) predicate.PrivacyRequest {
 	return predicate.PrivacyRequest(sql.FieldEQ(FieldCompletedAt, v))
 }
 
-// ExportFileKey applies equality check predicate on the "export_file_key" field. It's identical to ExportFileKeyEQ.
-func ExportFileKey(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldEQ(FieldExportFileKey, v))
-}
-
 // Notes applies equality check predicate on the "notes" field. It's identical to NotesEQ.
 func Notes(v string) predicate.PrivacyRequest {
 	return predicate.PrivacyRequest(sql.FieldEQ(FieldNotes, v))
@@ -608,81 +603,6 @@ func CompletedAtIsNil() predicate.PrivacyRequest {
 // CompletedAtNotNil applies the NotNil predicate on the "completed_at" field.
 func CompletedAtNotNil() predicate.PrivacyRequest {
 	return predicate.PrivacyRequest(sql.FieldNotNull(FieldCompletedAt))
-}
-
-// ExportFileKeyEQ applies the EQ predicate on the "export_file_key" field.
-func ExportFileKeyEQ(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldEQ(FieldExportFileKey, v))
-}
-
-// ExportFileKeyNEQ applies the NEQ predicate on the "export_file_key" field.
-func ExportFileKeyNEQ(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldNEQ(FieldExportFileKey, v))
-}
-
-// ExportFileKeyIn applies the In predicate on the "export_file_key" field.
-func ExportFileKeyIn(vs ...string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldIn(FieldExportFileKey, vs...))
-}
-
-// ExportFileKeyNotIn applies the NotIn predicate on the "export_file_key" field.
-func ExportFileKeyNotIn(vs ...string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldNotIn(FieldExportFileKey, vs...))
-}
-
-// ExportFileKeyGT applies the GT predicate on the "export_file_key" field.
-func ExportFileKeyGT(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldGT(FieldExportFileKey, v))
-}
-
-// ExportFileKeyGTE applies the GTE predicate on the "export_file_key" field.
-func ExportFileKeyGTE(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldGTE(FieldExportFileKey, v))
-}
-
-// ExportFileKeyLT applies the LT predicate on the "export_file_key" field.
-func ExportFileKeyLT(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldLT(FieldExportFileKey, v))
-}
-
-// ExportFileKeyLTE applies the LTE predicate on the "export_file_key" field.
-func ExportFileKeyLTE(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldLTE(FieldExportFileKey, v))
-}
-
-// ExportFileKeyContains applies the Contains predicate on the "export_file_key" field.
-func ExportFileKeyContains(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldContains(FieldExportFileKey, v))
-}
-
-// ExportFileKeyHasPrefix applies the HasPrefix predicate on the "export_file_key" field.
-func ExportFileKeyHasPrefix(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldHasPrefix(FieldExportFileKey, v))
-}
-
-// ExportFileKeyHasSuffix applies the HasSuffix predicate on the "export_file_key" field.
-func ExportFileKeyHasSuffix(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldHasSuffix(FieldExportFileKey, v))
-}
-
-// ExportFileKeyIsNil applies the IsNil predicate on the "export_file_key" field.
-func ExportFileKeyIsNil() predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldIsNull(FieldExportFileKey))
-}
-
-// ExportFileKeyNotNil applies the NotNil predicate on the "export_file_key" field.
-func ExportFileKeyNotNil() predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldNotNull(FieldExportFileKey))
-}
-
-// ExportFileKeyEqualFold applies the EqualFold predicate on the "export_file_key" field.
-func ExportFileKeyEqualFold(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldEqualFold(FieldExportFileKey, v))
-}
-
-// ExportFileKeyContainsFold applies the ContainsFold predicate on the "export_file_key" field.
-func ExportFileKeyContainsFold(v string) predicate.PrivacyRequest {
-	return predicate.PrivacyRequest(sql.FieldContainsFold(FieldExportFileKey, v))
 }
 
 // NotesEQ applies the EQ predicate on the "notes" field.

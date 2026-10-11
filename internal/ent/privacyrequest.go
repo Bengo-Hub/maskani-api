@@ -43,8 +43,6 @@ type PrivacyRequest struct {
 	DueAt time.Time `json:"due_at,omitempty"`
 	// CompletedAt holds the value of the "completed_at" field.
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	// ExportFileKey holds the value of the "export_file_key" field.
-	ExportFileKey string `json:"export_file_key,omitempty"`
 	// Notes holds the value of the "notes" field.
 	Notes        string `json:"notes,omitempty"`
 	selectValues sql.SelectValues
@@ -59,7 +57,7 @@ func (*PrivacyRequest) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case privacyrequest.FieldMetadata:
 			values[i] = new([]byte)
-		case privacyrequest.FieldRequesterName, privacyrequest.FieldRequesterPhone, privacyrequest.FieldKind, privacyrequest.FieldStatus, privacyrequest.FieldExportFileKey, privacyrequest.FieldNotes:
+		case privacyrequest.FieldRequesterName, privacyrequest.FieldRequesterPhone, privacyrequest.FieldKind, privacyrequest.FieldStatus, privacyrequest.FieldNotes:
 			values[i] = new(sql.NullString)
 		case privacyrequest.FieldCreatedAt, privacyrequest.FieldUpdatedAt, privacyrequest.FieldReceivedAt, privacyrequest.FieldDueAt, privacyrequest.FieldCompletedAt:
 			values[i] = new(sql.NullTime)
@@ -162,12 +160,6 @@ func (_m *PrivacyRequest) assignValues(columns []string, values []any) error {
 				_m.CompletedAt = new(time.Time)
 				*_m.CompletedAt = value.Time
 			}
-		case privacyrequest.FieldExportFileKey:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field export_file_key", values[i])
-			} else if value.Valid {
-				_m.ExportFileKey = value.String
-			}
 		case privacyrequest.FieldNotes:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field notes", values[i])
@@ -249,9 +241,6 @@ func (_m *PrivacyRequest) String() string {
 		builder.WriteString("completed_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
-	builder.WriteString(", ")
-	builder.WriteString("export_file_key=")
-	builder.WriteString(_m.ExportFileKey)
 	builder.WriteString(", ")
 	builder.WriteString("notes=")
 	builder.WriteString(_m.Notes)

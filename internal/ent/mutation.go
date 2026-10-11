@@ -62750,7 +62750,6 @@ type PrivacyRequestMutation struct {
 	received_at     *time.Time
 	due_at          *time.Time
 	completed_at    *time.Time
-	export_file_key *string
 	notes           *string
 	clearedFields   map[string]struct{}
 	done            bool
@@ -63359,55 +63358,6 @@ func (m *PrivacyRequestMutation) ResetCompletedAt() {
 	delete(m.clearedFields, privacyrequest.FieldCompletedAt)
 }
 
-// SetExportFileKey sets the "export_file_key" field.
-func (m *PrivacyRequestMutation) SetExportFileKey(s string) {
-	m.export_file_key = &s
-}
-
-// ExportFileKey returns the value of the "export_file_key" field in the mutation.
-func (m *PrivacyRequestMutation) ExportFileKey() (r string, exists bool) {
-	v := m.export_file_key
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldExportFileKey returns the old "export_file_key" field's value of the PrivacyRequest entity.
-// If the PrivacyRequest object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PrivacyRequestMutation) OldExportFileKey(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldExportFileKey is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldExportFileKey requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldExportFileKey: %w", err)
-	}
-	return oldValue.ExportFileKey, nil
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (m *PrivacyRequestMutation) ClearExportFileKey() {
-	m.export_file_key = nil
-	m.clearedFields[privacyrequest.FieldExportFileKey] = struct{}{}
-}
-
-// ExportFileKeyCleared returns if the "export_file_key" field was cleared in this mutation.
-func (m *PrivacyRequestMutation) ExportFileKeyCleared() bool {
-	_, ok := m.clearedFields[privacyrequest.FieldExportFileKey]
-	return ok
-}
-
-// ResetExportFileKey resets all changes to the "export_file_key" field.
-func (m *PrivacyRequestMutation) ResetExportFileKey() {
-	m.export_file_key = nil
-	delete(m.clearedFields, privacyrequest.FieldExportFileKey)
-}
-
 // SetNotes sets the "notes" field.
 func (m *PrivacyRequestMutation) SetNotes(s string) {
 	m.notes = &s
@@ -63491,7 +63441,7 @@ func (m *PrivacyRequestMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PrivacyRequestMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 13)
 	if m.tenant_id != nil {
 		fields = append(fields, privacyrequest.FieldTenantID)
 	}
@@ -63528,9 +63478,6 @@ func (m *PrivacyRequestMutation) Fields() []string {
 	if m.completed_at != nil {
 		fields = append(fields, privacyrequest.FieldCompletedAt)
 	}
-	if m.export_file_key != nil {
-		fields = append(fields, privacyrequest.FieldExportFileKey)
-	}
 	if m.notes != nil {
 		fields = append(fields, privacyrequest.FieldNotes)
 	}
@@ -63566,8 +63513,6 @@ func (m *PrivacyRequestMutation) Field(name string) (ent.Value, bool) {
 		return m.DueAt()
 	case privacyrequest.FieldCompletedAt:
 		return m.CompletedAt()
-	case privacyrequest.FieldExportFileKey:
-		return m.ExportFileKey()
 	case privacyrequest.FieldNotes:
 		return m.Notes()
 	}
@@ -63603,8 +63548,6 @@ func (m *PrivacyRequestMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldDueAt(ctx)
 	case privacyrequest.FieldCompletedAt:
 		return m.OldCompletedAt(ctx)
-	case privacyrequest.FieldExportFileKey:
-		return m.OldExportFileKey(ctx)
 	case privacyrequest.FieldNotes:
 		return m.OldNotes(ctx)
 	}
@@ -63700,13 +63643,6 @@ func (m *PrivacyRequestMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCompletedAt(v)
 		return nil
-	case privacyrequest.FieldExportFileKey:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetExportFileKey(v)
-		return nil
 	case privacyrequest.FieldNotes:
 		v, ok := value.(string)
 		if !ok {
@@ -63759,9 +63695,6 @@ func (m *PrivacyRequestMutation) ClearedFields() []string {
 	if m.FieldCleared(privacyrequest.FieldCompletedAt) {
 		fields = append(fields, privacyrequest.FieldCompletedAt)
 	}
-	if m.FieldCleared(privacyrequest.FieldExportFileKey) {
-		fields = append(fields, privacyrequest.FieldExportFileKey)
-	}
 	if m.FieldCleared(privacyrequest.FieldNotes) {
 		fields = append(fields, privacyrequest.FieldNotes)
 	}
@@ -63793,9 +63726,6 @@ func (m *PrivacyRequestMutation) ClearField(name string) error {
 		return nil
 	case privacyrequest.FieldCompletedAt:
 		m.ClearCompletedAt()
-		return nil
-	case privacyrequest.FieldExportFileKey:
-		m.ClearExportFileKey()
 		return nil
 	case privacyrequest.FieldNotes:
 		m.ClearNotes()
@@ -63843,9 +63773,6 @@ func (m *PrivacyRequestMutation) ResetField(name string) error {
 		return nil
 	case privacyrequest.FieldCompletedAt:
 		m.ResetCompletedAt()
-		return nil
-	case privacyrequest.FieldExportFileKey:
-		m.ResetExportFileKey()
 		return nil
 	case privacyrequest.FieldNotes:
 		m.ResetNotes()

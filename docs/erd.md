@@ -138,7 +138,7 @@ assigned through treasury S2S.
 | `documents` | number, template_id, template_version, kind, title, entity_type, entity_id, unit_id, party_ids, file_key, sha256, verification_code, status (draft, issued, partly_signed, executed, expired, superseded), issued_at, executed_at, expires_at, key_dates, legal_hold, retention_until | unique (tenant_id, number); unique (verification_code); index (tenant_id, entity_type, entity_id) |
 | `document_signatures` | document_id, party_id, method (otp_acceptance, wet_upload, e_signature), signed_at, document_hash, device, ip, scan_file_key | index (document_id) |
 | `document_access_logs` | document_id, actor_id, actor_kind, action (view, download), ip | index (tenant_id, document_id, created_at) |
-| `privacy_requests` | party_id, kind (access, correction, deletion), status, received_at, due_at, completed_at, export_file_key, notes | index (tenant_id, status, due_at) |
+| `privacy_requests` | party_id, requester_name, requester_phone (cleared on erasure), kind (access, correction, deletion), status, received_at, due_at, completed_at, notes; metadata holds the source, code hash, expiry and attempts, who verified and closed, the outcome or reason. Exports are built on demand, never stored | index (tenant_id, status, due_at), (tenant_id, party_id, created_at), keyset (tenant_id, created_at, id) |
 
 ## Reporting
 

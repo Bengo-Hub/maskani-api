@@ -282,7 +282,14 @@ their properties only.
 
 | Method and path | Purpose | Permission |
 |---|---|---|
-| `/privacy/requests`, `/privacy/export` | Data subject requests, tenant export | planned (sprint 5) |
+| GET `/privacy/requests` (keyset; `status`, `overdue=true`, `party_id`); POST `/privacy/requests` `{party_id, kind, notes}` | Data subject requests under the Kenya Data Protection Act: `kind` is `access`, `correction` or `deletion`; the deadline from receipt is 7 days for access and 14 for the others. One open request per kind per person. An office request starts `received`; the estate contact gets a `privacy.requested` email | `privacy.manage` |
+| POST `/privacy/requests/{id}/send-code`; POST `/privacy/requests/{id}/verify` `{code}` or `{in_person: true, note}` | Identity: a 6 digit code to the phone and email on record (never a number the caller gives), valid 5 minutes, 5 tries per code and 5 codes per request; or an in-person check with what was seen. The code hash never leaves the API | `privacy.manage` |
+| POST `/privacy/requests/{id}/complete` `{text}`; POST `/privacy/requests/{id}/reject` `{text}` | Close an access or correction request with what was done, or any request with the reason | `privacy.manage` |
+| GET `/privacy/requests/{id}/export` | The person's data as a zip built on demand (no stored copy): `data.json`, a CSV per section (units, accounts, vehicles, visitor passes, requests, bill queries, privacy requests) and a readme. Identity numbers and visitors' phones masked; up to 500 rows a section | `privacy.manage` |
+| POST `/privacy/requests/{id}/anonymise` | Completes an erasure: refused while the person has an active unit link or open reservation. Clears name (becomes "Former resident" and a short reference), phone, email, identity numbers, address, consents, notes, custom fields and portal access; removes their vehicles, cancels live passes, takes the name and phone off their accounts and off their privacy requests. Bills, payments, contracts and account history stay | `privacy.manage` |
+| GET `/me/privacy-requests`; POST `/me/privacy-requests` `{kind, notes}`; GET `/me/privacy-requests/{id}/export` | The resident's own requests, verified by the signed-in session and made for each of their records at the estate; the export downloads once the office completes an access request | portal |
+
+Verify, export, erasure and reject are in the audit allowlist (the export is the one read recorded).
 
 ## S2S (`/api/v1/s2s/{tenant}/maskani`)
 

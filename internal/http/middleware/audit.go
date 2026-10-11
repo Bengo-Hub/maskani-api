@@ -63,6 +63,11 @@ var audited = map[string]string{
 	"POST /unit-parties/{id}/end": "unit.link_end",
 	"POST /units/{id}/transfer":   "unit.transfer",
 	"POST /imports/{id}/commit":   "register.import_commit",
+	// Personal data: identity checks, a person's data leaving the system, and erasure.
+	"POST /privacy/requests/{id}/verify":    "privacy.verify",
+	"GET /privacy/requests/{id}/export":     "privacy.export",
+	"POST /privacy/requests/{id}/anonymise": "privacy.erase",
+	"POST /privacy/requests/{id}/reject":    "privacy.reject",
 }
 
 // AuditedRoutes lists the allowlisted "METHOD /route" keys, so the router test can check each one
@@ -81,7 +86,8 @@ func AuditedRoutes() []string {
 func Audit(rec Recorder) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if rec == nil || r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+			// Reads pass through the same allowlist: only a listed one (a person's data export) is kept.
+			if rec == nil || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 				next.ServeHTTP(w, r)
 				return
 			}

@@ -152,20 +152,6 @@ func (_c *PrivacyRequestCreate) SetNillableCompletedAt(v *time.Time) *PrivacyReq
 	return _c
 }
 
-// SetExportFileKey sets the "export_file_key" field.
-func (_c *PrivacyRequestCreate) SetExportFileKey(v string) *PrivacyRequestCreate {
-	_c.mutation.SetExportFileKey(v)
-	return _c
-}
-
-// SetNillableExportFileKey sets the "export_file_key" field if the given value is not nil.
-func (_c *PrivacyRequestCreate) SetNillableExportFileKey(v *string) *PrivacyRequestCreate {
-	if v != nil {
-		_c.SetExportFileKey(*v)
-	}
-	return _c
-}
-
 // SetNotes sets the "notes" field.
 func (_c *PrivacyRequestCreate) SetNotes(v string) *PrivacyRequestCreate {
 	_c.mutation.SetNotes(v)
@@ -376,10 +362,6 @@ func (_c *PrivacyRequestCreate) createSpec() (*PrivacyRequest, *sqlgraph.CreateS
 		_spec.SetField(privacyrequest.FieldCompletedAt, field.TypeTime, value)
 		_node.CompletedAt = &value
 	}
-	if value, ok := _c.mutation.ExportFileKey(); ok {
-		_spec.SetField(privacyrequest.FieldExportFileKey, field.TypeString, value)
-		_node.ExportFileKey = value
-	}
 	if value, ok := _c.mutation.Notes(); ok {
 		_spec.SetField(privacyrequest.FieldNotes, field.TypeString, value)
 		_node.Notes = value
@@ -583,24 +565,6 @@ func (u *PrivacyRequestUpsert) UpdateCompletedAt() *PrivacyRequestUpsert {
 // ClearCompletedAt clears the value of the "completed_at" field.
 func (u *PrivacyRequestUpsert) ClearCompletedAt() *PrivacyRequestUpsert {
 	u.SetNull(privacyrequest.FieldCompletedAt)
-	return u
-}
-
-// SetExportFileKey sets the "export_file_key" field.
-func (u *PrivacyRequestUpsert) SetExportFileKey(v string) *PrivacyRequestUpsert {
-	u.Set(privacyrequest.FieldExportFileKey, v)
-	return u
-}
-
-// UpdateExportFileKey sets the "export_file_key" field to the value that was provided on create.
-func (u *PrivacyRequestUpsert) UpdateExportFileKey() *PrivacyRequestUpsert {
-	u.SetExcluded(privacyrequest.FieldExportFileKey)
-	return u
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (u *PrivacyRequestUpsert) ClearExportFileKey() *PrivacyRequestUpsert {
-	u.SetNull(privacyrequest.FieldExportFileKey)
 	return u
 }
 
@@ -848,27 +812,6 @@ func (u *PrivacyRequestUpsertOne) UpdateCompletedAt() *PrivacyRequestUpsertOne {
 func (u *PrivacyRequestUpsertOne) ClearCompletedAt() *PrivacyRequestUpsertOne {
 	return u.Update(func(s *PrivacyRequestUpsert) {
 		s.ClearCompletedAt()
-	})
-}
-
-// SetExportFileKey sets the "export_file_key" field.
-func (u *PrivacyRequestUpsertOne) SetExportFileKey(v string) *PrivacyRequestUpsertOne {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.SetExportFileKey(v)
-	})
-}
-
-// UpdateExportFileKey sets the "export_file_key" field to the value that was provided on create.
-func (u *PrivacyRequestUpsertOne) UpdateExportFileKey() *PrivacyRequestUpsertOne {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.UpdateExportFileKey()
-	})
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (u *PrivacyRequestUpsertOne) ClearExportFileKey() *PrivacyRequestUpsertOne {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.ClearExportFileKey()
 	})
 }
 
@@ -1286,27 +1229,6 @@ func (u *PrivacyRequestUpsertBulk) UpdateCompletedAt() *PrivacyRequestUpsertBulk
 func (u *PrivacyRequestUpsertBulk) ClearCompletedAt() *PrivacyRequestUpsertBulk {
 	return u.Update(func(s *PrivacyRequestUpsert) {
 		s.ClearCompletedAt()
-	})
-}
-
-// SetExportFileKey sets the "export_file_key" field.
-func (u *PrivacyRequestUpsertBulk) SetExportFileKey(v string) *PrivacyRequestUpsertBulk {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.SetExportFileKey(v)
-	})
-}
-
-// UpdateExportFileKey sets the "export_file_key" field to the value that was provided on create.
-func (u *PrivacyRequestUpsertBulk) UpdateExportFileKey() *PrivacyRequestUpsertBulk {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.UpdateExportFileKey()
-	})
-}
-
-// ClearExportFileKey clears the value of the "export_file_key" field.
-func (u *PrivacyRequestUpsertBulk) ClearExportFileKey() *PrivacyRequestUpsertBulk {
-	return u.Update(func(s *PrivacyRequestUpsert) {
-		s.ClearExportFileKey()
 	})
 }
 

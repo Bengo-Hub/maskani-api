@@ -40,8 +40,6 @@ const (
 	FieldDueAt = "due_at"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
 	FieldCompletedAt = "completed_at"
-	// FieldExportFileKey holds the string denoting the export_file_key field in the database.
-	FieldExportFileKey = "export_file_key"
 	// FieldNotes holds the string denoting the notes field in the database.
 	FieldNotes = "notes"
 	// Table holds the table name of the privacyrequest in the database.
@@ -63,7 +61,6 @@ var Columns = []string{
 	FieldReceivedAt,
 	FieldDueAt,
 	FieldCompletedAt,
-	FieldExportFileKey,
 	FieldNotes,
 }
 
@@ -209,11 +206,6 @@ func ByDueAt(opts ...sql.OrderTermOption) OrderOption {
 // ByCompletedAt orders the results by the completed_at field.
 func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletedAt, opts...).ToFunc()
-}
-
-// ByExportFileKey orders the results by the export_file_key field.
-func ByExportFileKey(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldExportFileKey, opts...).ToFunc()
 }
 
 // ByNotes orders the results by the notes field.

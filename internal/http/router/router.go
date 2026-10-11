@@ -251,6 +251,18 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
 	r.With(perm(rbac.PermSettingsManage)).Get("/audit-logs", h.ListAuditLogs)
+	// Data subject requests: a copy, a correction or erasure, each with its legal deadline.
+	r.Route("/privacy/requests", func(pr chi.Router) {
+		pr.Use(perm(rbac.PermPrivacyManage))
+		pr.Get("/", h.ListPrivacyRequests)
+		pr.Post("/", h.CreatePrivacyRequest)
+		pr.Post("/{id}/send-code", h.SendPrivacyCode)
+		pr.Post("/{id}/verify", h.VerifyPrivacyRequest)
+		pr.Post("/{id}/complete", h.CompletePrivacyRequest)
+		pr.Post("/{id}/reject", h.RejectPrivacyRequest)
+		pr.Post("/{id}/anonymise", h.AnonymisePrivacyRequest)
+		pr.Get("/{id}/export", h.ExportPrivacyRequest)
+	})
 	// Central approvals: one inbox and one rule set for every workflow that needs sign-off. Acting
 	// is checked inside the engine against the current step's role or permission.
 	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSettingsView)).Get("/approvals", h.ListApprovals)
@@ -470,6 +482,9 @@ func mount(r chi.Router, d Deps) {
 		m.Post("/requests/{id}/actions", h.MyRequestAction)
 		m.Get("/notices", h.MyNotices)
 		m.Get("/terms", h.MyTermsHistory)
+		m.Get("/privacy-requests", h.MyPrivacyRequests)
+		m.Post("/privacy-requests", h.MyCreatePrivacyRequest)
+		m.Get("/privacy-requests/{id}/export", h.MyPrivacyExport)
 		m.Post("/terms/accept", h.MyAcceptTerms)
 		m.Post("/walk-ins/{id}/decide", h.MyDecideWalkIn)
 		m.Get("/documents", h.MyDocuments)

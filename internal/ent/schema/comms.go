@@ -177,7 +177,10 @@ func (DocumentAccessLog) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "document_id", "created_at")}
 }
 
-// PrivacyRequest is a data subject request with its statutory deadline.
+// PrivacyRequest is a data subject request with its statutory deadline. The export is built on
+// demand from the live records, so no copy of the person's data is kept. Metadata holds the source
+// (portal or office), the one-time code hash, its expiry and attempts, who verified and decided,
+// and the outcome or reason.
 type PrivacyRequest struct{ ent.Schema }
 
 func (PrivacyRequest) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
@@ -192,11 +195,14 @@ func (PrivacyRequest) Fields() []ent.Field {
 		field.Time("received_at"),
 		field.Time("due_at"),
 		field.Time("completed_at").Optional().Nillable(),
-		field.String("export_file_key").Optional(),
 		field.Text("notes").Optional(),
 	}
 }
 
 func (PrivacyRequest) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "status", "due_at")}
+	return []ent.Index{
+		index.Fields("tenant_id", "status", "due_at"),
+		index.Fields("tenant_id", "party_id", "created_at"),
+		index.Fields("tenant_id", "created_at", "id"), // keyset list
+	}
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/market"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/portal"
+	"github.com/bengobox/maskani-api/internal/modules/privacy"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reminders"
@@ -51,6 +52,7 @@ type H struct {
 	Notices     *notices.Service
 	Reports     *reports.Service
 	Portal      *portal.Service
+	Privacy     *privacy.Service
 	Market      *market.Service
 	Imports     *imports.Service
 	Docs        *docs.Service

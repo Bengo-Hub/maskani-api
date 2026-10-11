@@ -42,6 +42,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/notices"
 	"github.com/bengobox/maskani-api/internal/modules/notify"
 	"github.com/bengobox/maskani-api/internal/modules/portal"
+	"github.com/bengobox/maskani-api/internal/modules/privacy"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reminders"
@@ -182,6 +183,7 @@ func New(ctx context.Context) (*App, error) {
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
 	portalSvc := portal.NewService(orm, log)
+	privacySvc := privacy.NewService(orm, regSvc, box, log)
 	marketSvc := market.NewService(orm, box, log, cfg.Media.URLBase)
 
 	consumer := collections.NewConsumer(orm, collSvc, salesSvc.SyncProgress, loc, log)
@@ -224,7 +226,7 @@ func New(ctx context.Context) (*App, error) {
 	remindSvc := reminders.NewService(orm, sqlDB, docSvc, loc, log)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Approvals: approvalSvc, Audit: auditSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
-		Reports: reportSvc, Portal: portalSvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
+		Reports: reportSvc, Portal: portalSvc, Privacy: privacySvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
 		RT:    rt}
 

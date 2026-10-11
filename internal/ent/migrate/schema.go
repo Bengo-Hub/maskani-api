@@ -1981,7 +1981,6 @@ var (
 		{Name: "received_at", Type: field.TypeTime},
 		{Name: "due_at", Type: field.TypeTime},
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "export_file_key", Type: field.TypeString, Nullable: true},
 		{Name: "notes", Type: field.TypeString, Nullable: true, Size: 2147483647},
 	}
 	// PrivacyRequestsTable holds the schema information for the "privacy_requests" table.
@@ -1994,6 +1993,16 @@ var (
 				Name:    "privacyrequest_tenant_id_status_due_at",
 				Unique:  false,
 				Columns: []*schema.Column{PrivacyRequestsColumns[1], PrivacyRequestsColumns[9], PrivacyRequestsColumns[11]},
+			},
+			{
+				Name:    "privacyrequest_tenant_id_party_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PrivacyRequestsColumns[1], PrivacyRequestsColumns[5], PrivacyRequestsColumns[2]},
+			},
+			{
+				Name:    "privacyrequest_tenant_id_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{PrivacyRequestsColumns[1], PrivacyRequestsColumns[2], PrivacyRequestsColumns[0]},
 			},
 		},
 	}
