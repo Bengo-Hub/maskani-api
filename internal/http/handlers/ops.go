@@ -95,6 +95,50 @@ func (h *H) RecordReading(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, rd)
 }
 
+// ReplaceMeter is POST /meters/{id}/replace {period, closing_reading, new_serial, new_make,
+// opening_reading, read_at, photo_key, notes}: closes the meter and returns the new one.
+func (h *H) ReplaceMeter(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	var in utilities.ReplaceInput
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordMeter, id) {
+		return
+	}
+	m, err := h.Utilities.ReplaceMeter(r.Context(), id, actor(r), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, m)
+}
+
+// RecordReadingBatch is POST /properties/{id}/readings/batch {period, readings: [{meter_id, reading,
+// read_at, notes, photo_key}]}: up to 500 readings at once, each with its own result.
+func (h *H) RecordReadingBatch(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok || !requireProperty(w, r, id) {
+		return
+	}
+	var in struct {
+		Period   string                   `json:"period"`
+		Readings []utilities.BatchReading `json:"readings"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	res, err := h.Utilities.RecordBatch(r.Context(), id, actor(r), in.Period, in.Readings)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": res})
+}
+
 // VerifyReading is POST /meter-readings/{id}/verify {action}.
 func (h *H) VerifyReading(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")

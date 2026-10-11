@@ -367,6 +367,8 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermUtilitiesRead)).Get("/reading-rounds/{period}", h.GetRound)
 		g.With(perm(rbac.PermUtilitiesRead)).Post("/meters/{id}/readings", h.RecordReading)
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters/{id}/estimate", h.EstimateReading)
+		g.With(perm(rbac.PermUtilitiesManage)).Post("/meters/{id}/replace", h.ReplaceMeter)
+		g.With(perm(rbac.PermUtilitiesRead)).Post("/properties/{id}/readings/batch", h.RecordReadingBatch)
 		g.With(perm(rbac.PermUtilitiesManage)).Post("/meter-readings/{id}/verify", h.VerifyReading)
 		g.With(perm(rbac.PermUtilitiesView)).Get("/water-balance", h.WaterBalance)
 		g.With(perm(rbac.PermUtilitiesView), perm(rbac.PermReportsExport), export).Get("/water-balance/export", h.WaterBalanceExport)

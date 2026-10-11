@@ -212,6 +212,10 @@ func (s *Service) consumption(ctx context.Context, propertyID uuid.UUID, period 
 		if r.IsEstimated {
 			note += ", estimated"
 		}
+		// Two readings in one period (a meter replaced mid-period) keep both explanations.
+		if prior := notes[*r.UnitID][code]; prior != "" {
+			note = prior + "; " + note
+		}
 		notes[*r.UnitID][code] = note
 	}
 	return usage, notes, nil
