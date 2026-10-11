@@ -57,7 +57,9 @@ SELECT COALESCE(b.name, 'No block'), n.units, COALESCE(bi.amt, 0), COALESCE(c.am
 
 const collectionsChargeSQL = `
 WITH lines AS (
-  SELECT x->>'charge_code' AS code, NULLIF(x->>'amount', '')::numeric AS amt, l.id AS line_id
+  -- amount plus its VAT, so the charges add up to the billed total every other report shows
+  SELECT x->>'charge_code' AS code,
+         COALESCE(NULLIF(x->>'amount', '')::numeric, 0) + COALESCE(NULLIF(x->>'tax', '')::numeric, 0) AS amt, l.id AS line_id
     FROM billing_run_lines l JOIN billing_runs r ON r.id = l.run_id AND r.tenant_id = $1,
          jsonb_array_elements(l.lines) x
    WHERE l.tenant_id = $1 AND l.status = 'issued' AND r.period >= to_char($2::date, 'YYYY-MM') AND r.period < to_char($3::date, 'YYYY-MM')

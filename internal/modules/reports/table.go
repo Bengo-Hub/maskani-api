@@ -2,7 +2,9 @@ package reports
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -90,11 +92,24 @@ func (s *Service) tableReport(ctx context.Context, sc Scope, def Definition, fro
 
 // fill runs a report statement, reads one row per result in the table's column order and adds the
 // total row. Range reports and the snapshot reports (with their own parameters) share it.
+//
+// The statement runs in a short read-only transaction set to the estate's time zone, so a date
+// parameter means local midnight and to_char groups timestamps by local month: a work order, gate
+// entry or payment at 01:00 on the 1st belongs to that month, as on the dashboard. set_config with
+// is_local lasts only for the transaction, so it is safe through PgBouncer's transaction pooling.
 func (s *Service) fill(ctx context.Context, t *Table, query string, args ...any) (*Table, error) {
 	if s.db == nil {
 		return t, nil
 	}
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	tx, err := s.db.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("%s report: %w", t.Kind, err)
+	}
+	defer func() { _ = tx.Rollback() }() // read only: nothing to commit
+	if _, err := tx.ExecContext(ctx, `SELECT set_config('TimeZone', $1, true)`, pgTimeZone(s.loc, time.Now())); err != nil {
+		return nil, fmt.Errorf("%s report time zone: %w", t.Kind, err)
+	}
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s report: %w", t.Kind, err)
 	}
@@ -119,6 +134,27 @@ func (s *Service) fill(ctx context.Context, t *Table, query string, args ...any)
 	}
 	t.Totals = totals(t)
 	return t, nil
+}
+
+// pgTimeZone names loc for Postgres' TimeZone setting: the IANA name when it has one
+// (Africa/Nairobi, UTC), else a POSIX fixed offset for the current instant, since a bare
+// abbreviation such as the EAT fallback (no tzdata) is not a valid TimeZone. POSIX offsets count
+// west of UTC, so UTC+3 is written <+0300>-03:00.
+func pgTimeZone(loc *time.Location, now time.Time) string {
+	name := loc.String()
+	if name == "UTC" || strings.Contains(name, "/") {
+		return name
+	}
+	_, off := now.In(loc).Zone()
+	sign, west := "+", -off
+	if off < 0 {
+		sign = "-"
+	}
+	abs := off
+	if abs < 0 {
+		abs = -abs
+	}
+	return fmt.Sprintf("<%s%02d%02d>%+03d:%02d", sign, abs/3600, abs%3600/60, west/3600, abs%3600/60)
 }
 
 // cellValue normalises a scanned value: numbers as decimal strings (money to the cent), counts as

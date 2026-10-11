@@ -1,6 +1,9 @@
 package reports
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestRegistryAndCatalog(t *testing.T) {
 	all := Catalog(nil, func(string) bool { return true })
@@ -24,6 +27,28 @@ func TestRegistryAndCatalog(t *testing.T) {
 		}
 		if got.Source == SourceTable && (len(got.Columns) == 0 || (got.sql == "" && got.build == nil)) {
 			t.Fatalf("table report %s has no columns or no way to build it", d.ID)
+		}
+	}
+}
+
+func TestPgTimeZone(t *testing.T) {
+	nairobi, err := time.LoadLocation("Africa/Nairobi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		loc  *time.Location
+		want string
+	}{
+		{nairobi, "Africa/Nairobi"},
+		{time.UTC, "UTC"},
+		{time.FixedZone("EAT", 3*3600), "<+0300>-03:00"},
+		{time.FixedZone("X", -(5*3600 + 30*60)), "<-0530>+05:30"},
+	}
+	for _, c := range cases {
+		if got := pgTimeZone(c.loc, now); got != c.want {
+			t.Errorf("pgTimeZone(%s) = %q, want %q", c.loc, got, c.want)
 		}
 	}
 }

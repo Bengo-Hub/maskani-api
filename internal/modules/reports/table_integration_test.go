@@ -69,7 +69,8 @@ func TestTableReportsOnPostgres(t *testing.T) {
 	run, err := client.BillingRun.Create().SetPropertyID(p.ID).SetFundID(estate.ID).SetPeriod("2026-09").
 		SetInvoiceDate(at(1)).SetDueDate(at(10)).Save(tctx)
 	must(err)
-	lines := []map[string]any{{"charge_code": "service_charge", "amount": "700.00"}, {"charge_code": "water", "amount": "300.00"}}
+	// The service charge carries VAT: billed by charge counts amount plus tax, like the bill total.
+	lines := []map[string]any{{"charge_code": "service_charge", "amount": "600.00", "tax": "100.00"}, {"charge_code": "water", "amount": "300.00"}}
 	must(client.BillingRunLine.Create().SetRunID(run.ID).SetUnitID(u1.ID).SetUnitAccountID(acc1.ID).SetUnitCode("A01").
 		SetLines(lines).SetTotal(d(1000)).SetStatus(billingrunline.StatusIssued).Exec(tctx))
 	must(client.BillingRunLine.Create().SetRunID(run.ID).SetUnitID(u2.ID).SetUnitAccountID(acc2.ID).SetUnitCode("X01").
@@ -93,6 +94,11 @@ func TestTableReportsOnPostgres(t *testing.T) {
 	for i, k := range []string{"entry", "exit", "walk_in_request"} {
 		must(client.GateEvent.Create().SetPropertyID(p.ID).SetKind(gateKind(k)).SetOccurredAt(at(6)).SetClientEventID(k + string(rune('a'+i))).Exec(tctx))
 	}
+	// 01:00 on 1 October in the estate is still 30 September in UTC: it belongs to October.
+	earlyOct := time.Date(2026, 10, 1, 1, 0, 0, 0, loc)
+	must(client.WorkOrder.Create().SetNumber("WO-3").SetPropertyID(p.ID).SetCategory("plumbing").SetTitle("Night leak").
+		SetCreatedAt(earlyOct).SetStatus("assigned").Exec(tctx))
+	must(client.GateEvent.Create().SetPropertyID(p.ID).SetKind(gateKind("entry")).SetOccurredAt(earlyOct).SetClientEventID("early-oct").Exec(tctx))
 	must(client.Incident.Create().SetNumber("IN-1").SetPropertyID(p.ID).SetCategory("theft").SetTitle("Bike").SetSeverity("high").SetOccurredAt(at(7)).Exec(tctx))
 
 	sc := Scope{PropertyID: &p.ID}
