@@ -42,6 +42,9 @@ var DocKinds = []DocKind{
 	{Code: "payment_plan", Name: "Payment plan agreement", EntityType: "unit_account",
 		Fields: append(append([]string{}, accountFields...), "instalments", "instalment_amount", "first_due"),
 		Inputs: []string{"instalments", "instalment_amount", "first_due"}},
+	{Code: "bill_to_consent", Name: "Bill-to consent", EntityType: "unit_account",
+		Fields: append(append([]string{}, accountFields...), "occupant_name", "charges", "from_date"),
+		Inputs: []string{"occupant_name", "charges", "from_date"}},
 	{Code: "offer_letter", Name: "Letter of offer", EntityType: "sale_contract", Fields: contractFields},
 }
 
@@ -80,7 +83,14 @@ If the amount is not paid or a plan agreed, the estate may take further steps as
 New charges billed while the plan runs are paid as they fall due, on top of the instalments.
 
 **If an instalment is missed
-If an instalment is more than 14 days late, the plan ends and the full balance becomes due at once.`,
+If an instalment is more than 3 days late, the plan ends and the full balance becomes due at once.`,
+	"bill_to_consent": `This records the agreement of {{owner_name}}, owner of unit {{unit_code}} at {{property_name}}, that from {{from_date}} the following charges on account {{account_ref}} are paid by {{occupant_name}}, who lives in the unit: {{charges}}.
+
+**What stays with the owner
+The owner remains responsible to {{estate_name}} for any of these charges left unpaid. Charges not listed above stay with the owner.
+
+**When it ends
+This arrangement ends when the occupant moves out or the owner withdraws it in writing. Charges still unpaid then return to the owner after the estate's notice period.`,
 	"offer_letter": `Dear {{buyer_name}},
 
 **Unit {{unit_code}} at {{property_name}}
