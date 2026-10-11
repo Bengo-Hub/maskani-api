@@ -740,6 +740,28 @@ func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
+// EstateReport is GET /reports/estate/{kind}?from=&to=&property_id=: one estate report as a table
+// (collections by month, block or charge, payment channels, maintenance, vendors, security, water).
+func (h *H) EstateReport(w http.ResponseWriter, r *http.Request) {
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	v, err := h.Reports.EstateReport(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
+		chiParam(r, "kind"), reports.ReportRange{From: q.Get("from"), To: q.Get("to")})
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
+}
+
+// EstateReportKinds is GET /reports/estate: the reports on offer, in screen order.
+func (h *H) EstateReportKinds(w http.ResponseWriter, r *http.Request) {
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": reports.EstateReportKinds})
+}
+
 // RoleSummary is GET /reports/role-summary?property_id=: what each kind of staff acts on today.
 // Open to all staff; the screen shows only the panels the caller's role uses.
 func (h *H) RoleSummary(w http.ResponseWriter, r *http.Request) {

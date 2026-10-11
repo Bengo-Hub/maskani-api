@@ -92,6 +92,27 @@ func (h *H) PerformanceExport(w http.ResponseWriter, r *http.Request) {
 	sendFile(w, file)
 }
 
+// EstateReportExport is GET /reports/estate/{kind}/export?format=&from=&to=&property_id=.
+func (h *H) EstateReportExport(w http.ResponseWriter, r *http.Request) {
+	format, ok := exportFormat(w, r)
+	if !ok {
+		return
+	}
+	f, ok := scopeFilter(w, r)
+	if !ok {
+		return
+	}
+	a := access(r)
+	q := r.URL.Query()
+	file, err := h.Docs.EstateReport(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
+		chiParam(r, "kind"), analytics.ReportRange{From: q.Get("from"), To: q.Get("to")}, format)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	sendFile(w, file)
+}
+
 // WaterBalanceExport is GET /water-balance/export?format=&property_id=&period=.
 func (h *H) WaterBalanceExport(w http.ResponseWriter, r *http.Request) {
 	format, ok := exportFormat(w, r)
