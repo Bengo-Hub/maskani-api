@@ -252,6 +252,10 @@ type IntentResponse struct {
 	CheckoutRequestID *string         `json:"checkout_request_id,omitempty"`
 	AuthorizationURL  *string         `json:"authorization_url,omitempty"`
 	Instructions      map[string]any  `json:"instructions,omitempty"`
+	// InitiateURL is the pay page's initiate link, naming the tenant by its UUID. The payment modal
+	// derives the gateways URL from it; without it the pay page builds one from the tenant slug,
+	// which its UUID pattern cuts short ("codevertex-demo" becomes "c") and no gateway loads.
+	InitiateURL string `json:"initiate_url,omitempty"`
 }
 
 // CreateIntent starts a payment through the tenant's configured gateway (Daraja, PayHero, Paystack).
