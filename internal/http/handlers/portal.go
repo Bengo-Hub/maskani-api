@@ -8,6 +8,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
+	"github.com/bengobox/maskani-api/internal/modules/portal"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -216,7 +217,8 @@ func (h *H) MyNotices(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
-// MyAcceptTerms is POST /me/terms/accept.
+// MyAcceptTerms is POST /me/terms/accept {version}. The privacy notice version is the estate's
+// current one, recorded with the time and the caller's address.
 func (h *H) MyAcceptTerms(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Version string `json:"version"`
@@ -224,11 +226,26 @@ func (h *H) MyAcceptTerms(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
-	if err := h.Portal.AcceptTerms(r.Context(), access(r).PartyIDs, in.Version); err != nil {
+	a := access(r)
+	acc := portal.Acceptance{Version: in.Version, IP: httpx.ClientIP(r)}
+	if s, err := h.Settings.Get(r.Context(), a.TenantID); err == nil {
+		acc.PrivacyVersion = s.PrivacyVersion
+	}
+	if err := h.Portal.AcceptTerms(r.Context(), a.PartyIDs, acc); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+}
+
+// MyTermsHistory is GET /me/terms: every acceptance of the terms and privacy notice, newest first.
+func (h *H) MyTermsHistory(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.Portal.TermsHistory(r.Context(), access(r).PartyIDs)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
 // MyDecideWalkIn is POST /me/walk-ins/{id}/decide {approve}.

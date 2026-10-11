@@ -187,7 +187,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/me/purchase` | Purchase plans with schedule and next due |
 | GET, POST `/me/passes`; POST `/me/passes/{id}/cancel` | Visitor passes for own units |
 | GET, POST `/me/requests`; POST `/me/requests/{id}/actions` | Work requests; confirm or reopen within 7 days |
-| GET `/me/notices`; POST `/me/terms/accept` `{version}` | Notices; terms acceptance |
+| GET `/me/notices`; POST `/me/terms/accept` `{version}`; GET `/me/terms` | Notices; terms acceptance. Each acceptance sets the current version on every party of the caller and adds `{version, privacy_version, at, ip}` to the party's `consents.terms_history` (the estate's privacy version at that moment, the address from the edge; the last 50 kept). GET `/me/terms` reads the history back, newest first, once per acceptance |
 | POST `/me/walk-ins/{id}/decide` `{approve}` | Host decision on a walk-in, recorded with `decided_by: host`. The 5 minutes run from the latest ask (a ring restarts them). A walk-in the guard already settled comes back unchanged, so the page can say who answered |
 | POST `/me/queries`; GET, POST `/me/household` | planned (sprint 2, sprint 1) |
 

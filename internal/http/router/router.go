@@ -469,6 +469,7 @@ func mount(r chi.Router, d Deps) {
 		m.Post("/requests", h.MyCreateRequest)
 		m.Post("/requests/{id}/actions", h.MyRequestAction)
 		m.Get("/notices", h.MyNotices)
+		m.Get("/terms", h.MyTermsHistory)
 		m.Post("/terms/accept", h.MyAcceptTerms)
 		m.Post("/walk-ins/{id}/decide", h.MyDecideWalkIn)
 		m.Get("/documents", h.MyDocuments)

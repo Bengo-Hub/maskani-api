@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"net"
 	"net/http"
 	"slices"
 
@@ -171,11 +170,7 @@ func (h *H) MyDocumentFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) sendDocument(w http.ResponseWriter, r *http.Request, d *ent.Document, who *uuid.UUID, kind string) {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
-	f, err := h.Docs.File(r.Context(), d, who, kind, ip)
+	f, err := h.Docs.File(r.Context(), d, who, kind, httpx.ClientIP(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

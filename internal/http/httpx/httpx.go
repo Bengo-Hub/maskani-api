@@ -4,6 +4,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"strings"
 
@@ -47,6 +48,15 @@ func UUIDParam(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, 
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// ClientIP is the caller's address without the port. The router's TrustedRealIP middleware has
+// already put the client address from the edge into RemoteAddr.
+func ClientIP(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 // QueryUUID parses an optional query UUID.

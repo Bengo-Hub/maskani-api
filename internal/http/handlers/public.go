@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"net"
 	"net/http"
 
 	"github.com/bengobox/maskani-api/internal/http/httpx"
@@ -36,8 +35,7 @@ func (h *H) PublicEnquiry(w http.ResponseWriter, r *http.Request) {
 	if !httpx.Decode(w, r, &in) {
 		return
 	}
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if err := h.Market.Enquire(r.Context(), ip, in); err != nil {
+	if err := h.Market.Enquire(r.Context(), httpx.ClientIP(r), in); err != nil {
 		httpx.Fail(w, err)
 		return
 	}

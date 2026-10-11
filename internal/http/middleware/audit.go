@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/audit"
 )
 
@@ -116,10 +116,7 @@ func Audit(rec Recorder) func(http.Handler) http.Handler {
 					break
 				}
 			}
-			ip := r.RemoteAddr // TrustedRealIP has already put the client address here
-			if host, _, err := net.SplitHostPort(ip); err == nil {
-				ip = host
-			}
+			ip := httpx.ClientIP(r)
 			rec.Record(context.WithoutCancel(r.Context()), audit.Entry{TenantID: a.TenantID, ActorID: a.AuthUserID, ActorEmail: a.Email,
 				Action: action, TargetType: strings.SplitN(action, ".", 2)[0], TargetID: target, IP: ip,
 				RequestID: chimw.GetReqID(r.Context())})

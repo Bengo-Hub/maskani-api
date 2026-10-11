@@ -4,6 +4,7 @@ package portal
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -247,12 +248,81 @@ func (s *Service) AcceptedTerms(ctx context.Context, partyIDs []uuid.UUID) strin
 	return oldest
 }
 
-// AcceptTerms records the terms and privacy version the caller accepted.
-func (s *Service) AcceptTerms(ctx context.Context, partyIDs []uuid.UUID, version string) error {
-	if version == "" {
+// maxTermsHistory bounds the acceptances kept on one party; terms change a few times a year.
+const maxTermsHistory = 50
+
+// Acceptance is one acceptance of the estate's terms and privacy notice, kept in the party's
+// consents under "terms_history" as the proof of what was agreed, when and from where.
+type Acceptance struct {
+	Version        string    `json:"version"`
+	PrivacyVersion string    `json:"privacy_version,omitempty"`
+	At             time.Time `json:"at"`
+	IP             string    `json:"ip,omitempty"`
+}
+
+// AcceptTerms records the terms and privacy versions the caller accepted on each of their parties:
+// the current version on the party and one more line in its history.
+func (s *Service) AcceptTerms(ctx context.Context, partyIDs []uuid.UUID, a Acceptance) error {
+	if a.Version == "" {
 		return httpx.Invalid("version is required")
 	}
-	_, err := s.client.Party.Update().Where(party.IDIn(partyIDs...)).
-		SetTermsAcceptedVersion(version).SetTermsAcceptedAt(time.Now()).Save(ctx)
-	return err
+	if len(partyIDs) == 0 {
+		return httpx.Forbidden("only residents accept the terms")
+	}
+	a.At = time.Now()
+	rows, err := s.client.Party.Query().Where(party.IDIn(partyIDs...)).Select(party.FieldID, party.FieldConsents).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, p := range rows {
+		consents := p.Consents
+		if consents == nil {
+			consents = map[string]any{}
+		}
+		history, _ := consents["terms_history"].([]any)
+		history = append(history, a)
+		if len(history) > maxTermsHistory {
+			history = history[len(history)-maxTermsHistory:]
+		}
+		consents["terms_history"] = history
+		if err := s.client.Party.UpdateOneID(p.ID).SetConsents(consents).
+			SetTermsAcceptedVersion(a.Version).SetTermsAcceptedAt(a.At).Exec(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// TermsHistory returns the caller's acceptances across their parties, newest first, one line per
+// acceptance (an acceptance covering several parties is shown once).
+func (s *Service) TermsHistory(ctx context.Context, partyIDs []uuid.UUID) ([]Acceptance, error) {
+	if len(partyIDs) == 0 {
+		return []Acceptance{}, nil
+	}
+	rows, err := s.client.Party.Query().Where(party.IDIn(partyIDs...)).Select(party.FieldID, party.FieldConsents).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	out := []Acceptance{}
+	for _, p := range rows {
+		history, _ := p.Consents["terms_history"].([]any)
+		for _, raw := range history {
+			m, _ := raw.(map[string]any)
+			a := Acceptance{}
+			a.Version, _ = m["version"].(string)
+			a.PrivacyVersion, _ = m["privacy_version"].(string)
+			a.IP, _ = m["ip"].(string)
+			at, _ := m["at"].(string)
+			a.At, _ = time.Parse(time.RFC3339Nano, at)
+			key := a.Version + "|" + at
+			if a.Version == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].At.After(out[j].At) })
+	return out, nil
 }
