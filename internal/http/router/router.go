@@ -265,9 +265,9 @@ func mount(r chi.Router, d Deps) {
 	})
 	// Central approvals: one inbox and one rule set for every workflow that needs sign-off. Acting
 	// is checked inside the engine against the current step's role or permission.
-	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSettingsView)).Get("/approvals", h.ListApprovals)
-	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage)).Post("/approvals/{id}/approve", h.ApproveRequest)
-	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage)).Post("/approvals/{id}/reject", h.RejectRequest)
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSalesManage, rbac.PermSettingsView)).Get("/approvals", h.ListApprovals)
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSalesManage)).Post("/approvals/{id}/approve", h.ApproveRequest)
+	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSalesManage)).Post("/approvals/{id}/reject", h.RejectRequest)
 	r.With(perm(rbac.PermSettingsView, rbac.PermBillingApprove)).Get("/approvals/rules", h.ListApprovalRules)
 	r.With(perm(rbac.PermSettingsManage)).Post("/approvals/rules", h.CreateApprovalRule)
 	r.With(perm(rbac.PermSettingsManage)).Put("/approvals/rules/{id}", h.UpdateApprovalRule)

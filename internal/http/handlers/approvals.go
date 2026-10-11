@@ -22,7 +22,7 @@ func approver(r *http.Request) approvals.Actor {
 }
 
 // approvalPerms are the permission steps the built-in defaults use, so "waiting for me" can match them.
-var approvalPerms = []string{rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage}
+var approvalPerms = []string{rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSalesManage}
 
 // ListApprovals is GET /approvals?status=&module=&property_id=&mine=true (keyset): the central
 // inbox across every workflow. mine keeps requests whose current step the caller may act on.

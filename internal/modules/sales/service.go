@@ -666,6 +666,9 @@ type ContractView struct {
 	PendingPlan *ScheduleView `json:"pending_plan,omitempty"`
 	// Handover is the unit's handover once booked: keys, checklist, readings and snags.
 	Handover *ent.Handover `json:"handover,omitempty"`
+	// HandoverMeters are the unit's working meters while the unit waits for handover (contract
+	// detail only), so whoever completes it can take the readings without access to meters.
+	HandoverMeters []HandoverMeter `json:"handover_meters,omitempty"`
 }
 
 // inPlan is what the buyer's plan shows: the active schedule, plus lines already billed under an
@@ -689,6 +692,11 @@ func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView,
 	v := contractView(sc, ins)
 	if err := s.attach(ctx, []*ContractView{v}); err != nil {
 		return nil, err
+	}
+	if sc.Status == salecontract.StatusFullyPaid {
+		if v.HandoverMeters, err = s.handoverMeters(ctx, sc.UnitID); err != nil {
+			return nil, err
+		}
 	}
 	return v, nil
 }

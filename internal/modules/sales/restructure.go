@@ -58,6 +58,14 @@ type RestructureInput struct {
 	FirstDue   string `json:"first_due"` // YYYY-MM-DD
 }
 
+// beforeToday reports whether a calendar day (midnight in loc) is earlier than today in loc. Today
+// itself is allowed. (Truncating to 24 hours would cut at UTC midnight, which is 03:00 in Nairobi,
+// and refuse today.)
+func beforeToday(day, now time.Time, loc *time.Location) bool {
+	n := now.In(loc)
+	return day.Before(time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, loc))
+}
+
 // ScheduleView is a schedule version with its lines.
 type ScheduleView struct {
 	*ent.InstalmentSchedule
@@ -91,7 +99,7 @@ func (s *Service) ProposeRestructure(ctx context.Context, contractID, by uuid.UU
 	if err != nil {
 		return nil, httpx.Invalid("first_due must be a date (YYYY-MM-DD)")
 	}
-	if first.Before(time.Now().In(s.loc).Truncate(24 * time.Hour)) {
+	if beforeToday(first, time.Now(), s.loc) {
 		return nil, httpx.Invalid("the first payment cannot be in the past")
 	}
 	sc, err := s.client.SaleContract.Get(ctx, contractID)

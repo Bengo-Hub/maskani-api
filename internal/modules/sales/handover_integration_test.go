@@ -87,6 +87,13 @@ func TestHandoverAndTitleOnPostgres(t *testing.T) {
 	if len(ho.Checklist) == 0 {
 		t.Fatal("a handover starts with the walk-through checklist")
 	}
+	// The contract view carries the unit's meters while it waits for handover, for staff without
+	// access to meters.
+	waiting, err := s.GetContract(ctx, sc.ID)
+	must(err)
+	if len(waiting.HandoverMeters) != 1 || waiting.HandoverMeters[0].ID != m.ID || !waiting.HandoverMeters[0].LastReading.Equal(d(10)) {
+		t.Fatalf("handover meters: %+v", waiting.HandoverMeters)
+	}
 	if _, err := s.CompleteHandover(ctx, ho.ID, staff, time.Time{}, nil); err == nil {
 		t.Fatal("no keys recorded, no handover")
 	}
@@ -109,6 +116,9 @@ func TestHandoverAndTitleOnPostgres(t *testing.T) {
 	gotC, _ := client.SaleContract.Get(ctx, sc.ID)
 	if gotU.HandedOverAt == nil || gotU.SaleStatus != "handed_over" || gotC.Status != "handed_over" {
 		t.Fatalf("unit %v %s contract %s", gotU.HandedOverAt, gotU.SaleStatus, gotC.Status)
+	}
+	if after, err := s.GetContract(ctx, sc.ID); err != nil || after.HandoverMeters != nil {
+		t.Fatalf("no handover meters once handed over: %v %+v", err, after)
 	}
 	if len(linked) != 2 || linked[0] != u.ID || linked[1] != buyer.ID {
 		t.Fatalf("the buyer becomes the owner: %v", linked)

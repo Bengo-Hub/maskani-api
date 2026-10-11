@@ -47,6 +47,44 @@ type HandoverInput struct {
 	Snags       []Snag           `json:"snags"`
 }
 
+// HandoverMeter is a working meter on the unit and the reading a handover reading may not go below.
+type HandoverMeter struct {
+	ID          uuid.UUID       `json:"id"`
+	Serial      string          `json:"serial"`
+	LastReading decimal.Decimal `json:"last_reading"`
+}
+
+// handoverMeters lists the unit's active meters with their last reading (a unit has one or two).
+func (s *Service) handoverMeters(ctx context.Context, unitID uuid.UUID) ([]HandoverMeter, error) {
+	ms, err := s.client.Meter.Query().Where(meter.UnitID(unitID), meter.StatusEQ(meter.StatusActive)).
+		Order(ent.Asc(meter.FieldSerial)).Limit(20).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]HandoverMeter, 0, len(ms))
+	for _, m := range ms {
+		last, err := lastReading(ctx, s.client, m)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, HandoverMeter{ID: m.ID, Serial: m.Serial, LastReading: last})
+	}
+	return out, nil
+}
+
+// lastReading is the meter's latest reading that was not rejected, or its initial reading.
+func lastReading(ctx context.Context, c *ent.Client, m *ent.Meter) (decimal.Decimal, error) {
+	last, err := c.MeterReading.Query().Where(meterreading.MeterID(m.ID), meterreading.StatusNEQ(meterreading.StatusRejected)).
+		Order(ent.Desc(meterreading.FieldReadAt)).First(ctx)
+	switch {
+	case err == nil:
+		return last.Reading, nil
+	case ent.IsNotFound(err):
+		return m.InitialReading, nil
+	}
+	return decimal.Zero, err
+}
+
 // HandoverReading is a meter's reading at handover: where the new owner's water bill starts.
 type HandoverReading struct {
 	MeterID uuid.UUID `json:"meter_id"`
@@ -210,10 +248,9 @@ func (s *Service) CompleteHandover(ctx context.Context, id, by uuid.UUID, at tim
 			return fail(httpx.Invalid("a reading names a meter that is not on this unit"))
 		}
 		reading := decimal.NewFromFloat(rd.Reading)
-		prev := m.InitialReading
-		if last, err := tx.MeterReading.Query().Where(meterreading.MeterID(m.ID), meterreading.StatusNEQ(meterreading.StatusRejected)).
-			Order(ent.Desc(meterreading.FieldReadAt)).First(ctx); err == nil {
-			prev = last.Reading
+		prev, err := lastReading(ctx, tx.Client(), m)
+		if err != nil {
+			return fail(err)
 		}
 		if reading.LessThan(prev) {
 			return fail(httpx.Invalid("a handover reading is below the meter's last reading " + prev.StringFixed(0)))
