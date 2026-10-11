@@ -65,6 +65,9 @@ func (h *H) PerformanceExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) exportReport(w http.ResponseWriter, r *http.Request, id string) {
+	if !h.reportAllowed(w, r, id) {
+		return
+	}
 	format, ok := exportFormat(w, r)
 	if !ok {
 		return

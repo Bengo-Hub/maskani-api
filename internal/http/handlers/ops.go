@@ -751,6 +751,9 @@ func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
 // ReportTable is GET /reports/{id}/table?from=&to=&property_id=: a table report from the registry
 // (collections by month, block or charge, payment channels, maintenance, vendors, security, water).
 func (h *H) ReportTable(w http.ResponseWriter, r *http.Request) {
+	if !h.reportAllowed(w, r, chiParam(r, "id")) {
+		return
+	}
 	f, ok := scopeFilter(w, r)
 	if !ok {
 		return
@@ -775,6 +778,32 @@ func (h *H) ReportCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"modules": reports.Catalog(mods, func(p string) bool { return a.Has(p) })})
+}
+
+// reportAllowed applies the catalog's rules to opening or downloading one report: its module is
+// switched on for the tenant and the caller holds its permission, so a report hidden from the
+// catalog cannot be read by its URL either.
+func (h *H) reportAllowed(w http.ResponseWriter, r *http.Request, id string) bool {
+	def, ok := reports.Lookup(id)
+	if !ok {
+		httpx.Fail(w, httpx.Invalid("unknown report"))
+		return false
+	}
+	a := access(r)
+	if def.Permission != "" && !a.Has(def.Permission) {
+		httpx.Error(w, http.StatusForbidden, "forbidden", "you cannot see this report")
+		return false
+	}
+	mods, err := h.Settings.Modules(r.Context(), a.TenantID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return false
+	}
+	if mods != nil && !mods[def.Module] {
+		httpx.Error(w, http.StatusForbidden, "module_off", "this report's part of Maskani is switched off")
+		return false
+	}
+	return true
 }
 
 // RoleSummary is GET /reports/role-summary?property_id=: what each kind of staff acts on today.

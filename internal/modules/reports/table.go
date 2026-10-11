@@ -85,9 +85,18 @@ func (s *Service) tableReport(ctx context.Context, sc Scope, def Definition, fro
 		return t, nil
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
-	rows, err := s.db.QueryContext(ctx, def.sql, tenantID, from.Format("2006-01-02"), to.Format("2006-01-02"), sc.sqlIDs())
+	return s.fill(ctx, t, def.sql, tenantID, from.Format("2006-01-02"), to.Format("2006-01-02"), sc.sqlIDs())
+}
+
+// fill runs a report statement, reads one row per result in the table's column order and adds the
+// total row. Range reports and the snapshot reports (with their own parameters) share it.
+func (s *Service) fill(ctx context.Context, t *Table, query string, args ...any) (*Table, error) {
+	if s.db == nil {
+		return t, nil
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("%s report: %w", def.ID, err)
+		return nil, fmt.Errorf("%s report: %w", t.Kind, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
