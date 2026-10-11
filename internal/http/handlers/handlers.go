@@ -13,6 +13,7 @@ import (
 	mw "github.com/bengobox/maskani-api/internal/http/middleware"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/approvals"
+	"github.com/bengobox/maskani-api/internal/modules/audit"
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/docs"
@@ -42,6 +43,7 @@ type H struct {
 	Billing     *billing.Service
 	Collections *collections.Service
 	Approvals   *approvals.Service
+	Audit       *audit.Service
 	Utilities   *utilities.Service
 	Sales       *sales.Service
 	Works       *works.Service

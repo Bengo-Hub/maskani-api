@@ -21,6 +21,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/http/handlers"
 	mw "github.com/bengobox/maskani-api/internal/http/middleware"
+	"github.com/bengobox/maskani-api/internal/modules/audit"
 	"github.com/bengobox/maskani-api/internal/modules/market"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
@@ -34,6 +35,7 @@ type Deps struct {
 	Auth           *authclient.AuthMiddleware
 	AllowedOrigins []string
 	Ent            *ent.Client
+	Audit          *audit.Service
 	RBAC           *rbac.Service
 	Settings       *settings.Service
 	TenantSyncer   *tenant.Syncer
@@ -159,6 +161,7 @@ func New(d Deps) http.Handler {
 		}))
 		tr.Use(tenantSync(d))
 		tr.Use(mw.ResolveAccess(d.Ent, d.RBAC, d.Log))
+		tr.Use(mw.Audit(d.Audit)) // every successful staff write, after access is known
 		mount(tr, d)
 	})
 	routes = r
@@ -247,6 +250,7 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings", h.UpdateSettings)
 	r.With(perm(rbac.PermSettingsView)).Get("/settings/modules", h.GetModules)
 	r.With(perm(rbac.PermSettingsManage)).Put("/settings/modules", h.SetModules)
+	r.With(perm(rbac.PermSettingsManage)).Get("/audit-logs", h.ListAuditLogs)
 	// Central approvals: one inbox and one rule set for every workflow that needs sign-off. Acting
 	// is checked inside the engine against the current step's role or permission.
 	r.With(perm(rbac.PermBillingApprove, rbac.PermBillingVerify, rbac.PermWorksManage, rbac.PermSettingsView)).Get("/approvals", h.ListApprovals)
