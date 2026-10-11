@@ -740,16 +740,16 @@ func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
-// EstateReport is GET /reports/estate/{kind}?from=&to=&property_id=: one estate report as a table
+// ReportTable is GET /reports/{id}/table?from=&to=&property_id=: a table report from the registry
 // (collections by month, block or charge, payment channels, maintenance, vendors, security, water).
-func (h *H) EstateReport(w http.ResponseWriter, r *http.Request) {
+func (h *H) ReportTable(w http.ResponseWriter, r *http.Request) {
 	f, ok := scopeFilter(w, r)
 	if !ok {
 		return
 	}
 	q := r.URL.Query()
-	v, err := h.Reports.EstateReport(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		chiParam(r, "kind"), reports.ReportRange{From: q.Get("from"), To: q.Get("to")})
+	v, err := h.Reports.TableReport(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
+		chiParam(r, "id"), reports.ReportRange{From: q.Get("from"), To: q.Get("to")})
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -767,11 +767,6 @@ func (h *H) ReportCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"modules": reports.Catalog(mods, func(p string) bool { return a.Has(p) })})
-}
-
-// EstateReportKinds is GET /reports/estate: the reports on offer, in screen order.
-func (h *H) EstateReportKinds(w http.ResponseWriter, r *http.Request) {
-	httpx.JSON(w, http.StatusOK, map[string]any{"data": reports.EstateReportKinds})
 }
 
 // RoleSummary is GET /reports/role-summary?property_id=: what each kind of staff acts on today.

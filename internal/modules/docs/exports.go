@@ -9,14 +9,42 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/bengobox/maskani-api/internal/http/httpx"
 	analytics "github.com/bengobox/maskani-api/internal/modules/reports"
 )
 
-// EstateReport renders one estate report (wave 2.3) as PDF or a spreadsheet: a chart of its main
-// figure when it runs month by month or by category, then the table with its total row. The table
-// is the one the screen shows, so the file and the screen never disagree.
-func (s *Service) EstateReport(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, kind string, rg analytics.ReportRange, format reports.Format) (*File, error) {
-	t, err := s.analytics.EstateReport(ctx, sc, kind, rg)
+// ExportParams are the filters a report export may take; each report reads the ones it uses.
+type ExportParams struct {
+	Range      analytics.ReportRange
+	Period     string
+	Arrears    analytics.ArrearsFilter
+	MaskPhones bool
+}
+
+// Export renders any report in the registry through this one branded engine: table reports from
+// their table, arrears and performance through their own layouts. Every download in Maskani, from
+// the Reports page, Collections or the dashboard, comes through here.
+func (s *Service) Export(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, id string, p ExportParams, format reports.Format) (*File, error) {
+	def, ok := analytics.Lookup(id)
+	if !ok {
+		return nil, httpx.Invalid("unknown report")
+	}
+	switch {
+	case def.ID == "arrears":
+		return s.Arrears(ctx, tenantID, slug, sc, p.Arrears, p.MaskPhones, format)
+	case def.ID == "performance":
+		return s.Performance(ctx, tenantID, slug, sc, p.Period, format)
+	case def.Source == analytics.SourceTable:
+		return s.tableReport(ctx, tenantID, slug, sc, id, p.Range, format)
+	}
+	return nil, httpx.Invalid("this report has no download")
+}
+
+// tableReport renders a table report: a chart of its main figure when it runs month by month or
+// by category, then the table with its total row. It is the table the screen shows, so the file and
+// the screen never disagree.
+func (s *Service) tableReport(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, kind string, rg analytics.ReportRange, format reports.Format) (*File, error) {
+	t, err := s.analytics.TableReport(ctx, sc, kind, rg)
 	if err != nil {
 		return nil, err
 	}

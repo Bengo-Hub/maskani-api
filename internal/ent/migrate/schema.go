@@ -1125,6 +1125,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{IncidentsColumns[1], IncidentsColumns[2], IncidentsColumns[0]},
 			},
+			{
+				Name:    "incident_tenant_id_property_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{IncidentsColumns[1], IncidentsColumns[6], IncidentsColumns[12]},
+			},
 		},
 	}
 	// InstalmentsColumns holds the columns for the "instalments" table.
@@ -1292,6 +1297,11 @@ var (
 				Name:    "manualpayment_tenant_id_unit_account_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{ManualPaymentsColumns[1], ManualPaymentsColumns[5], ManualPaymentsColumns[2]},
+			},
+			{
+				Name:    "manualpayment_tenant_id_status_reviewed_at",
+				Unique:  false,
+				Columns: []*schema.Column{ManualPaymentsColumns[1], ManualPaymentsColumns[14], ManualPaymentsColumns[19]},
 			},
 			{
 				Name:    "manualpayment_tenant_id_method_reference",

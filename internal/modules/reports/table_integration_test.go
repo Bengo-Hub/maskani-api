@@ -21,9 +21,9 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
 
-// TestEstateReportsOnPostgres runs every estate report on seeded data and checks the figures each
+// TestTableReportsOnPostgres runs every table report on seeded data and checks the figures each
 // one is built from. Needs REPORTS_TEST_POSTGRES_URL (a scratch database).
-func TestEstateReportsOnPostgres(t *testing.T) {
+func TestTableReportsOnPostgres(t *testing.T) {
 	dsn := os.Getenv("REPORTS_TEST_POSTGRES_URL")
 	if dsn == "" {
 		t.Skip("REPORTS_TEST_POSTGRES_URL not set")
@@ -99,7 +99,7 @@ func TestEstateReportsOnPostgres(t *testing.T) {
 	rg := ReportRange{From: "2026-09", To: "2026-09"}
 	get := func(kind string) *Table {
 		t.Helper()
-		tb, err := s.EstateReport(tctx, sc, kind, rg)
+		tb, err := s.TableReport(tctx, sc, kind, rg)
 		if err != nil {
 			t.Fatalf("%s: %v", kind, err)
 		}
@@ -126,10 +126,10 @@ func TestEstateReportsOnPostgres(t *testing.T) {
 	if r := get("security"); len(r.Rows) != 1 || r.Rows[0]["entries"] != int64(1) || r.Rows[0]["walk_ins"] != int64(1) || r.Rows[0]["serious"] != int64(1) {
 		t.Fatalf("security: %+v", r.Rows)
 	}
-	if _, err := s.EstateReport(tctx, Scope{All: true}, "water", rg); err == nil {
+	if _, err := s.TableReport(tctx, Scope{All: true}, "water", rg); err == nil {
 		t.Fatal("the water trend needs a property")
 	}
-	if _, err := s.EstateReport(tctx, sc, "collections_month", ReportRange{From: "2026-10", To: "2026-01"}); err == nil {
+	if _, err := s.TableReport(tctx, sc, "collections_month", ReportRange{From: "2026-10", To: "2026-01"}); err == nil {
 		t.Fatal("a backwards range should be refused")
 	}
 }

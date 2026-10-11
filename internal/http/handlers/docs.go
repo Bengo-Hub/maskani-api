@@ -50,50 +50,21 @@ func (h *H) statementExport(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	sendFile(w, f)
 }
 
-// ArrearsExport is GET /reports/arrears/export?format=&property_id=&q=&min=: every owing account in
-// scope with the ageing breakdown.
-func (h *H) ArrearsExport(w http.ResponseWriter, r *http.Request) {
-	format, ok := exportFormat(w, r)
-	if !ok {
-		return
-	}
-	f, ok := scopeFilter(w, r)
-	if !ok {
-		return
-	}
-	a := access(r)
-	file, err := h.Docs.Arrears(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		arrearsFilter(r), maskArrearsPhones(r), format)
-	if err != nil {
-		httpx.Fail(w, err)
-		return
-	}
-	sendFile(w, file)
+// ReportExport is GET /reports/{id}/export?format=&from=&to=&period=&property_id=&q=&min=: any
+// report in the registry as PDF, Excel or CSV through the one branded docs engine.
+func (h *H) ReportExport(w http.ResponseWriter, r *http.Request) {
+	h.exportReport(w, r, chiParam(r, "id"))
 }
 
-// PerformanceExport is GET /reports/insights/export?format=&property_id=&period=: the business view
-// behind the staff dashboard as a document.
+// ArrearsExport is GET /reports/arrears/export, kept for the Collections page; same as ReportExport.
+func (h *H) ArrearsExport(w http.ResponseWriter, r *http.Request) { h.exportReport(w, r, "arrears") }
+
+// PerformanceExport is GET /reports/insights/export, kept for the dashboard; same as ReportExport.
 func (h *H) PerformanceExport(w http.ResponseWriter, r *http.Request) {
-	format, ok := exportFormat(w, r)
-	if !ok {
-		return
-	}
-	f, ok := scopeFilter(w, r)
-	if !ok {
-		return
-	}
-	a := access(r)
-	file, err := h.Docs.Performance(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		r.URL.Query().Get("period"), format)
-	if err != nil {
-		httpx.Fail(w, httpx.Invalid(err.Error()))
-		return
-	}
-	sendFile(w, file)
+	h.exportReport(w, r, "performance")
 }
 
-// EstateReportExport is GET /reports/estate/{kind}/export?format=&from=&to=&property_id=.
-func (h *H) EstateReportExport(w http.ResponseWriter, r *http.Request) {
+func (h *H) exportReport(w http.ResponseWriter, r *http.Request, id string) {
 	format, ok := exportFormat(w, r)
 	if !ok {
 		return
@@ -104,8 +75,9 @@ func (h *H) EstateReportExport(w http.ResponseWriter, r *http.Request) {
 	}
 	a := access(r)
 	q := r.URL.Query()
-	file, err := h.Docs.EstateReport(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		chiParam(r, "kind"), analytics.ReportRange{From: q.Get("from"), To: q.Get("to")}, format)
+	file, err := h.Docs.Export(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties}, id,
+		docs.ExportParams{Range: analytics.ReportRange{From: q.Get("from"), To: q.Get("to")}, Period: q.Get("period"),
+			Arrears: arrearsFilter(r), MaskPhones: maskArrearsPhones(r)}, format)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -113,12 +85,9 @@ func (h *H) EstateReportExport(w http.ResponseWriter, r *http.Request) {
 	sendFile(w, file)
 }
 
-// WaterBalanceExport is GET /water-balance/export?format=&property_id=&period=.
+// WaterBalanceExport is GET /water-balance/export?format=&property_id=&period=, kept for the water
+// page: the registry's water report for the twelve months ending at the period.
 func (h *H) WaterBalanceExport(w http.ResponseWriter, r *http.Request) {
-	format, ok := exportFormat(w, r)
-	if !ok {
-		return
-	}
 	pid := httpx.QueryUUID(r, "property_id")
 	if pid == nil {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "property_id is required")
@@ -127,13 +96,12 @@ func (h *H) WaterBalanceExport(w http.ResponseWriter, r *http.Request) {
 	if !requireProperty(w, r, *pid) {
 		return
 	}
-	a := access(r)
-	file, err := h.Docs.WaterBalance(r.Context(), a.TenantID, a.TenantSlug, *pid, period(r), format)
-	if err != nil {
-		httpx.Fail(w, err)
-		return
+	q := r.URL.Query()
+	if q.Get("to") == "" {
+		q.Set("to", period(r))
+		r.URL.RawQuery = q.Encode()
 	}
-	sendFile(w, file)
+	h.exportReport(w, r, "water")
 }
 
 func exportFormat(w http.ResponseWriter, r *http.Request) (reports.Format, bool) {

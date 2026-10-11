@@ -351,6 +351,8 @@ func (ManualPayment) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "status", "created_at"),
 		index.Fields("tenant_id", "unit_account_id", "created_at"),
+		// Payment channels report: approved payments by the day they were booked.
+		index.Fields("tenant_id", "status", "reviewed_at"),
 		// One slip once: a rejected entry can be corrected and submitted again.
 		index.Fields("tenant_id", "method", "reference").Unique().Annotations(entsql.IndexWhere("status <> 'rejected'")),
 	}

@@ -273,7 +273,9 @@ func (Incident) Fields() []ent.Field {
 
 func (Incident) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "number").Unique(), index.Fields("tenant_id", "property_id", "status"),
-		index.Fields("tenant_id", "property_id", "created_at", "id"), index.Fields("tenant_id", "created_at", "id")}
+		index.Fields("tenant_id", "property_id", "created_at", "id"), index.Fields("tenant_id", "created_at", "id"),
+		// Security summary: incidents by the month they happened.
+		index.Fields("tenant_id", "property_id", "occurred_at")}
 }
 
 // OccurrenceEntry is a digital occurrence book line (shift handover, notes).

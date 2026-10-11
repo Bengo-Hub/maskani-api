@@ -176,33 +176,6 @@ func performanceReport(r *reports.Report, v *analytics.Insights) {
 	r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionKeyValue, Title: "Occupancy and sales", Pairs: pairs})
 }
 
-// WaterBalance renders supplied against billed water for a property over six months.
-func (s *Service) WaterBalance(ctx context.Context, tenantID uuid.UUID, slug string, propertyID uuid.UUID, period string, format reports.Format) (*File, error) {
-	points, err := s.analytics.WaterBalance(ctx, propertyID, period)
-	if err != nil {
-		return nil, err
-	}
-	r := s.newReport(ctx, tenantID, slug, analytics.Scope{PropertyID: &propertyID}, "Water balance", "Supplied against billed")
-	m3 := func(d decimal.Decimal) string { return reports.Quantity(d.Round(1).InexactFloat64()) + " m3" }
-	rows := make([][]reports.Cell, len(points))
-	bars := make([]reports.Bar, len(points))
-	for i, p := range points {
-		rows[i] = []reports.Cell{reports.Text(monthLabel(p.Period)), reports.Text(m3(p.Supplied)), reports.Text(m3(p.Billed)),
-			reports.Text(m3(p.Common)), reports.Text(m3(p.Lost)), reports.Text(pctText(&p.LossPct)), reports.Text(strconv.Itoa(p.Estimated))}
-		bars[i] = reports.Bar{Label: shortMonth(p.Period), Value: p.LossPct.InexactFloat64()}
-	}
-	r.Currency = ""
-	r.Sections = []reports.Section{
-		{Kind: reports.SectionChart, Title: "Water lost, percent of supply", Bars: bars, ValueUnit: "%"},
-		{Kind: reports.SectionTable, Title: "By month", Note: "Unaccounted is supplied less billed and common use",
-			Columns: []reports.Column{{Header: "Month", Weight: 2}, {Header: "Supplied", Weight: 1.4, Align: "R"}, {Header: "Billed", Weight: 1.4, Align: "R"},
-				{Header: "Common", Weight: 1.3, Align: "R"}, {Header: "Unaccounted", Weight: 1.5, Align: "R"}, {Header: "Loss", Weight: 1, Align: "R"},
-				{Header: "Estimated readings", Weight: 1.6, Align: "R"}},
-			Rows: rows},
-	}
-	return s.render(r, format, "water-balance-"+period)
-}
-
 // newReport starts a branded report for a scope: the property's name as the outlet when there is
 // one, else "All properties".
 func (s *Service) newReport(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, title, subtitle string) *reports.Report {
