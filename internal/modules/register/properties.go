@@ -4,6 +4,7 @@ package register
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/block"
+	"github.com/bengobox/maskani-api/internal/ent/outlet"
 	"github.com/bengobox/maskani-api/internal/ent/property"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
@@ -229,6 +231,9 @@ type PropertySummary struct {
 	UnitCount     int `json:"unit_count"`
 	OccupiedCount int `json:"occupied_count"`
 	SoldCount     int `json:"sold_count"`
+	// IsDefault marks the property the console opens on: the one on the tenant's head office
+	// outlet, otherwise the first by name. Exactly one property in a list carries it.
+	IsDefault bool `json:"is_default"`
 }
 
 // ListProperties returns visible properties with unit counts computed in one grouped SQL query.
@@ -278,7 +283,38 @@ func (s *Service) ListProperties(ctx context.Context, scope []uuid.UUID, all boo
 			out[i].UnitCount, out[i].OccupiedCount, out[i].SoldCount = counts[j].Total, counts[j].Occupied, counts[j].Sold
 		}
 	}
+	if err := s.markDefault(ctx, out); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// markDefault flags the default property among the listed ones: the property on a head office
+// outlet (auth-api's is_hq, mirrored by the tenant syncer), else the first by name.
+func (s *Service) markDefault(ctx context.Context, props []PropertySummary) error {
+	if len(props) == 0 {
+		return nil
+	}
+	outletIDs := make([]uuid.UUID, 0, len(props))
+	for _, p := range props {
+		if p.OutletID != nil {
+			outletIDs = append(outletIDs, *p.OutletID)
+		}
+	}
+	if len(outletIDs) > 0 {
+		hq, err := s.client.Outlet.Query().Where(outlet.IDIn(outletIDs...), outlet.IsHq(true)).IDs(ctx)
+		if err != nil {
+			return err
+		}
+		for i, p := range props {
+			if p.OutletID != nil && slices.Contains(hq, *p.OutletID) {
+				props[i].IsDefault = true
+				return nil
+			}
+		}
+	}
+	props[0].IsDefault = true
+	return nil
 }
 
 // GetProperty returns a property with its blocks.

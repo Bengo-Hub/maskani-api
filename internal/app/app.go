@@ -236,7 +236,7 @@ func New(ctx context.Context) (*App, error) {
 		Collections: collSvc, Approvals: approvalSvc, Audit: auditSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Privacy: privacySvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
-		RT:    rt}
+		RT:    rt, Tenants: syncer}
 
 	var limiter *ratelimit.Limiter
 	if rdb != nil {

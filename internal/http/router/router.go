@@ -232,6 +232,7 @@ func mount(r chi.Router, d Deps) {
 	}
 
 	r.Get("/auth/me", h.Me)
+	r.Get("/platform/tenants", h.PlatformTenants)
 	// Live change hints (SSE). The router's timeout already bypasses event streams.
 	r.Get("/stream", h.Stream)
 	if d.Limiter != nil {

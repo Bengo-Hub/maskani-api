@@ -30,6 +30,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/sales"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
+	"github.com/bengobox/maskani-api/internal/modules/tenant"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
@@ -62,6 +63,8 @@ type H struct {
 	Media       *Media
 	// RT is the realtime hub behind GET /stream (nil disables live updates).
 	RT *realtime.Hub
+	// Tenants lists the tenants a platform owner can switch between.
+	Tenants *tenant.Syncer
 }
 
 func access(r *http.Request) *mw.Access { return mw.FromContext(r.Context()) }
@@ -126,6 +129,25 @@ func (h *H) scopeOf(w http.ResponseWriter, r *http.Request, kind register.Record
 		return false
 	}
 	return requireProperty(w, r, pid)
+}
+
+// PlatformTenants is GET /platform/tenants: the tenants that use Maskani, for the platform owner's
+// tenant switcher (treasury's TenantFilter pattern). Platform owners only.
+func (h *H) PlatformTenants(w http.ResponseWriter, r *http.Request) {
+	if a := access(r); a == nil || a.Claims == nil || !a.Claims.IsPlatformOwner {
+		httpx.Fail(w, httpx.Forbidden("only the platform owner can list tenants"))
+		return
+	}
+	if h.Tenants == nil {
+		httpx.JSON(w, http.StatusOK, map[string]any{"data": []tenant.TenantOption{}})
+		return
+	}
+	rows, err := h.Tenants.Tenants(r.Context())
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }
 
 // Me is GET /auth/me: identity, roles, permissions, modules, assigned properties and party links.

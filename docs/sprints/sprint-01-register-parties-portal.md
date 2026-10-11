@@ -71,6 +71,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Demo estate is Mvumo Gardens, Kitengela; nothing names or locates the real client estate (api `f9f13a4`)
 - [x] Resale and transfer: clearance first, buyer as primary owner, sellers' links end with their effects, handover reading, month split by days, portal invite (SRDD 16.3, api `d640c7e`, ui `263aa82`)
 - [x] Portal household, vehicles and domestic staff, managed by owners and occupants; staff get passes from Visitors (SRDD 16.2 step 5, api `572e9f6`, ui `4877ac0`); bill-to consent document (`3fcb21d`)
+- [x] Default property in `GET /properties` (`is_default`: head office outlet's, else first by name) and `GET /platform/tenants` for the platform owner's tenant switcher, as treasury does (2026-10-11)
 - [ ] Import: natural-key maps preloaded per 500-row batch, validation once, no raw contacts kept after validation, uncommitted jobs purged after 7 days (wave 1a and 1b)
 - [ ] Tenant syncer on shared-service-client and `cache.GetTenantDetails`; access resolution cached per user and tenant (wave 1b)
 - [ ] Keyset indexes `(tenant_id, property_id, created_at, id)` on units and parties (wave 1b)

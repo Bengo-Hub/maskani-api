@@ -69,6 +69,28 @@ func NewSyncer(client *ent.Client, authURL string, db *sql.DB, log *zap.Logger) 
 // Forget drops a slug from memory (a tenant event changed it).
 func (s *Syncer) Forget(slug string) { s.slugs.Delete(slug) }
 
+// TenantOption is a tenant a platform owner can open in Maskani.
+type TenantOption struct {
+	ID   uuid.UUID `json:"id"`
+	Slug string    `json:"slug"`
+	Name string    `json:"name"`
+}
+
+// Tenants lists the active tenants that use Maskani (the local mirror holds only tenants that have
+// reached this service), by name, for the platform owner's tenant switcher. Capped at 500.
+func (s *Syncer) Tenants(ctx context.Context) ([]TenantOption, error) {
+	rows, err := s.client.Tenant.Query().Where(enttenant.StatusEQ("active")).Order(ent.Asc(enttenant.FieldName)).
+		Select(enttenant.FieldID, enttenant.FieldSlug, enttenant.FieldName).Limit(500).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TenantOption, len(rows))
+	for i, t := range rows {
+		out[i] = TenantOption{ID: t.ID, Slug: t.Slug, Name: t.Name}
+	}
+	return out, nil
+}
+
 // OnFirstSeen registers the defaults initialiser.
 func (s *Syncer) OnFirstSeen(fn FirstSeenFunc) { s.onFirstSeen = fn }
 
