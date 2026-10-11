@@ -14,8 +14,8 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/config"
 	"github.com/bengobox/maskani-api/internal/ent"
-	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	_ "github.com/bengobox/maskani-api/internal/ent/runtime"
+	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/platform/database"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 )
