@@ -63,7 +63,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Manual payments (bank, cash, cheque, typed M-Pesa) with review by someone other than the recorder; residents above the KES 250,000 M-Pesa limit give a bank or cheque reference (api `9a1cbda`, treasury `645f060`)
 - [x] Bank paybills: fund paybill account format (`{ref}`, `2362010#{ref}` or the bank account alone), pay instruction on bills, messages, statements and the portal; bank statement CSV import into review (api `d46337b`, `628986d`, ui `d7e43d3`)
 - [x] Per-account collections, so dashboard collections follow a block or fund (api `15f347f`, `65fd340`)
-- [ ] Meter replacement route with closing and opening readings; batch bulk and borehole readings (FR-27, wave 2.7)
+- [x] Meter replacement with closing and opening readings in one transaction; batch readings for bulk and borehole sheets; bill notes keep both readings when a meter is swapped mid-period (FR-27, api `a25f5b3`, ui `4bf1bfe`)
 - [x] Arrears search and minimum balance filtered in SQL, not over loaded pages; suspense total from the API (wave 1c)
 - [x] Water balance and arrears read from the replica with a 60 second cache invalidated across pods (`bf20a0d`)
 - [x] Billing issue and retry run under a per-run fleet lease, mark themselves alive per batch, and a two-minute job resumes runs a stopped pod left in "issuing" (NFR-06, `bf20a0d`)
