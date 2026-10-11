@@ -366,7 +366,7 @@ func (s *Service) LinkParty(ctx context.Context, unitID, actor uuid.UUID, in Lin
 	}
 	switch link.Role {
 	case unitparty.RoleOwner, unitparty.RoleJointOwner:
-		if in.IsPrimary || link.Role == unitparty.RoleOwner {
+		if (in.IsPrimary || link.Role == unitparty.RoleOwner) && s.accounts != nil {
 			if _, err := s.accounts.Ensure(ctx, u, "estate", &accounts.Party{ID: p.ID, Name: p.DisplayName, Phone: p.Phone, Email: p.Email}); err != nil {
 				s.log.Warn("estate account not opened", zap.Error(err))
 			}

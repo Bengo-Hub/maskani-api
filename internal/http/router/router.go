@@ -297,6 +297,7 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/units/{id}/parties", h.LinkParty)
 		g.With(perm(rbac.PermPartiesManage)).Post("/units/{id}/vehicles", h.AddVehicle)
 		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/unit-parties/{id}/end", h.EndLink)
+		g.With(perm(rbac.PermPartiesManage), forgetAccess).Post("/units/{id}/transfer", h.TransferUnit)
 		g.With(perm(rbac.PermPartiesView)).Get("/parties", h.ListParties)
 		g.With(perm(rbac.PermPartiesManage)).Post("/parties", h.CreateParty)
 		g.With(perm(rbac.PermPartiesView)).Get("/parties/{id}", h.GetParty)

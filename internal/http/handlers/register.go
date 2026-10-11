@@ -219,6 +219,30 @@ func (h *H) LinkParty(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, l)
 }
 
+// TransferUnit is POST /units/{id}/transfer {new_owner_id, date, reading, invite, note}: resale or
+// transfer to a new owner once every account is clear.
+func (h *H) TransferUnit(w http.ResponseWriter, r *http.Request) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	var in register.TransferInput
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	if !h.scopeOf(w, r, register.RecordUnit, id) {
+		return
+	}
+	a := access(r)
+	res, err := h.Register.Transfer(r.Context(), id, actor(r), a.TenantSlug, h.PortalURL+"/"+a.TenantSlug+"/portal", in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	h.Reports.Invalidate(a.TenantID)
+	httpx.JSON(w, http.StatusOK, res)
+}
+
 // EndLink is POST /unit-parties/{id}/end.
 func (h *H) EndLink(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.UUIDParam(w, r, "id")

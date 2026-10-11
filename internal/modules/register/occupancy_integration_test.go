@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/config"
@@ -101,4 +102,25 @@ func TestOccupancyOnPostgres(t *testing.T) {
 	if n, _ := s.CloseLinks(context.Background(), []uuid.UUID{tid}, time.Now().Add(25*time.Hour), 100); n != 0 {
 		t.Fatal("a second run ends nothing")
 	}
+
+	// Transfer: refused while an account owes; once clear, the buyer becomes owner and the account follows.
+	_, err = client.UnitAccount.UpdateOneID(acc.ID).SetBalance(decimal.NewFromInt(500)).Save(ctx)
+	must(err)
+	buyer := party("Buyer", "254700000009")
+	if _, err := s.Transfer(ctx, u.ID, uuid.New(), "demo", "", TransferInput{NewOwnerID: buyer.ID}); err == nil {
+		t.Fatal("a unit that owes should not transfer")
+	}
+	_, err = client.UnitAccount.UpdateOneID(acc.ID).SetBalance(decimal.Zero).Save(ctx)
+	must(err)
+	res, err := s.Transfer(ctx, u.ID, uuid.New(), "demo", "", TransferInput{NewOwnerID: buyer.ID, Reading: ptrF(150)})
+	must(err)
+	if res.EndedLinks != 1 || res.Apportion.HandoverUse == nil || res.Apportion.DaysInPeriod == 0 {
+		t.Fatalf("transfer: %+v", res)
+	}
+	got, _ = client.UnitAccount.Get(ctx, acc.ID)
+	if got.PrimaryPartyID == nil || *got.PrimaryPartyID != buyer.ID {
+		t.Fatal("the account should follow the new owner")
+	}
 }
+
+func ptrF(v float64) *float64 { return &v }
