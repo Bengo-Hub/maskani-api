@@ -276,6 +276,7 @@ func (AuditLog) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "created_at"),
 		index.Fields("tenant_id", "target_type", "target_id"),
+		index.Fields("created_at"), // retention purge across tenants
 	}
 }
 

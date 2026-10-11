@@ -192,10 +192,10 @@ period and panic recovery.
 | `sla-breaches` | 5 min | maintenance on | Flag work orders past their resolution target and publish the breach |
 | `vendor-doc-expiry` | daily | providers or maintenance on | Alert at 30, 14 and 7 days and on expiry |
 | `gate-offline` | 5 min | gate on | Alert once when a tablet has not been seen for 15 minutes |
-| `gate-retention` | daily | all tenants | Purge gate events past retention in batches |
+| `retention` | daily | all tenants | The retention schedule (`privacy/retention.go`) in batches: gate events and patrol scans after 90 days, visitor passes 90 days after they end, returning visitors not seen for a year (never banned ones, never one a kept pass names), document access logs and the audit trail after 2 years. Bills, payments, contracts and account history are never on it |
 | `scheduled-notices` | 5 min | communication on (new sends) | Send notices whose time has come; direct sends a pod left mid-way resume for every tenant |
 | `daily-stats-rebuild` | daily | all tenants | Rebuild yesterday's `daily_stats` from source tables |
-| `outbox-prune-passes`, `outbox-prune` | 15 min, daily | all tenants | Drop published visitor pass events after 15 minutes, other published rows after 7 days, failed after 30 |
+| `outbox-prune-passes`, `outbox-prune` | 15 min, daily | all tenants | Drop published events carrying a plain code (visitor pass, privacy one-time code) after 15 minutes, other published rows after 7 days, failed after 30 |
 
 A switched-off module is read only (FR-09), so jobs that alert, send or invoice for it skip that
 tenant (`settings.TenantsWithModule`, filtered inside each query so a skipped tenant's rows never

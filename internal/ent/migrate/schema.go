@@ -190,6 +190,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{AuditLogsColumns[1], AuditLogsColumns[5], AuditLogsColumns[6]},
 			},
+			{
+				Name:    "auditlog_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{AuditLogsColumns[11]},
+			},
 		},
 	}
 	// BillQueriesColumns holds the columns for the "bill_queries" table.
@@ -692,6 +697,11 @@ var (
 				Name:    "documentaccesslog_tenant_id_document_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{DocumentAccessLogsColumns[1], DocumentAccessLogsColumns[5], DocumentAccessLogsColumns[2]},
+			},
+			{
+				Name:    "documentaccesslog_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{DocumentAccessLogsColumns[2]},
 			},
 		},
 	}
@@ -1867,6 +1877,11 @@ var (
 				Name:    "patrolscan_tenant_id_property_id_scanned_at",
 				Unique:  false,
 				Columns: []*schema.Column{PatrolScansColumns[1], PatrolScansColumns[5], PatrolScansColumns[9]},
+			},
+			{
+				Name:    "patrolscan_scanned_at",
+				Unique:  false,
+				Columns: []*schema.Column{PatrolScansColumns[9]},
 			},
 		},
 	}
@@ -3081,6 +3096,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{VisitorsColumns[1], VisitorsColumns[5], VisitorsColumns[14]},
 			},
+			{
+				Name:    "visitor_last_visit_at",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorsColumns[14]},
+			},
 		},
 	}
 	// VisitorPassesColumns holds the columns for the "visitor_passes" table.
@@ -3147,6 +3167,11 @@ var (
 				Name:    "visitorpass_tenant_id_created_at_id",
 				Unique:  false,
 				Columns: []*schema.Column{VisitorPassesColumns[1], VisitorPassesColumns[2], VisitorPassesColumns[0]},
+			},
+			{
+				Name:    "visitorpass_valid_to",
+				Unique:  false,
+				Columns: []*schema.Column{VisitorPassesColumns[18]},
 			},
 		},
 	}

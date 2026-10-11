@@ -9,11 +9,12 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/outboxevent"
 	"github.com/bengobox/maskani-api/internal/events"
+	"github.com/bengobox/maskani-api/internal/modules/privacy"
 )
 
 // Outbox retention. The shared poller only marks rows published; nothing else removes them, so
-// without this the table grows with every event and keeps plain gate codes (pass.created carries
-// the code notifications sends to the visitor) for ever.
+// without this the table grows with every event and keeps plain codes (pass.created carries the
+// code notifications sends to the visitor, privacy.otp_requested a one-time code) for ever.
 const (
 	pruneBatch         = 1000
 	pruneMaxBatches    = 50
@@ -34,7 +35,8 @@ type pruneRule struct {
 // rows went.
 func PruneOutbox(ctx context.Context, client *ent.Client, passesOnly bool) (int, error) {
 	now := time.Now()
-	rules := []pruneRule{{eventslib.StatusPublished, now.Add(-passEventRetention), []string{events.PassCreated}}}
+	// Events carrying a plain code: a visitor's gate code, a privacy request's one-time code.
+	rules := []pruneRule{{eventslib.StatusPublished, now.Add(-passEventRetention), []string{events.PassCreated, privacy.OTPRequested}}}
 	if !passesOnly {
 		rules = append(rules,
 			pruneRule{eventslib.StatusPublished, now.Add(-publishedRetention), nil},

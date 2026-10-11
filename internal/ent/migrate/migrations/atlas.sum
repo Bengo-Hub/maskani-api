@@ -1,4 +1,4 @@
-h1:qDJyQYc4E/OWvvPHJTP7WdNxyiSguXRJ69F4fg9Yil8=
+h1:Ger7mmww/22aU06WM3bWoeXW7SbuEn+mxRbyIlZwa7o=
 20261007124306_initial_schema.sql h1:HKWGbbgsrJ6SYm8zcqjtHliD01Cf9F57Fs0Hz2ftrf0=
 20261008082552_keyset_list_indexes.sql h1:/Y3nPoCtnrKSJEC5x6EcAEmQZyTOeds0xxE07a1HMOM=
 20261009012750_job_and_lookup_indexes.sql h1:w+eS8b3zLH0GPUH1DIgmkl8XxvDGNUHJo45RTok+mrk=
@@ -9,3 +9,4 @@ h1:qDJyQYc4E/OWvvPHJTP7WdNxyiSguXRJ69F4fg9Yil8=
 20261010193146_approvals_engine.sql h1:77vH4KTRMgaJOefKhPRYvgwPvMLRNAdil+8r/LP5wmI=
 20261011071918_report_indexes.sql h1:R6tkHH5xR4ifkePT9+3AurhieHy4fBVWgE5eo23HERU=
 20261011114111_privacy_requests.sql h1:5kpwd76I2z//OgoM3CaiDTfRPlhA5dYpiZ69rRxjBY0=
+20261011115635_retention_indexes.sql h1:m2E1wp3j0zOvxeMZDefkGCvtqtX+lkqG3fI6MLVJuYs=

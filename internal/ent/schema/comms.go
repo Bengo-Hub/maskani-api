@@ -174,7 +174,10 @@ func (DocumentAccessLog) Fields() []ent.Field {
 }
 
 func (DocumentAccessLog) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("tenant_id", "document_id", "created_at")}
+	return []ent.Index{
+		index.Fields("tenant_id", "document_id", "created_at"),
+		index.Fields("created_at"), // retention purge across tenants
+	}
 }
 
 // PrivacyRequest is a data subject request with its statutory deadline. The export is built on

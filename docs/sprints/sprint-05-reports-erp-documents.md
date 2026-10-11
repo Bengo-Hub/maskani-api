@@ -50,8 +50,10 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Notice direct-send fallback pages recipients in 500s and resumes a send a stopped pod left half done (`b8be252`); deliveries list paging still open
 - [x] Property scope on notice create (estate-wide needs every property), send and deliveries and on enquiry update (`15375db`)
 - [x] Broadcast completion applied once with its notice.published event (`15375db`)
-- [ ] `AuditLog` written by one helper from money, contract, configuration, role and access changes (FR-67, wave 2.4)
-- [ ] Privacy requests with OTP identity, deadline, export and anonymisation, statutory records kept; retention purge jobs (FR-67, NFR-10, wave 2.4)
+- [x] `AuditLog` written by one middleware from an allowlist of critical security workflows only (access, configuration, money decisions, ownership, personal data); routine work is never logged (FR-67, wave 2.4, `276156f`)
+- [x] Plan limits on units and staff users from the subscription tier, 402 `usage_limit_exceeded` (wave 2.4, `94ffc36`)
+- [x] Terms acceptance history with privacy version, time and address, read back in the portal (FR-19, wave 2.4, `88ca9c0`)
+- [x] Privacy requests with code or in-person identity, 7 and 14 day deadlines, export built on demand and anonymisation, statutory records kept (FR-67, wave 2.4, `5136872`); retention schedule in one daily job (NFR-10)
 - [ ] Documents: templates with merge fields, versions and approval; generation with reference and verification code; OTP acceptance; wet-signed upload; access log; public verify route (FR-46 to FR-49, wave 2.1)
 - [ ] Budgets against actual, income and expenditure and the sinking fund statement read from treasury budgets, ledger and cost-centre S2S; AGM pack (FR-65, wave 2.10)
 - [ ] ERP client: no client exists yet although `ERP_URL` is configured (FR-63, wave 2.8)

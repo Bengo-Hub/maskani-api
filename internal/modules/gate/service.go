@@ -35,9 +35,6 @@ import (
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
-// Retention of gate events (SRDD 15.2).
-const Retention = 90 * 24 * time.Hour
-
 // Service is the gate service.
 type Service struct {
 	client *ent.Client
@@ -1028,24 +1025,6 @@ func (s *Service) ReportIncident(ctx context.Context, kind string, by uuid.UUID,
 		"title": inc.Title, "property_id": inc.PropertyID, "urgent": sev == incident.SeverityHigh || sev == incident.SeverityCritical,
 	})
 	return inc, nil
-}
-
-// PurgeOld deletes gate events past retention in batches (system job).
-func (s *Service) PurgeOld(ctx context.Context) (int, error) {
-	cutoff := time.Now().Add(-Retention)
-	total := 0
-	for i := 0; i < 20; i++ {
-		ids, err := s.client.GateEvent.Query().Where(gateevent.OccurredAtLT(cutoff)).Limit(1000).IDs(ctx)
-		if err != nil || len(ids) == 0 {
-			return total, err
-		}
-		n, err := s.client.GateEvent.Delete().Where(gateevent.IDIn(ids...)).Exec(ctx)
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
 }
 
 // OfflineDevices flags tablets silent for over 15 minutes (system job) and returns them once.

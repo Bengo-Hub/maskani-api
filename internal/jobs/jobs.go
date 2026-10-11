@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/privacy"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reminders"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
@@ -53,6 +54,7 @@ type Deps struct {
 	Sales       *sales.Service
 	Works       *works.Service
 	Gate        *gate.Service
+	Privacy     *privacy.Service
 	Notices     *notices.Service
 	Settings    *settings.Service
 	Reminders   *reminders.Service
@@ -217,8 +219,13 @@ func New(d Deps) *Runner {
 			_, err = d.Works.AlertExpiring(sys(ctx), on)
 			return err
 		}},
-		{"maskani:gate-retention", 24 * time.Hour, func(ctx context.Context) error {
-			_, err := d.Gate.PurgeOld(sys(ctx))
+		// The retention schedule (privacy/retention.go): gate events, patrol scans, finished passes,
+		// lapsed visitors, document access logs and the audit trail, for every tenant.
+		{"maskani:retention", 24 * time.Hour, func(ctx context.Context) error {
+			n, err := d.Privacy.PurgeExpired(sys(ctx))
+			if len(n) > 0 {
+				d.Log.Info("retention purge", zap.Any("removed", n))
+			}
 			return err
 		}},
 		{"maskani:gate-offline", 5 * time.Minute, func(ctx context.Context) error {

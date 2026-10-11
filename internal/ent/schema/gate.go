@@ -118,6 +118,8 @@ func (PatrolScan) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "device_id", "client_event_id").Unique(),
 		index.Fields("tenant_id", "property_id", "scanned_at"),
+		// The retention purge scans every tenant by age.
+		index.Fields("scanned_at"),
 	}
 }
 
@@ -161,6 +163,8 @@ func (VisitorPass) Indexes() []ent.Index {
 		index.Fields("tenant_id", "host_party_id"),
 		index.Fields("tenant_id", "property_id", "created_at", "id"),
 		index.Fields("tenant_id", "created_at", "id"),
+		// The retention purge scans every tenant by end date.
+		index.Fields("valid_to"),
 	}
 }
 
@@ -195,6 +199,8 @@ func (Visitor) Indexes() []ent.Index {
 		index.Fields("tenant_id", "property_id", "id_number_hash"),
 		index.Fields("tenant_id", "property_id", "vehicle_plate"),
 		index.Fields("tenant_id", "property_id", "last_visit_at"),
+		// The retention purge scans every tenant by last visit.
+		index.Fields("last_visit_at"),
 	}
 }
 
