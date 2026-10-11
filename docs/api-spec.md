@@ -312,7 +312,7 @@ row whose `actions` hold each step's decision; approvers act on the current step
 rejection ends it. Each step is claimed with a compare-and-set on the request's status and current
 step. Maskani adds: the submitter never decides, one person decides at most one step, steps may name
 a permission (the built-in defaults), and requests carry the property for scoped inboxes
-(`current_approver` makes "waiting for me" a SQL filter).
+(`current_approver` makes "waiting for me" a SQL filter). A waiting step that names a role publishes `approval.pending` to the people who hold it; permission steps are announced by the workflow's own alert.
 
 | Module | Object | Default without a rule | On approval | On rejection |
 |---|---|---|---|---|

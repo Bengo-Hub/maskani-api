@@ -25,6 +25,7 @@ envelope first and are idempotent on event ID.
 | `maskani.bill_query.raised` | A resident queried a bill | bill_query_id, account_ref, unit_code, subject, invoice_number, raised_by, due_by, property, responders (finance and managers) | staff alert |
 | `maskani.bill_query.answered` | Finance resolved or rejected a query | bill_query_id, account_ref, subject, status, resolution, invoice_number, name, phone, email | notifications to the resident |
 | `maskani.payment_plan.broken` | An agreed payment plan fell behind (an instalment more than 3 days late) | account_ref, unit_code, name, total, paid, balance, property, responders (finance and managers) | staff alert |
+| `maskani.approval.pending` | An approval's waiting step names a role (on submission and each time a request moves to the next step) | request_id, module, label, amount, step, step_number, steps, submitted_by, property_id, responders (active holders of the role, up to 10) | staff alert (email and push) |
 | `maskani.sale_contract.activated`, `.defaulted`, `.fully_paid` | Contract state changes | contract, unit, buyer | notifications, dashboard |
 | `maskani.unit.handed_over` | Handover completed | unit, owner, date | estate billing start, welcome message |
 | `maskani.work_order.created`, `.assigned`, `.completed`, `.sla_breached` | Works lifecycle | number, priority, unit, assignee, due | notifications to requester, assignee, manager |

@@ -2,13 +2,16 @@ package register
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/maskanirole"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuser"
 	"github.com/bengobox/maskani-api/internal/ent/maskaniuseroutlet"
 	"github.com/bengobox/maskani-api/internal/ent/property"
+	"github.com/bengobox/maskani-api/internal/ent/userroleassignment"
 )
 
 // Responder is a staff member assigned to a property, as an alert addresses them: notifications-api
@@ -53,4 +56,29 @@ func PropertyResponders(ctx context.Context, client *ent.Client, propertyID uuid
 		out = append(out, Responder{UserID: u.AuthServiceUserID, Name: u.Name, Email: u.Email, Phone: u.Phone, Role: role[u.ID]})
 	}
 	return out, prop.Name, nil
+}
+
+// RoleHolders returns up to max active staff of the tenant who hold a role (an approval step names
+// the role, not a property assignment). Expired assignments are left out.
+func RoleHolders(ctx context.Context, client *ent.Client, tenantID uuid.UUID, roleCode string, max int) ([]Responder, error) {
+	as, err := client.UserRoleAssignment.Query().Where(userroleassignment.TenantID(tenantID),
+		userroleassignment.HasRoleWith(maskanirole.RoleCode(roleCode)),
+		userroleassignment.Or(userroleassignment.ExpiresAtIsNil(), userroleassignment.ExpiresAtGT(time.Now()))).
+		Limit(max * 2).All(ctx)
+	if err != nil || len(as) == 0 {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, len(as))
+	for i, a := range as {
+		ids[i] = a.UserID
+	}
+	users, err := client.MaskaniUser.Query().Where(maskaniuser.IDIn(ids...), maskaniuser.StatusEQ("active")).Limit(max).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Responder, 0, len(users))
+	for _, u := range users {
+		out = append(out, Responder{UserID: u.AuthServiceUserID, Name: u.Name, Email: u.Email, Phone: u.Phone, Role: roleCode})
+	}
+	return out, nil
 }

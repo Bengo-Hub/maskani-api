@@ -29,7 +29,10 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrequest"
 	"github.com/bengobox/maskani-api/internal/ent/approvalrule"
+	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
+	"github.com/bengobox/maskani-api/internal/modules/register"
+	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 )
 
@@ -225,7 +228,42 @@ func (s *Service) Submit(ctx context.Context, in Submission) (*ent.ApprovalReque
 	if err != nil {
 		return nil, false, err
 	}
+	s.announce(ctx, req)
 	return req, true, nil
+}
+
+// ApprovalPending tells the holders of the waiting step's role that an approval needs them.
+const ApprovalPending = "approval.pending"
+
+// announce publishes approval.pending when the waiting step names a role, addressed to the people
+// who hold it. Permission steps (the built-in defaults) are announced by the workflow's own alert.
+// Best effort: a failure to alert never blocks the approval.
+func (s *Service) announce(ctx context.Context, req *ent.ApprovalRequest) {
+	if req.Status != approvalrequest.StatusPending || req.CurrentApprover == "" || strings.HasPrefix(req.CurrentApprover, "perm:") {
+		return
+	}
+	tenantID, ok := tenantguard.TenantID(ctx)
+	if !ok {
+		return
+	}
+	rs, err := register.RoleHolders(ctx, s.client, tenantID, req.CurrentApprover, 10)
+	if err != nil || len(rs) == 0 {
+		return
+	}
+	step := ""
+	for _, a := range Actions(req) {
+		if a.Sequence == req.CurrentSequence {
+			step = a.Name
+		}
+	}
+	label, _ := req.Metadata["label"].(string)
+	if label == "" {
+		label = req.ObjectReference
+	}
+	_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, req.ID.String()+":"+itoa(req.CurrentSequence), ApprovalPending, map[string]any{
+		"request_id": req.ID, "module": string(req.Module), "label": label, "amount": req.Amount.StringFixed(2),
+		"step": step, "step_number": req.CurrentSequence, "steps": len(req.Actions), "submitted_by": req.SubmittedByName,
+		"property_id": req.PropertyID, "responders": rs})
 }
 
 // Actions reads a request's steps and decisions in order.
@@ -318,7 +356,12 @@ func (s *Service) Act(ctx context.Context, requestID uuid.UUID, by Actor, d Deci
 	if n == 0 {
 		return nil, httpx.Conflict("someone else decided this step at the same moment; reload and try again")
 	}
-	return s.client.ApprovalRequest.Get(ctx, req.ID)
+	out2, err := s.client.ApprovalRequest.Get(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	s.announce(ctx, out2) // the next step's approvers, when the request moved on
+	return out2, nil
 }
 
 // Get returns one request.

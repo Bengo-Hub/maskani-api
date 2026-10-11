@@ -13,6 +13,7 @@ import (
 
 	"github.com/bengobox/maskani-api/internal/config"
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/outboxevent"
 	_ "github.com/bengobox/maskani-api/internal/ent/runtime"
 	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/platform/database"
@@ -71,6 +72,17 @@ func TestQuoteApprovalOnPostgres(t *testing.T) {
 		t.Fatalf("approved quote: %s %s", got.Status, got.QuoteStatus)
 	}
 
+	// A property manager on file, so the role step's alert has someone to reach.
+	tid, _ := tenantguard.TenantID(ctx)
+	_, err = client.Tenant.Create().SetID(tid).SetName("Estate").SetSlug("estate-"+tid.String()[:8]).Save(tenantguard.System(ctx))
+	must(err)
+	pmRole, err := client.MaskaniRole.Create().SetRoleCode("property_manager").SetName("Property manager").Save(ctx)
+	must(err)
+	pm, err := client.MaskaniUser.Create().SetTenantID(tid).SetAuthServiceUserID(uuid.New()).SetName("Pat").Save(ctx)
+	must(err)
+	_, err = client.UserRoleAssignment.Create().SetTenantID(tid).SetUserID(pm.ID).SetRoleID(pmRole.ID).SetAssignedBy(uuid.New()).Save(ctx)
+	must(err)
+
 	// Large quote: two steps by role; a rejection at step two sends it back.
 	_, err = ap.CreateRule(ctx, approvals.RuleInput{Module: "work_order_quote", MinAmount: decimal.NewFromInt(50000),
 		Steps: []approvals.Step{{ApproverRole: "property_manager"}, {ApproverRole: "tenant_admin"}}})
@@ -78,6 +90,9 @@ func TestQuoteApprovalOnPostgres(t *testing.T) {
 	big := newWO("WO-2")
 	_, err = s.Act(ctx, big.ID, Actor{UserID: clerk, Kind: "staff"}, ActionInput{Action: "quote", QuoteAmount: q(90000)})
 	must(err)
+	if n, _ := client.OutboxEvent.Query().Where(outboxevent.EventType(approvals.ApprovalPending)).Count(ctx); n != 1 {
+		t.Fatalf("the property manager step should be announced once, got %d", n)
+	}
 	got, err = s.DecideQuote(ctx, big.ID, approvals.Actor{UserID: uuid.New(), Roles: []string{"property_manager"}}, approvals.Approve, "")
 	must(err)
 	if got.Status != "quoted" {
