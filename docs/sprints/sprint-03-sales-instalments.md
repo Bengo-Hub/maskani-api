@@ -14,11 +14,11 @@ Requirements FR-20 to FR-25.
 | Schedules | Outright, monthly, quarterly, milestone; last instalment absorbs rounding; versioned | Yes |
 | Instalment invoicing | Daily job raises a treasury invoice per instalment due within the lead window (sales fund, `S-` account) | Yes |
 | Payments | Applied oldest due first by treasury; overpayment reduces the next instalment unless early completion is requested | Yes (treasury allocator) |
-| Reminders and default | 3 days before, due date, 7 and 14 after; default after the agreement grace period; sales officer alerted | Reminders only |
-| Restructure | New schedule under approval, original kept, buyer acceptance | After demo |
+| Reminders and default | 3 days before, due date, 7 and 14 after; default after the agreement grace period; sales officer alerted | Yes |
+| Restructure | New schedule under approval, original kept, buyer acceptance | Yes |
 | Statements | Purchase statement and completion statement | Purchase statement |
-| Handover | Checklist, snag list, meter readings, keys, signatures; estate billing starts prorated | After demo |
-| Title tracking | Stages with dates and documents until release | After demo |
+| Handover | Checklist, snag list, meter readings, keys, signatures; estate billing starts prorated | Yes (signed form still to wire) |
+| Title tracking | Stages with dates and documents until release | Yes |
 
 ## Worked check (SRDD 9.2)
 
@@ -37,11 +37,11 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
 - [x] Instalment invoicing: hourly job, invoices sent through `IssueInvoice`
 - [x] Payments allocated oldest first by treasury
 - [x] Overpayment applied to the next instalment: treasury pays a newly sent account bill from the account's held credit (treasury `616de29`); instalments mirror it as soon as they are issued (wave 2.6)
-- [ ] Reminders and default
+- [x] Reminders and default (wave 2.2, `c699d08`)
 - [x] Purchase position: `/me/purchase`, `/reports/sales-position`
 - [x] Reservations list `GET /reservations`; keyset sale contracts; property scope on price lists, contracts and sales position (2026-10-08)
 - [ ] Purchase and completion statement PDF
-- [ ] Restructure, handover, title tracking (after demo)
+- [x] Restructure, handover, title tracking (wave 2.6; screens in maskani-ui sprint 03)
 - [x] maskani-ui sales screens
 
 ### Gaps found by the 2026-10-09 audit
@@ -52,8 +52,8 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Progress sync reads all instalments in one query and keeps the mirrored amount for instalments older than the 500-invoice ledger page instead of resetting them to zero (bug fix, `b8be252`)
 - [x] Indexes `sale_contracts(tenant_id, unit_account_id)` and `instalments(tenant_id, treasury_invoice_id)` (`3ae57a5`)
 - [x] Portal purchase plans in one instalment query (`b8be252`)
-- [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
-- [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
+- [x] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
+- [x] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
 - [x] Overpayment reduces the next instalment: held credit pays it when it is issued (SRDD 9.3, wave 2.6). Early completion on request is a restructure (one balance instalment), not a separate path
 - [x] Restructure as a new schedule version on the central approvals engine, billed lines kept, buyer acceptance in the portal or by code at the office (FR-23, wave 2.6)
 - [x] Handover with checklist, keys, snags (tracked after completion) and meter readings that start the owner's water; publishes `maskani.unit.handed_over`, makes the buyer the owner and starts estate billing prorated (FR-25, wave 2.6). Signed handover form: through the documents module, still to wire

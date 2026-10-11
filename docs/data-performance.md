@@ -72,8 +72,8 @@ treasury's ledger, which repairs anything an event missed. Report queries compar
 | `gate_events` | Highest (every entry and exit) | Composite (tenant, property, occurred_at), 90 day retention purge in batches. BRIN and monthly partitions come together in sprint 6: the migrate binary runs a live diff with `WithDropIndex`, so any index not declared in the Ent schema (BRIN included) would be dropped on the next deploy; it needs Ent-side declaration or an excluded migration path first |
 | `patrol_scans` | High | Same as gate events: 90 day purge on a `scanned_at` index |
 | `meter_readings` | One per meter per month | Composite (tenant, round, status) and (tenant, meter, period) |
-| `audit_logs` | Critical security workflows only (an allowlist) | (tenant, target_type, target_id), (tenant, created_at), and `created_at` for the 2 year purge |
-| `visitor_passes`, `visitors`, `document_access_logs` | With visits and document opens | Age indexes (`valid_to`, `last_visit_at`, `created_at`) for the retention purge: passes 90 days after they end, visitors a year after their last visit, access logs after 2 years |
+| `audit_logs` | Critical security workflows only (an allowlist) | (tenant, target_type, target_id), (tenant, created_at), and `created_at` for the one year purge |
+| `visitor_passes`, `visitors`, `document_access_logs` | With visits and document opens | Age indexes (`valid_to`, `last_visit_at`, `created_at`) for the retention purge: passes 90 days after they end, visitors a year after their last visit, access logs after a year |
 | `notice_deliveries` | Audience size per notice | Unique key plus (tenant, notice) |
 | `outbox_events` | Every event | The shared poller only marks rows published. maskani's own jobs delete them in batches of 1,000: published `pass.created` rows after 15 minutes (they carry the plain gate code), other published rows after 7 days, failed rows after 30 days (`internal/jobs/outbox.go`) |
 

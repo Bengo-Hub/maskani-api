@@ -19,11 +19,11 @@ import (
 // requires (bills, payments, contracts, account history) are not on it and are never purged here.
 // Outbox events and import uploads have their own, shorter clean-ups (jobs/outbox.go, imports).
 const (
-	GateRetention       = 90 * 24 * time.Hour      // entries, exits and patrol scans (SRDD 15.2)
-	PassRetention       = 90 * 24 * time.Hour      // after a visitor pass ends: visitor name, phone, plate
-	VisitorRetention    = 365 * 24 * time.Hour     // a returning visitor not seen for a year (never a banned one)
-	AccessLogRetention  = 2 * 365 * 24 * time.Hour // who opened a document and from where
-	AuditRetention      = 2 * 365 * 24 * time.Hour // the security audit trail
+	GateRetention       = 90 * 24 * time.Hour  // entries, exits and patrol scans (SRDD 15.2)
+	PassRetention       = 90 * 24 * time.Hour  // after a visitor pass ends: visitor name, phone, plate
+	VisitorRetention    = 365 * 24 * time.Hour // a returning visitor not seen for a year (never a banned one)
+	AccessLogRetention  = 365 * 24 * time.Hour // who opened a document and from where
+	AuditRetention      = 365 * 24 * time.Hour // the security audit trail
 	retentionBatch      = 1000
 	retentionMaxBatches = 20
 )
