@@ -47,6 +47,8 @@ const (
 	ArrearsReminder     = "arrears.reminder"
 	ArrearsDemandLetter = "arrears.demand_letter"
 	ArrearsEscalated    = "arrears.escalated"
+	// Occupancy: a resident or owner left a metered unit, so a final reading is needed.
+	FinalReadingNeeded = "occupancy.final_reading"
 )
 
 // Publisher is client.OutboxEvent or tx.OutboxEvent.

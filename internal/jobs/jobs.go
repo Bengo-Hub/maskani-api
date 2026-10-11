@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/notices"
+	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/reminders"
 	"github.com/bengobox/maskani-api/internal/modules/reports"
 	"github.com/bengobox/maskani-api/internal/modules/sales"
@@ -55,6 +56,7 @@ type Deps struct {
 	Notices     *notices.Service
 	Settings    *settings.Service
 	Reminders   *reminders.Service
+	Register    *register.Service
 	Collections *collections.Service
 	Log         *zap.Logger
 }
@@ -109,6 +111,22 @@ func New(d Deps) *Runner {
 			n, err := d.Collections.BackfillAccountCollections(ctx, on, d.Loc, 200)
 			if n > 0 {
 				log.Info("account collections backfilled", zap.Int("accounts", n))
+			}
+			return err
+		}},
+		// Occupancy: links past their end date end, with their effects (passes, final reading,
+		// accounts), and bill-to on long-ended links clears. Each link once.
+		{"maskani:occupancy-links", time.Hour, func(ctx context.Context) error {
+			if d.Register == nil {
+				return nil
+			}
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "properties")
+			if err != nil || len(on) == 0 {
+				return err
+			}
+			n, err := d.Register.CloseLinks(ctx, on, time.Now(), 500)
+			if n > 0 {
+				log.Info("occupancy links ended", zap.Int("links", n))
 			}
 			return err
 		}},

@@ -381,13 +381,25 @@ func (s *Service) LinkParty(ctx context.Context, unitID, actor uuid.UUID, in Lin
 }
 
 // EndLink closes a relationship on a date (transfer, move-out).
+// A future end date keeps the link active until that day, when the occupancy job ends it; an end
+// today or earlier ends it now with the same effects (passes, final reading, accounts).
 func (s *Service) EndLink(ctx context.Context, linkID uuid.UUID, end time.Time) (*ent.UnitParty, error) {
-	u := s.client.UnitParty.UpdateOneID(linkID).SetEndDate(end)
-	// A future end date keeps the link active until that day; the daily link job ends it then.
-	if !end.After(time.Now()) {
-		u.SetStatus(unitparty.StatusEnded)
+	l, err := s.client.UnitParty.UpdateOneID(linkID).SetEndDate(end).Save(ctx)
+	if err != nil || end.After(time.Now()) {
+		return l, err
 	}
-	return u.Save(ctx)
+	n, err := s.client.UnitParty.Update().Where(unitparty.ID(l.ID), unitparty.StatusEQ(unitparty.StatusActive)).
+		SetStatus(unitparty.StatusEnded).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if n > 0 {
+		tenantID, _ := tenantguard.TenantID(ctx)
+		if err := s.afterLinkEnded(ctx, tenantID, l, time.Now()); err != nil {
+			s.log.Warn("occupancy: link end effects", zap.String("link", l.ID.String()), zap.Error(err))
+		}
+	}
+	return s.client.UnitParty.Get(ctx, l.ID)
 }
 
 // Invite links the party to an auth-api account by phone (creating one if needed) with a portal
