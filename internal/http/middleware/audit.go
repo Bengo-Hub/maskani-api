@@ -67,6 +67,9 @@ var audited = map[string]string{
 	"POST /sale-contracts/{id}/restructure": "restructure.propose",
 	"POST /schedules/{id}/accept":           "restructure.accept_at_office",
 	"POST /me/plans/{id}/accept":            "restructure.accept",
+	// Ownership moving at the end of a sale.
+	"POST /handovers/{id}/complete":          "unit.handover",
+	"PUT /sale-contracts/{id}/title/{stage}": "unit.title_stage",
 	// Personal data: identity checks, a person's data leaving the system, and erasure.
 	"POST /privacy/requests/{id}/verify":    "privacy.verify",
 	"GET /privacy/requests/{id}/export":     "privacy.export",

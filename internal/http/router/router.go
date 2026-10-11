@@ -408,6 +408,12 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermSalesView)).Get("/sale-contracts/{id}/schedules", h.ContractSchedules)
 		g.With(perm(rbac.PermSalesManage)).Post("/schedules/{id}/send-code", h.SendPlanCode)
 		g.With(perm(rbac.PermSalesManage)).Post("/schedules/{id}/accept", h.AcceptPlanWithCode)
+		// Handover of a fully paid unit, then title.
+		g.With(perm(rbac.PermSalesManage)).Post("/sale-contracts/{id}/handover", h.StartHandover)
+		g.With(perm(rbac.PermSalesManage)).Patch("/handovers/{id}", h.UpdateHandover)
+		g.With(perm(rbac.PermSalesManage)).Post("/handovers/{id}/complete", h.CompleteHandover)
+		g.With(perm(rbac.PermSalesView)).Get("/sale-contracts/{id}/title", h.ContractTitle)
+		g.With(perm(rbac.PermSalesManage)).Put("/sale-contracts/{id}/title/{stage}", h.SetTitleStage)
 		g.With(perm(rbac.PermSalesManage)).Post("/instalments/{id}/release", h.ReleaseMilestone)
 		g.With(perm(rbac.PermReportsView, rbac.PermSalesView)).Get("/reports/sales-position", h.SalesPosition)
 		g.With(perm(rbac.PermSalesView)).Get("/enquiries", h.ListEnquiries)

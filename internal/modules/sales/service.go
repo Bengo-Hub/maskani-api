@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/handover"
 	"github.com/bengobox/maskani-api/internal/ent/instalment"
 	"github.com/bengobox/maskani-api/internal/ent/instalmentschedule"
 	"github.com/bengobox/maskani-api/internal/ent/party"
@@ -41,6 +42,8 @@ type Service struct {
 	seq       *sequence.Allocator
 	approvals *approvals.Service
 	box       *secure.Box // one-time codes (restructure acceptance)
+	linkOwner OwnerLinker // the buyer becomes owner at handover
+	catalogue CatalogueFunc
 	loc       *time.Location
 	log       *zap.Logger
 }
@@ -661,6 +664,8 @@ type ContractView struct {
 	Balance     decimal.Decimal   `json:"balance"`
 	// PendingPlan is an approved new plan waiting for the buyer to accept.
 	PendingPlan *ScheduleView `json:"pending_plan,omitempty"`
+	// Handover is the unit's handover once booked: keys, checklist, readings and snags.
+	Handover *ent.Handover `json:"handover,omitempty"`
 }
 
 // inPlan is what the buyer's plan shows: the active schedule, plus lines already billed under an
@@ -682,21 +687,42 @@ func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView,
 		return nil, err
 	}
 	v := contractView(sc, ins)
-	pending, err := s.pendingPlans(ctx, []uuid.UUID{id})
-	v.PendingPlan = pending[id]
-	return v, err
+	if err := s.attach(ctx, []*ContractView{v}); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
-// pendingPlans returns, per contract, the approved plan waiting for the buyer (one query).
-func (s *Service) pendingPlans(ctx context.Context, contractIDs []uuid.UUID) (map[uuid.UUID]*ScheduleView, error) {
-	rows, err := s.client.InstalmentSchedule.Query().Where(instalmentschedule.ContractIDIn(contractIDs...),
+// attach adds each contract's pending plan and handover, one query each for all the contracts.
+func (s *Service) attach(ctx context.Context, views []*ContractView) error {
+	if len(views) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(views))
+	for i, v := range views {
+		ids[i] = v.ID
+	}
+	plans, err := s.client.InstalmentSchedule.Query().Where(instalmentschedule.ContractIDIn(ids...),
 		instalmentschedule.StatusEQ(instalmentschedule.StatusProposed), instalmentschedule.ApprovedAtNotNil()).
 		WithInstalments(func(q *ent.InstalmentQuery) { q.Order(ent.Asc(instalment.FieldSeq)) }).All(ctx)
-	out := map[uuid.UUID]*ScheduleView{}
-	for _, r := range rows {
-		out[r.ContractID] = toScheduleView(r, r.Edges.Instalments)
+	if err != nil {
+		return err
 	}
-	return out, err
+	hos, err := s.client.Handover.Query().Where(handover.ContractIDIn(ids...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	planOf, hoOf := map[uuid.UUID]*ScheduleView{}, map[uuid.UUID]*ent.Handover{}
+	for _, p := range plans {
+		planOf[p.ContractID] = toScheduleView(p, p.Edges.Instalments)
+	}
+	for _, h := range hos {
+		hoOf[h.ContractID] = h
+	}
+	for _, v := range views {
+		v.PendingPlan, v.Handover = planOf[v.ID], hoOf[v.ID]
+	}
+	return nil
 }
 
 func contractView(sc *ent.SaleContract, ins []*ent.Instalment) *ContractView {
@@ -733,16 +759,10 @@ func (s *Service) ContractViews(ctx context.Context, cs []*ent.SaleContract) ([]
 	for _, in := range ins {
 		byContract[in.ContractID] = append(byContract[in.ContractID], in)
 	}
-	pending, err := s.pendingPlans(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
 	for _, c := range cs {
-		v := contractView(c, byContract[c.ID])
-		v.PendingPlan = pending[c.ID]
-		out = append(out, v)
+		out = append(out, contractView(c, byContract[c.ID]))
 	}
-	return out, nil
+	return out, s.attach(ctx, out)
 }
 
 // ListContracts returns a keyset page of contracts, newest first, for one property or the scope.

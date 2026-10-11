@@ -180,6 +180,13 @@ func New(ctx context.Context) (*App, error) {
 	worksSvc := works.NewService(orm, seq, log)
 	worksSvc.SetApprovals(approvalSvc)
 	salesSvc.SetApprovals(approvalSvc, box)
+	salesSvc.SetCatalogue(settingsSvc.Catalogue)
+	// At handover the buyer becomes the owner through the register's one link path.
+	salesSvc.SetOwnerLinker(func(ctx context.Context, unitID, partyID, actor uuid.UUID, from time.Time) error {
+		_, err := regSvc.LinkParty(ctx, unitID, actor, register.LinkInput{PartyID: partyID, Role: "owner", IsPrimary: true,
+			StartDate: &from, Source: "sale"})
+		return err
+	})
 	gateSvc := gate.NewService(orm, box, seq, log)
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)

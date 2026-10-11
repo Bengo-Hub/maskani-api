@@ -241,9 +241,12 @@ func (s *Service) previousReadings(ctx context.Context, meterIDs []uuid.UUID, pe
 	if t, err := time.Parse("2006-01", period); err == nil {
 		floor = t.AddDate(-2, 0, 0).Format("2006-01")
 	}
+	// A handover reading in the period itself is where a new owner's water starts, so the period's
+	// reading measures from it; use before handover is not theirs.
 	rows, err := s.client.MeterReading.Query().
-		Where(meterreading.MeterIDIn(meterIDs...), meterreading.PeriodLT(period), meterreading.PeriodGTE(floor),
-			meterreading.StatusNEQ(meterreading.StatusRejected)).
+		Where(meterreading.MeterIDIn(meterIDs...), meterreading.StatusNEQ(meterreading.StatusRejected),
+			meterreading.Or(meterreading.And(meterreading.PeriodLT(period), meterreading.PeriodGTE(floor)),
+				meterreading.And(meterreading.Period(period), meterreading.SourceEQ(meterreading.SourceHandover)))).
 		Order(ent.Desc(meterreading.FieldPeriod), ent.Desc(meterreading.FieldReadAt)).All(ctx)
 	if err != nil {
 		return nil, err
