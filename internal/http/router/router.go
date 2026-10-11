@@ -440,6 +440,7 @@ func mount(r chi.Router, d Deps) {
 	})
 	r.With(perm(rbac.PermReportsView)).Get("/reports/dashboard", h.Dashboard)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/insights", h.Insights)
+	r.With(perm(rbac.PermReportsView)).Get("/reports/catalog", h.ReportCatalog)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/estate", h.EstateReportKinds)
 	r.With(perm(rbac.PermReportsView)).Get("/reports/estate/{kind}", h.EstateReport)
 	r.With(perm(rbac.PermReportsView), perm(rbac.PermReportsExport), export).Get("/reports/estate/{kind}/export", h.EstateReportExport)

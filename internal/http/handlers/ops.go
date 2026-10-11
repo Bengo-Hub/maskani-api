@@ -757,6 +757,18 @@ func (h *H) EstateReport(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, v)
 }
 
+// ReportCatalog is GET /reports/catalog: every report grouped by module, only for modules the tenant
+// runs and reports the caller may see (the console's one Reports page reads it).
+func (h *H) ReportCatalog(w http.ResponseWriter, r *http.Request) {
+	a := access(r)
+	mods, err := h.Settings.Modules(r.Context(), a.TenantID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"modules": reports.Catalog(mods, func(p string) bool { return a.Has(p) })})
+}
+
 // EstateReportKinds is GET /reports/estate: the reports on offer, in screen order.
 func (h *H) EstateReportKinds(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": reports.EstateReportKinds})
