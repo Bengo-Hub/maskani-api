@@ -464,6 +464,11 @@ func mount(r chi.Router, d Deps) {
 		m.Post("/terms/accept", h.MyAcceptTerms)
 		m.Post("/walk-ins/{id}/decide", h.MyDecideWalkIn)
 		m.Get("/documents", h.MyDocuments)
+		m.Get("/units/{id}/household", h.MyHousehold)
+		m.Post("/units/{id}/household", h.MyAddHousehold)
+		m.Post("/units/{id}/household/{link}/end", h.MyEndHousehold)
+		m.Post("/units/{id}/vehicles", h.MyAddVehicle)
+		m.Post("/units/{id}/vehicles/{vehicle}/remove", h.MyRemoveVehicle)
 		m.With(export).Get("/documents/{id}/file", h.MyDocumentFile)
 	})
 }

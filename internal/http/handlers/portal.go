@@ -8,6 +8,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
+	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 )
@@ -261,4 +262,108 @@ func (h *H) MyDecideWalkIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, ev)
+}
+
+// householdUnit reads the {id} unit and checks the caller manages its household.
+func (h *H) householdUnit(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	id, ok := httpx.UUIDParam(w, r, "id")
+	if !ok {
+		return uuid.Nil, false
+	}
+	if err := h.Portal.ManagesHousehold(r.Context(), access(r).PartyIDs, id); err != nil {
+		httpx.Fail(w, err)
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// MyHousehold is GET /me/units/{id}/household: household members, domestic staff and vehicles.
+func (h *H) MyHousehold(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.householdUnit(w, r)
+	if !ok {
+		return
+	}
+	out, err := h.Register.HouseholdOf(r.Context(), id)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, out)
+}
+
+// MyAddHousehold is POST /me/units/{id}/household {name, phone, role}.
+func (h *H) MyAddHousehold(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.householdUnit(w, r)
+	if !ok {
+		return
+	}
+	var in register.HouseholdInput
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	l, err := h.Register.AddHouseholdMember(r.Context(), id, actor(r), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, l)
+}
+
+// MyEndHousehold is POST /me/units/{id}/household/{link}/end.
+func (h *H) MyEndHousehold(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.householdUnit(w, r)
+	if !ok {
+		return
+	}
+	linkID, ok := httpx.UUIDParam(w, r, "link")
+	if !ok {
+		return
+	}
+	l, err := h.Register.EndHouseholdLink(r.Context(), id, linkID)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, l)
+}
+
+// MyAddVehicle is POST /me/units/{id}/vehicles {plate, make, model, colour}.
+func (h *H) MyAddVehicle(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.householdUnit(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Plate  string `json:"plate"`
+		Make   string `json:"make"`
+		Model  string `json:"model"`
+		Colour string `json:"colour"`
+	}
+	if !httpx.Decode(w, r, &in) {
+		return
+	}
+	v, err := h.Register.AddVehicle(r.Context(), id, h.portalParty(r), in.Plate, in.Make, in.Model, in.Colour)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, v)
+}
+
+// MyRemoveVehicle is POST /me/units/{id}/vehicles/{vehicle}/remove.
+func (h *H) MyRemoveVehicle(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.householdUnit(w, r)
+	if !ok {
+		return
+	}
+	vid, ok := httpx.UUIDParam(w, r, "vehicle")
+	if !ok {
+		return
+	}
+	v, err := h.Register.RemoveVehicle(r.Context(), id, vid)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
 }

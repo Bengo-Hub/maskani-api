@@ -144,6 +144,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | GET `/collections/bill-queries?status=&property_id=` (keyset) | Residents' bill queries, answer due 7 days after raising | `billing.view` |
 | POST `/bill-queries/{id}/answer` `{status: in_review, resolved or rejected, resolution}` | Take a query, or answer it; the resident is told | `billing.adjust` or `billing.manage` |
 | POST `/me/accounts/{id}/bill-queries` `{invoice_id, subject, body}`; GET `/me/bill-queries` | Portal: query a bill within 30 days of its date (five open per account at most) and see the answers | portal user |
+| GET `/me/units/{id}/household`; POST `/me/units/{id}/household` `{name, phone, role: household_member or domestic_staff}`; POST `/me/units/{id}/household/{link}/end`; POST `/me/units/{id}/vehicles` `{plate, make, model, colour}`; POST `/me/units/{id}/vehicles/{vehicle}/remove` | Portal: owners and occupants (not household members themselves) list and manage the unit's household, domestic staff and vehicles. A person is matched by phone when already known; up to 30 per unit; only household roles can be added or ended here. Domestic staff then get passes like any visitor | portal user (owner, joint owner, buyer, landlord or occupant of the unit) |
 
 ## Meters and utilities (module `utilities`)
 

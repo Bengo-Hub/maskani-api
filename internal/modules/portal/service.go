@@ -190,6 +190,21 @@ func (s *Service) OwnsUnit(ctx context.Context, partyIDs []uuid.UUID, unitID uui
 	return nil
 }
 
+// ManagesHousehold checks the caller lives at or owns the unit (owner, joint owner, buyer, landlord
+// or occupant), so household members and staff cannot add more people themselves.
+func (s *Service) ManagesHousehold(ctx context.Context, partyIDs []uuid.UUID, unitID uuid.UUID) error {
+	ok, err := s.client.UnitParty.Query().Where(unitparty.UnitID(unitID), unitparty.PartyIDIn(partyIDs...),
+		unitparty.RoleIn(unitparty.RoleOwner, unitparty.RoleJointOwner, unitparty.RoleBuyer, unitparty.RoleLandlord, unitparty.RoleOccupant),
+		activeLink()).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return httpx.Forbidden("only the unit's owners and occupants manage its household")
+	}
+	return nil
+}
+
 // Contracts returns the caller's purchase contracts.
 func (s *Service) Contracts(ctx context.Context, partyIDs []uuid.UUID) ([]*ent.SaleContract, error) {
 	return s.client.SaleContract.Query().Where(salecontract.PrimaryBuyerIDIn(partyIDs...),
