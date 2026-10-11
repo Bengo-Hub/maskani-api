@@ -31,7 +31,13 @@ WITH jobs AS (
 ), docs AS (
   SELECT d.vendor_id, COUNT(*) FILTER (WHERE d.expires_at < now()) AS expired,
          COUNT(*) FILTER (WHERE d.expires_at >= now() AND d.expires_at < now() + interval '30 days') AS expiring
-    FROM vendor_documents d WHERE d.tenant_id = $1 GROUP BY 1
+    FROM vendor_documents d
+   WHERE d.tenant_id = $1
+     -- the vendor's current document of each type (works.CurrentDocument): a renewal replaces the old copy
+     AND NOT EXISTS (SELECT 1 FROM vendor_documents n
+                      WHERE n.tenant_id = $1 AND n.vendor_id = d.vendor_id AND n.doc_type = d.doc_type
+                        AND (n.created_at > d.created_at OR (n.created_at = d.created_at AND n.id > d.id)))
+   GROUP BY 1
 )
 SELECT v.name, COALESCE(j.jobs, 0), COALESCE(j.done, 0),
        CASE WHEN COALESCE(j.done, 0) > 0 THEN ROUND(j.on_time * 100.0 / j.done, 1) END,

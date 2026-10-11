@@ -45,11 +45,9 @@ func (s *Service) Arrears(ctx context.Context, tenantID uuid.UUID, slug string, 
 		table[i] = []reports.Cell{reports.Text(a.AccountRef), reports.Text(a.Customer), reports.Text(phone),
 			reports.Text(moneyText(cur, a.Balance)), reports.Text(last)}
 	}
-	over60, bars := decimal.Zero, make([]reports.Bar, len(ageing))
+	_, over60 := analytics.Over60(ageing)
+	bars := make([]reports.Bar, len(ageing))
 	for i, b := range ageing {
-		if b.Bucket == "61-90" || b.Bucket == "90+" {
-			over60 = over60.Add(b.Amount)
-		}
 		bars[i] = reports.Bar{Label: b.Bucket + " days", Value: b.Amount.InexactFloat64()}
 	}
 	count := strconv.Itoa(len(rows))

@@ -431,7 +431,8 @@ func (s *Service) WaterBalance(ctx context.Context, propertyID uuid.UUID, period
 		return nil, httpx.Invalid("period must be YYYY-MM")
 	}
 	from := end.AddDate(0, -5, 0).Format("2006-01")
-	meters, err := s.client.Meter.Query().Where(meter.PropertyID(propertyID)).All(ctx)
+	// Only the id and kind decide where a meter's water counts.
+	meters, err := s.client.Meter.Query().Where(meter.PropertyID(propertyID)).Select(meter.FieldID, meter.FieldKind).All(ctx)
 	if err != nil {
 		return nil, err
 	}

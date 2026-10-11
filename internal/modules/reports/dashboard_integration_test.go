@@ -165,4 +165,44 @@ func TestDashboardFiltersOnPostgres(t *testing.T) {
 	if _, err := s.Dashboard(tctx, sc, DashboardFilter{From: "2025-01", To: "2026-09"}); err == nil {
 		t.Fatal("a range over 12 months should be refused")
 	}
+
+	// "Over 60 days" follows the ageing: an account whose old bill is paid and which owes only a
+	// recent one is not 60 days behind; one that still owes part of an old bill is. Dates are
+	// relative to today because the ageing is.
+	p2, err := client.Property.Create().SetCode("AG").SetName("Ageing").Save(tctx)
+	must(err)
+	now := time.Now().In(loc)
+	agedRun := func(daysAgo int) *ent.BillingRun {
+		due := now.AddDate(0, 0, -daysAgo)
+		run, err := client.BillingRun.Create().SetPropertyID(p2.ID).SetFundID(estate.ID).SetPeriod(due.Format("2006-01")).
+			SetInvoiceDate(due.AddDate(0, 0, -9)).SetDueDate(due).Save(tctx)
+		must(err)
+		return run
+	}
+	old, recent := agedRun(100), agedRun(10)
+	paidUp, err := client.Unit.Create().SetPropertyID(p2.ID).SetCode("C01").Save(tctx)
+	must(err)
+	behind, err := client.Unit.Create().SetPropertyID(p2.ID).SetCode("C02").Save(tctx)
+	must(err)
+	// C01 paid the old 300 and owes the recent 200; C02 owes 100 of the old 300 plus the recent 200.
+	paidAcc, err := client.UnitAccount.Create().SetUnitID(paidUp.ID).SetFundID(estate.ID).SetAccountRef("C01").SetBalance(decimal.NewFromInt(200)).Save(tctx)
+	must(err)
+	behindAcc, err := client.UnitAccount.Create().SetUnitID(behind.ID).SetFundID(estate.ID).SetAccountRef("C02").SetBalance(decimal.NewFromInt(300)).Save(tctx)
+	must(err)
+	for _, u := range []struct {
+		unit *ent.Unit
+		acc  *ent.UnitAccount
+	}{{paidUp, paidAcc}, {behind, behindAcc}} {
+		line(old, u.unit, u.acc, 300)
+		line(recent, u.unit, u.acc, 200)
+	}
+	s.Invalidate(uuid.Nil)
+	ag, err := s.Dashboard(tctx, Scope{PropertyID: &p2.ID}, DashboardFilter{From: now.Format("2006-01"), To: now.Format("2006-01")})
+	must(err)
+	if ag.Arrears60Accounts != 1 || !ag.Arrears60Amount.Equal(dec(300)) || ag.AccountsOwing != 2 {
+		t.Fatalf("over 60 days: %d accounts, %s (owing %d)", ag.Arrears60Accounts, ag.Arrears60Amount, ag.AccountsOwing)
+	}
+	if n, amt := Over60(ag.ArrearsAgeing); n != ag.Arrears60Accounts || !amt.Equal(ag.Arrears60Amount) {
+		t.Fatalf("the tile and the ageing disagree: %d %s", n, amt)
+	}
 }

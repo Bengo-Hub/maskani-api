@@ -204,7 +204,7 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 |---|---|---|
 | GET `/work-orders` (keyset; `property_id`, `status` incl. `open`, `priority`, `overdue`); POST `/work-orders`; GET `/work-orders/{id}` | Work orders with timeline | `works.view` / `works.manage` |
 | POST `/work-orders/{id}/actions` `{action, vendor_id, erp_employee_id, assigned_user_id, quote_amount, cost_amount, recharge, photos, minutes_on_site, note}` | assign, quote (opens the quote approval), approve_quote and reject_quote (decide its current step on the central engine; the person who entered the quote never decides; reject needs a note), start, complete, confirm, reopen, cancel, close | `works.manage` |
-| GET `/vendors` (keyset; `status`) | Vendors with `documents`, `next_expiry`, `expired_documents`, `personnel` (each with `has_pin`) | `vendors.view` |
+| GET `/vendors` (keyset; `status`) | Vendors with `documents`, `next_expiry`, `expired_documents`, `replaced_documents`, `personnel` (each with `has_pin`). Only a vendor's newest document of each type counts towards expiry (`works.CurrentDocument`); older ones of that type are listed in `replaced_documents`. The same rule drives the dashboard, the vendor scorecard and the expiry alerts | `vendors.view` |
 | POST `/vendors` | Create a vendor | `vendors.manage` |
 | GET `/vendors/{id}` | Vendor with documents and personnel (`has_pin`, never the hash); personnel deployed only outside the caller's properties are left out | `vendors.view` |
 | POST `/vendors/{id}/documents` `{doc_type, number, issued_at, expires_at, file_key}` | Compliance document | `vendors.manage` |
@@ -275,7 +275,7 @@ All exports render on `github.com/Bengo-Hub/reports`, send `Cache-Control: priva
 The dashboard reads through the read-only database and is cached for 60 seconds per tenant, scope
 and period (dropped on every pod when a payment is applied or a billing run progresses). Response:
 `period`, `billed`, `collected`, `collection_rate`, `outstanding`, `accounts_owing`,
-`arrears_60_accounts`, `arrears_60_amount`, `open_work_orders`, `past_sla`, `water_loss_pct`
+`arrears_60_accounts`, `arrears_60_amount` (the 61 to 90 and 90+ buckets of `arrears_ageing`, which ages each balance by its oldest unpaid bill; the arrears report uses the same `reports.Over60`), `open_work_orders`, `past_sla`, `water_loss_pct`
 (with a property only), `vendors_due_for_renewal`, `units`, `occupied`, `units_sold`, `sales_value`,
 `sales_collected`, plus
 

@@ -27,11 +27,13 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/salecontract"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
 	"github.com/bengobox/maskani-api/internal/ent/unitaccount"
+	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/workorder"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/utilities"
+	"github.com/bengobox/maskani-api/internal/modules/works"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/sqlx"
@@ -177,6 +179,17 @@ type AgeBucket struct {
 // AgeBuckets are the ageing bands in display order.
 var AgeBuckets = []string{"0-30", "31-60", "61-90", "90+"}
 
+// Over60 sums the ageing buckets past 60 days: the one definition of "over 60 days" for the
+// dashboard tile and the arrears report, so the two always agree with the ageing chart.
+func Over60(buckets []AgeBucket) (accounts int, amount decimal.Decimal) {
+	for _, b := range buckets {
+		if b.Bucket == "61-90" || b.Bucket == "90+" {
+			accounts, amount = accounts+b.Accounts, amount.Add(b.Amount)
+		}
+	}
+	return accounts, amount
+}
+
 // Dashboard computes the dashboard for a property (or the caller's properties) and month. Results
 // are cached for 60 seconds per tenant, scope and period.
 // DashboardFilter narrows the dashboard: a range of months (From to To, YYYY-MM, at most 12), a
@@ -314,8 +327,8 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 		d.CollectionRate = d.Collected.Div(d.Billed).Mul(decimal.NewFromInt(100)).Round(1)
 	}
 
-	// Outstanding and arrears from cached treasury balances. "Over 60 days" = owing accounts whose
-	// oldest issued bill fell due more than 60 days ago.
+	// Outstanding from cached treasury balances. "Over 60 days" comes from the ageing below, which
+	// ages each balance by its oldest unpaid bill (treasury pays the oldest first).
 	aq := s.client.UnitAccount.Query().Where(unitaccount.BalanceGT(decimal.Zero))
 	if ids != nil {
 		aq = aq.Where(unitaccount.HasUnitWith(unit.PropertyIDIn(ids...)))
@@ -330,29 +343,11 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 		N   int             `json:"n"`
 		Sum decimal.Decimal `json:"sum"`
 	}
-	if err := aq.Clone().Aggregate(sqlx.CountAs("n", ""), sqlx.SumAs(unitaccount.FieldBalance, "sum", "")).Scan(ctx, &owing); err != nil {
+	if err := aq.Aggregate(sqlx.CountAs("n", ""), sqlx.SumAs(unitaccount.FieldBalance, "sum", "")).Scan(ctx, &owing); err != nil {
 		return nil, err
 	}
 	if len(owing) > 0 {
 		d.AccountsOwing, d.Outstanding = owing[0].N, owing[0].Sum
-	}
-	cutoff := time.Now().AddDate(0, 0, -60)
-	var old []struct {
-		N   int             `json:"n"`
-		Sum decimal.Decimal `json:"sum"`
-	}
-	if err := aq.Clone().Where(func(sel *sql.Selector) {
-		lt := sql.Table(billingrunline.Table)
-		rt := sql.Table(billingrun.Table)
-		sub := sql.Select(lt.C(billingrunline.FieldUnitAccountID)).From(lt).
-			Join(rt).On(lt.C(billingrunline.FieldRunID), rt.C(billingrun.FieldID)).
-			Where(sql.And(sql.EQ(lt.C(billingrunline.FieldStatus), "issued"), sql.LT(rt.C(billingrun.FieldDueDate), cutoff)))
-		sel.Where(sql.In(sel.C(unitaccount.FieldID), sub))
-	}).Aggregate(sqlx.CountAs("n", ""), sqlx.SumAs(unitaccount.FieldBalance, "sum", "")).Scan(ctx, &old); err != nil {
-		return nil, err
-	}
-	if len(old) > 0 {
-		d.Arrears60Accounts, d.Arrears60Amount = old[0].N, old[0].Sum
 	}
 
 	// Work orders.
@@ -421,12 +416,15 @@ func (s *Service) dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 	if d.ArrearsAgeing, err = s.ageing(ctx, tenantID, sc, f.BlockID, f.FundID); err != nil {
 		return nil, err
 	}
+	d.Arrears60Accounts, d.Arrears60Amount = Over60(d.ArrearsAgeing)
 
 	// Vendors due: contracts ending or documents expiring within 30 days.
 	soon := time.Now().AddDate(0, 0, 30)
 	nc, _ := s.client.VendorContract.Query().Where(vendorcontract.StatusEQ(vendorcontract.StatusActive),
 		vendorcontract.EndsOnNotNil(), vendorcontract.EndsOnLT(soon)).Count(ctx)
-	nd, _ := s.client.VendorDocument.Query().Where(vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(soon)).Count(ctx)
+	// Only active vendors' current documents: a renewed one replaces the old copy (works.CurrentDocument).
+	nd, _ := s.client.VendorDocument.Query().Where(vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(soon),
+		vendordocument.HasVendorWith(vendor.StatusEQ(vendor.StatusActive)), works.CurrentDocument()).Count(ctx)
 	d.VendorsDue = nc + nd
 
 	if sc.PropertyID != nil && s.utilities != nil {

@@ -6,11 +6,14 @@ import (
 	"context"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
+
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
+	"github.com/bengobox/maskani-api/internal/ent/predicate"
 	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
@@ -414,14 +417,50 @@ type VendorView struct {
 	Documents   []*ent.VendorDocument `json:"documents"`
 	NextExpiry  *time.Time            `json:"next_expiry,omitempty"`
 	ExpiredDocs int                   `json:"expired_documents"`
+	// ReplacedDocs are older documents of a type the vendor has since uploaded again; they are kept
+	// for the record but no longer count towards expiry.
+	ReplacedDocs []uuid.UUID `json:"replaced_documents"`
+}
+
+// newerDocument reports whether a was uploaded after b (the id breaks a tie in the same instant).
+func newerDocument(a, b *ent.VendorDocument) bool {
+	if !a.CreatedAt.Equal(b.CreatedAt) {
+		return a.CreatedAt.After(b.CreatedAt)
+	}
+	return a.ID.String() > b.ID.String()
+}
+
+// CurrentDocument keeps a vendor's newest document of each type. Uploading a document of the same
+// type replaces the older one, so a renewed permit never counts as expired. It is the one rule for
+// the vendor list, the dashboard, the vendor scorecard and the expiry alerts.
+func CurrentDocument() predicate.VendorDocument {
+	return func(s *sql.Selector) {
+		t := sql.Table(vendordocument.Table).As("newer_doc")
+		s.Where(sql.Not(sql.Exists(sql.Select(t.C(vendordocument.FieldID)).From(t).Where(sql.And(
+			sql.ColumnsEQ(t.C(vendordocument.FieldVendorID), s.C(vendordocument.FieldVendorID)),
+			sql.ColumnsEQ(t.C(vendordocument.FieldDocType), s.C(vendordocument.FieldDocType)),
+			sql.Or(sql.ColumnsGT(t.C(vendordocument.FieldCreatedAt), s.C(vendordocument.FieldCreatedAt)),
+				sql.And(sql.ColumnsEQ(t.C(vendordocument.FieldCreatedAt), s.C(vendordocument.FieldCreatedAt)),
+					sql.ColumnsGT(t.C(vendordocument.FieldID), s.C(vendordocument.FieldID)))))))))
+	}
 }
 
 func viewVendor(v *ent.Vendor, now time.Time) VendorView {
-	out := VendorView{Vendor: v, Documents: v.Edges.Documents}
+	out := VendorView{Vendor: v, Documents: v.Edges.Documents, ReplacedDocs: []uuid.UUID{}}
 	if out.Documents == nil {
 		out.Documents = []*ent.VendorDocument{}
 	}
-	for _, d := range v.Edges.Documents {
+	latest := map[string]*ent.VendorDocument{}
+	for _, d := range out.Documents {
+		if cur := latest[d.DocType]; cur == nil || newerDocument(d, cur) {
+			latest[d.DocType] = d
+		}
+	}
+	for _, d := range out.Documents {
+		if latest[d.DocType] != d {
+			out.ReplacedDocs = append(out.ReplacedDocs, d.ID)
+			continue
+		}
 		if d.ExpiresAt == nil {
 			continue
 		}
@@ -499,9 +538,12 @@ func (s *Service) AlertExpiring(ctx context.Context, tenants []uuid.UUID) (int, 
 		return 0, nil
 	}
 	now := time.Now()
+	// Only each vendor's current document of a type, and not one already told it has expired (the
+	// last alert), so documents that were renewed or alerted never crowd a batch as they pile up.
 	docs, err := s.client.VendorDocument.Query().
-		Where(vendordocument.TenantIDIn(tenants...), vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(now.AddDate(0, 0, 31))).
-		WithVendor().Limit(1000).All(ctx)
+		Where(vendordocument.TenantIDIn(tenants...), vendordocument.ExpiresAtNotNil(), vendordocument.ExpiresAtLT(now.AddDate(0, 0, 31)),
+			vendordocument.Or(vendordocument.LastAlertDaysIsNil(), vendordocument.LastAlertDaysGTE(0)), CurrentDocument()).
+		Order(ent.Asc(vendordocument.FieldExpiresAt)).WithVendor().Limit(1000).All(ctx)
 	if err != nil {
 		return 0, err
 	}
