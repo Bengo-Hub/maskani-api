@@ -482,6 +482,16 @@ func (s *Service) InvoiceDue(ctx context.Context, contractID *uuid.UUID, horizon
 		accByID[a.ID] = a
 	}
 	done := 0
+	issued := map[uuid.UUID]bool{}
+	// Treasury pays a newly sent bill from credit the account already holds (an overpayment), so
+	// the instalments mirror it at once instead of waiting for the next payment (SRDD 9.3).
+	defer func() {
+		for accID := range issued {
+			if err := s.SyncProgress(ctx, accID); err != nil {
+				s.log.Warn("instalment progress after issue", zap.Error(err))
+			}
+		}
+	}()
 	for _, in := range rows {
 		sc := byID[in.ContractID]
 		if sc == nil || sc.UnitAccountID == nil || accByID[*sc.UnitAccountID] == nil {
@@ -518,6 +528,7 @@ func (s *Service) InvoiceDue(ctx context.Context, contractID *uuid.UUID, horizon
 		}
 		if tx.Commit() == nil {
 			done++
+			issued[acc.ID] = true
 		}
 	}
 	return done, nil

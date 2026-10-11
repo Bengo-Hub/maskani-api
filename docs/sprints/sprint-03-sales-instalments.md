@@ -36,7 +36,7 @@ API state as of 2026-10-08. Screens are in maskani-ui sprint 03 (not started).
 - [x] Schedules with the SRDD 9.2 test
 - [x] Instalment invoicing: hourly job, invoices sent through `IssueInvoice`
 - [x] Payments allocated oldest first by treasury
-- [ ] Overpayment applied to the next instalment (treasury backlog: held credit)
+- [x] Overpayment applied to the next instalment: treasury pays a newly sent account bill from the account's held credit (treasury `616de29`); instalments mirror it as soon as they are issued (wave 2.6)
 - [ ] Reminders and default
 - [x] Purchase position: `/me/purchase`, `/reports/sales-position`
 - [x] Reservations list `GET /reservations`; keyset sale contracts; property scope on price lists, contracts and sales position (2026-10-08)
@@ -54,7 +54,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Portal purchase plans in one instalment query (`b8be252`)
 - [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
 - [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
-- [ ] Overpayment reduces the next instalment, read from the ledger's unapplied amount, unless the buyer asks for early completion (SRDD 9.3, wave 2.6)
+- [x] Overpayment reduces the next instalment: held credit pays it when it is issued (SRDD 9.3, wave 2.6). Early completion on request is a restructure (one balance instalment), not a separate path
 - [ ] Restructure as a new schedule version under approval, original kept, buyer acceptance by OTP (FR-23, wave 2.6)
 - [ ] Handover with snag list, meter readings, keys and signatures; publishes `maskani.unit.handed_over` and starts estate billing prorated (FR-25, wave 2.6)
 - [ ] Title stages with dates and documents (FR-25, wave 2.6)
