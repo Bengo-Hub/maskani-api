@@ -147,6 +147,9 @@ func (h *H) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	if in.PropertyID != nil && !requireProperty(w, r, *in.PropertyID) {
 		return
 	}
+	if !h.unitLimit(w, r, 1) {
+		return
+	}
 	u, err := h.Register.CreateUnit(r.Context(), actor(r), in)
 	if err != nil {
 		httpx.Fail(w, err)

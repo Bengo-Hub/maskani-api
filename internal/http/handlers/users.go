@@ -169,6 +169,9 @@ func (h *H) InviteStaff(w http.ResponseWriter, r *http.Request) {
 	if !h.canGrantRoles(w, r, in.Roles) {
 		return
 	}
+	if !h.staffLimit(w, r) {
+		return
+	}
 	// Validate the roles before creating anything in auth-api.
 	roles, err := h.RBAC.EffectiveRoles(r.Context(), a.TenantID, in.Roles)
 	if err != nil {

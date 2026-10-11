@@ -97,6 +97,12 @@ func (h *H) CommitImport(w http.ResponseWriter, r *http.Request) {
 	if job.PropertyID != nil && !requireProperty(w, r, *job.PropertyID) {
 		return
 	}
+	// The validated import says how many units it creates; the whole file must fit the plan.
+	if counts, ok := job.Summary["counts"].(map[string]any); ok {
+		if n, ok := counts["units_create"].(float64); ok && n > 0 && !h.unitLimit(w, r, int(n)) {
+			return
+		}
+	}
 	job, err = h.Imports.Commit(r.Context(), actor(r), id)
 	if err != nil {
 		httpx.Fail(w, err)

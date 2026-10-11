@@ -406,6 +406,13 @@ type UserView struct {
 }
 
 // ListUsers returns the tenant's users of a kind with their roles. Bounded by limit.
+// CountStaff counts the tenant's active staff users who hold a role (the plan's max_users); owners,
+// occupants, guards and vendor supervisors never count.
+func (s *Service) CountStaff(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	return s.client.MaskaniUser.Query().Where(maskaniuser.TenantID(tenantID), maskaniuser.KindEQ(maskaniuser.KindStaff),
+		maskaniuser.Status("active"), maskaniuser.HasRoleAssignments()).Count(ctx)
+}
+
 func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID, kind, search string, limit int) ([]UserView, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200

@@ -45,6 +45,11 @@ type UnitInput struct {
 
 func dec(f *float64) decimal.Decimal { return decimal.NewFromFloat(*f) }
 
+// CountUnits counts the tenant's units under management (the plan's max_units), all properties.
+func (s *Service) CountUnits(ctx context.Context) (int, error) {
+	return s.client.Unit.Query().Where(unit.StatusEQ(unit.StatusActive)).Count(ctx)
+}
+
 // CreateUnit adds a unit. Codes are unique per property and upper-cased.
 func (s *Service) CreateUnit(ctx context.Context, actor uuid.UUID, in UnitInput) (*ent.Unit, error) {
 	if in.PropertyID == nil || in.Code == nil || strings.TrimSpace(*in.Code) == "" {
