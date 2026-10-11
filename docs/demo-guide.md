@@ -1,13 +1,13 @@
-# Demo guide: Shaba Village on codevertex-demo
+# Demo guide: Mvumo Gardens on codevertex-demo
 
 codevertex-demo is the one demo tenant for every Codevertex product. Maskani's part of it is the
-**Shaba Village** estate (outlet `SHABA`, use case `property`), loaded by `cmd/seed-tenant`.
+**Mvumo Gardens** estate (outlet `MVUMO`, use case `property`), loaded by `cmd/seed-tenant`.
 
 ## What sets it up
 
 | Piece | Where | Runs |
 |---|---|---|
-| Estate outlet `SHABA` and the estate staff accounts | auth-api `cmd/seed` (`seed_tenants.go`, `seed_users.go`) | On every auth-api pod start |
+| Estate outlet `MVUMO` and the estate staff accounts | auth-api `cmd/seed` (`seed_tenants.go`, `seed_users.go`) | On every auth-api pod start |
 | Estate data: 40 units, 32 owners and buyers, charges, readings, sales, vendors, work orders, passes, a notice | maskani-api `cmd/seed-tenant` | By hand, once (re-runs add nothing) |
 | A real person as the B07 owner, invited to the owner portal | `cmd/seed-tenant` with `SEED_DEMO_RESIDENT_*` | Same run |
 
@@ -68,4 +68,4 @@ on with the PIN set on their vendor personnel record. The tablet keeps working o
 8. **Works:** the owner's request appears as a work order; assign a vendor, close it, and the
    owner confirms in the portal.
 9. **Sales:** Availability, the A16 reservation and the A15 and B15 contracts with instalments.
-10. **Marketplace:** `https://maskani.codevertexafrica.com` lists Shaba Village once it is published.
+10. **Marketplace:** `https://maskani.codevertexafrica.com` lists Mvumo Gardens once it is published.

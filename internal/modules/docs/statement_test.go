@@ -38,7 +38,7 @@ func sampleStatement() *collections.Statement {
 // also writes the PDF to look at.
 func TestStatementReport(t *testing.T) {
 	r := &reports.Report{GeneratedAt: time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC), Currency: "KES",
-		TenantName: "Shaba Village Estate", OutletName: "Shaba Village Phase 1", PrimaryColor: "#8E2C76"}
+		TenantName: "Mvumo Gardens Estate", OutletName: "Mvumo Gardens Phase 1", PrimaryColor: "#8E2C76"}
 	statementReport(r, sampleStatement(), time.UTC)
 
 	if got := r.Sections[0].Rows; len(got) != 5 || got[0][1].Text != "Service charge, July" {

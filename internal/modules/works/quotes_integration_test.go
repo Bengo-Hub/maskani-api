@@ -47,7 +47,7 @@ func TestQuoteApprovalOnPostgres(t *testing.T) {
 	ap := approvals.NewService(client)
 	s := NewService(client, nil, zap.NewNop())
 	s.SetApprovals(ap)
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba").Save(ctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo").Save(ctx)
 	must(err)
 	newWO := func(n string) *ent.WorkOrder {
 		wo, err := client.WorkOrder.Create().SetNumber(n).SetPropertyID(p.ID).SetCategory("plumbing").SetTitle("Leak").
@@ -74,7 +74,7 @@ func TestQuoteApprovalOnPostgres(t *testing.T) {
 
 	// A property manager on file, so the role step's alert has someone to reach.
 	tid, _ := tenantguard.TenantID(ctx)
-	_, err = client.Tenant.Create().SetID(tid).SetName("Estate").SetSlug("estate-"+tid.String()[:8]).Save(tenantguard.System(ctx))
+	_, err = client.Tenant.Create().SetID(tid).SetName("Estate").SetSlug("estate-" + tid.String()[:8]).Save(tenantguard.System(ctx))
 	must(err)
 	pmRole, err := client.MaskaniRole.Create().SetRoleCode("property_manager").SetName("Property manager").Save(ctx)
 	must(err)

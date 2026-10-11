@@ -48,7 +48,7 @@ func TestDashboardFiltersOnPostgres(t *testing.T) {
 		}
 	}
 
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba").Save(tctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo").Save(tctx)
 	must(err)
 	blockA, err := client.Block.Create().SetPropertyID(p.ID).SetCode("A").SetName("Block A").Save(tctx)
 	must(err)

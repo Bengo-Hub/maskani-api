@@ -3,14 +3,14 @@ package richtext
 import "testing"
 
 func TestSanitizeKeepsEditorTagsAndDropsScripts(t *testing.T) {
-	in := `<p>Water <strong>off</strong> on Friday</p><script>alert(1)</script><p onclick="x()"><a href="javascript:alert(1)">bad</a> <a href="https://shaba.example/notice">read</a></p>`
+	in := `<p>Water <strong>off</strong> on Friday</p><script>alert(1)</script><p onclick="x()"><a href="javascript:alert(1)">bad</a> <a href="https://mvumo.example/notice">read</a></p>`
 	got := Sanitize(in)
 	for _, bad := range []string{"<script", "onclick", "javascript:"} {
 		if contains(got, bad) {
 			t.Fatalf("sanitised output still has %q: %s", bad, got)
 		}
 	}
-	for _, good := range []string{"<strong>off</strong>", `href="https://shaba.example/notice"`, `rel="nofollow`} {
+	for _, good := range []string{"<strong>off</strong>", `href="https://mvumo.example/notice"`, `rel="nofollow`} {
 		if !contains(got, good) {
 			t.Fatalf("sanitised output lost %q: %s", good, got)
 		}

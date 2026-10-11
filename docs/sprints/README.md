@@ -1,6 +1,6 @@
 # maskani-api sprints
 
-SRDD schedule: one-week sprint 0, two-week sprints, a hardening week and a launch week. The Shaba
+SRDD schedule: one-week sprint 0, two-week sprints, a hardening week and a launch week. The Mvumo
 Village demo (Sunday 11 October 2026) pulls the core of sprints 1 to 4 forward; each sprint file
 marks what is in the **demo slice** and what remains.
 

@@ -45,7 +45,7 @@ func TestOwingOnPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba").Save(tctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo").Save(tctx)
 	must(err)
 	f, err := client.Fund.Create().SetCode("estate").SetName("Estate").Save(tctx)
 	must(err)

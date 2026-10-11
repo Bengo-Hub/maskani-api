@@ -14,8 +14,8 @@ import (
 	"github.com/bengobox/maskani-api/internal/config"
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/outboxevent"
-	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	_ "github.com/bengobox/maskani-api/internal/ent/runtime"
+	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/platform/database"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
@@ -47,7 +47,7 @@ func TestOccupancyOnPostgres(t *testing.T) {
 		}
 	}
 	s := NewService(client, nil, nil, nil, zap.NewNop())
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba").Save(ctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo").Save(ctx)
 	must(err)
 	u, err := client.Unit.Create().SetPropertyID(p.ID).SetCode("A01").Save(ctx)
 	must(err)

@@ -1,9 +1,9 @@
-// Command seed-tenant loads the Shaba Village demo dataset into one tenant. It is idempotent: every
+// Command seed-tenant loads the Mvumo Gardens demo dataset into one tenant. It is idempotent: every
 // record is looked up by its natural key first (property code, block code, unit code, party phone,
 // charge code, meter serial, vendor name, price list name, badge, title), so a second run creates
 // nothing new. Writes go through the same domain services the API uses.
 //
-//	seed-tenant --tenant codevertex-demo [--dry-run] [--property-code SHABA]
+//	seed-tenant --tenant codevertex-demo [--dry-run] [--property-code MVUMO]
 //
 // Inside the cluster: kubectl exec deploy/maskani-api -- /app/seed-tenant --tenant codevertex-demo
 //
@@ -104,7 +104,7 @@ type seeder struct {
 func main() {
 	tenantArg := flag.String("tenant", "", "tenant slug or UUID (required)")
 	dry := flag.Bool("dry-run", false, "print what would be created and write nothing")
-	code := flag.String("property-code", "SHABA", "property code of the demo estate")
+	code := flag.String("property-code", "MVUMO", "property code of the demo estate")
 	keepEvents := flag.Bool("keep-events", false, "deliver the outbox events the seed raises (default: mark them delivered so no messages go to demo numbers)")
 	flag.Parse()
 	if strings.TrimSpace(*tenantArg) == "" {
@@ -184,7 +184,7 @@ func main() {
 	if s.dry {
 		mode = "dry run (nothing is written)"
 	}
-	fmt.Printf("Shaba Village demo, tenant %s (%s), %s\n", t.Slug, t.ID, mode)
+	fmt.Printf("Mvumo Gardens demo, tenant %s (%s), %s\n", t.Slug, t.ID, mode)
 	if err := s.run(strings.ToUpper(strings.TrimSpace(*code))); err != nil {
 		log.Fatalf("seed stopped: %v (re-run is safe; finished steps are skipped)", err)
 	}
@@ -347,15 +347,15 @@ func (s *seeder) property(code string) (*ent.Property, error) {
 	if !ent.IsNotFound(err) {
 		return nil, err
 	}
-	if !s.step(false, "property %s Shaba Village (Syokimau, Machakos), published as shaba-village", code) {
+	if !s.step(false, "property %s Mvumo Gardens (Kitengela, Kajiado), published as mvumo-gardens", code) {
 		return &ent.Property{ID: uuid.Nil, Code: code}, nil
 	}
-	in := register.PropertyInput{Code: ptr(code), Name: ptr("Shaba Village"), PropertyType: ptr("estate"),
-		UseCase: ptr("estate_developer"), Description: ptr("A gated estate of 40 two and three bedroom apartments in Syokimau, with borehole water, CCTV and a children's playground."),
-		AddressLine: ptr("Off Mombasa Road, Syokimau"), Area: ptr("Syokimau"), Town: ptr("Syokimau"), County: ptr("Machakos"),
-		Latitude: ptr(-1.3644), Longitude: ptr(36.9330), Phases: []string{"Phase 1"},
+	in := register.PropertyInput{Code: ptr(code), Name: ptr("Mvumo Gardens"), PropertyType: ptr("estate"),
+		UseCase: ptr("estate_developer"), Description: ptr("A gated estate of 40 two and three bedroom apartments in Kitengela, with borehole water, CCTV and a children's playground."),
+		AddressLine: ptr("Off Namanga Road, Kitengela"), Area: ptr("Kitengela"), Town: ptr("Kitengela"), County: ptr("Kajiado"),
+		Latitude: ptr(-1.4747), Longitude: ptr(36.9620), Phases: []string{"Phase 1"},
 		Amenities: []string{"borehole", "perimeter_wall", "cctv", "playground", "parking"},
-		Published: ptr(true), PublicSlug: ptr("shaba-village")}
+		Published: ptr(true), PublicSlug: ptr("mvumo-gardens")}
 	p, err = s.register.CreateProperty(s.ctx, s.slug, s.bearer, uuid.Nil, in)
 	if err != nil {
 		return nil, err
@@ -569,7 +569,7 @@ func (s *seeder) charges(p *ent.Property) error {
 		if !s.step(found, "rate %s %s %s %.0f from %s", r.code, r.scope, r.unitType, r.amount, rateFrom.Format("2006-01-02")) {
 			continue
 		}
-		in := billing.RateInput{Scope: r.scope, UnitType: r.unitType, Amount: r.amount, EffectiveFrom: rateFrom, Notes: "Shaba Village demo tariff"}
+		in := billing.RateInput{Scope: r.scope, UnitType: r.unitType, Amount: r.amount, EffectiveFrom: rateFrom, Notes: "Mvumo Gardens demo tariff"}
 		if r.scope == "property" {
 			in.PropertyID = &p.ID
 		}
@@ -653,7 +653,7 @@ func (s *seeder) reading(m *ent.Meter, period string, value float64) error {
 // salesData creates the price list, one reservation and two activated contracts with schedules.
 func (s *seeder) salesData(p *ent.Property, units map[string]*ent.Unit, parties []*ent.Party) error {
 	fmt.Println("sales")
-	const listName = "Shaba Village launch prices 2026"
+	const listName = "Mvumo Gardens launch prices 2026"
 	found, err := s.client.PriceList.Query().Where(pricelist.PropertyID(p.ID), pricelist.Name(listName)).Exist(s.ctx)
 	if err != nil {
 		return err
@@ -716,7 +716,7 @@ func (s *seeder) salesData(p *ent.Property, units map[string]*ent.Unit, parties 
 			continue
 		}
 		sc, err := s.sales.CreateContract(s.ctx, uuid.Nil, sales.ContractInput{UnitID: u.ID, BuyerID: b.ID, PaymentOption: c.option,
-			Frequency: c.freq, TermMonths: c.term, Milestones: c.ms, GraceDays: 30, Notes: "Shaba Village demo contract"})
+			Frequency: c.freq, TermMonths: c.term, Milestones: c.ms, GraceDays: 30, Notes: "Mvumo Gardens demo contract"})
 		if err != nil {
 			return fmt.Errorf("contract %s: %w", c.unit, err)
 		}
@@ -742,7 +742,7 @@ func (s *seeder) vendors(p *ent.Property) error {
 		guards             [][2]string
 	}
 	for i, v := range []vendorSpec{
-		{"Shaba Guard Services Ltd", "Peter Mwangi", "security", []docSpec{
+		{"Mvumo Guard Services Ltd", "Peter Mwangi", "security", []docSpec{
 			{"psra", "PSRA/2026/0412", now.AddDate(0, 0, 20)}, // expires within 30 days: shows on the dashboard
 			{"business_permit", "MCG-BP-88213", now.AddDate(0, 8, 0)},
 			{"kra", "P051234567X", now.AddDate(2, 0, 0)},

@@ -11,11 +11,11 @@ SRDD weeks 13 and 14 (hardening week, launch week, milestone 4).
 | Security review | OWASP ASVS L2 checklist; access between units; payment adjustments; OTP rate limits; file type checks on uploads |
 | Load test | Billing run for 1,000 units under 2 minutes; 50 requests per second within NFR-04 |
 | Restore drill | Restore the latest offsite backup into an isolated namespace; compare record counts and ledger balances |
-| Parallel billing run | One month billed both ways; unit by unit comparison signed off with Shaba finance |
+| Parallel billing run | One month billed both ways; unit by unit comparison signed off with Mvumo finance |
 | Live payment tests | KES 1 on both paybills, portal prompt, a vendor payout; each reconciled (user confirms each call) |
 | Offline gate test | Network removed for 2 hours; passes verified, entries queued, synchronised without loss |
 | Configuration tests | Each preset and module switched on and off; no screen, route, job or message of a disabled module reachable |
-| UAT and launch | Shaba staff and pilot owners; owner invitations; training; handover |
+| UAT and launch | Mvumo staff and pilot owners; owner invitations; training; handover |
 
 ## Progress
 

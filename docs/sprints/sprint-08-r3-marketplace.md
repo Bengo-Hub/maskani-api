@@ -1,6 +1,6 @@
 # Sprint 8: Release 3 marketplace (and Release 4 notes)
 
-Development June to August 2027, launch September 2027 seeded with managed vacancies and Shaba
+Development June to August 2027, launch September 2027 seeded with managed vacancies and Mvumo
 resales. Requirements FR-68 to FR-76. UI lives in `maskani-commerce`.
 
 ## Scope (maskani-api side)

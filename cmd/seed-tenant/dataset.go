@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// unitSpec is one demo unit of Shaba Village.
+// unitSpec is one demo unit of Mvumo Gardens.
 type unitSpec struct {
 	Code       string
 	Block      string

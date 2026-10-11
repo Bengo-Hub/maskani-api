@@ -53,7 +53,7 @@ func TestScheduleOnPostgres(t *testing.T) {
 	must(client.Fund.Create().SetCode("estate").SetName("Estate").Exec(tctx))
 	must(client.ChargeType.Create().SetCode("water").SetName("Water").SetChargeGroup(chargetype.ChargeGroupUtilities).
 		SetBasis(chargetype.BasisMetered).SetFundCode("estate").Exec(tctx))
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba Village").Save(tctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo Gardens").Save(tctx)
 	must(err)
 	u, err := client.Unit.Create().SetPropertyID(p.ID).SetCode("A01").Save(tctx)
 	must(err)

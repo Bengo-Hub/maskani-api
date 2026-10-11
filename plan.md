@@ -1,13 +1,13 @@
 # Maskani plan
 
 Source: SRDD CVX-MASKANI-SRDD-001 v1.0, 6 October 2026 (private docs repo,
-`codevertex-private-docs/shaba-village-proposal/`). This file is the engineering plan derived from it.
+`codevertex-private-docs/mvumo-gardens-proposal/`). This file is the engineering plan derived from it.
 
 ## Product
 
 Maskani is one platform serving three kinds of business, each an isolated tenant:
 
-1. **Estate operators and developers** (launch tenant Shaba Village, Syokimau): sell units outright
+1. **Estate operators and developers** (launch tenant Mvumo Gardens, Kitengela): sell units outright
    or by instalments, then run the estate and bill owners for water, service charge and services.
 2. **Property management firms** (Release 2): let and manage buildings for many landlords.
 3. **Landlords, developers and agents** (Release 2 and 3): manage their own portfolios or advertise.
@@ -37,7 +37,7 @@ research behind this list is in [docs/market-research.md](docs/market-research.m
 
 | Release | Scope | Timing |
 |---|---|---|
-| R1 MVP | Multi-tenant core, register, staff per property, estate billing, utilities, sales and instalments, owner portal, providers, works, gate, ERP staff, reports | Shaba launch, February 2027 |
+| R1 MVP | Multi-tenant core, register, staff per property, estate billing, utilities, sales and instalments, owner portal, providers, works, gate, ERP staff, reports | Mvumo launch, February 2027 |
 | R2 | Landlord portfolios and mandates, applications, leases, deposits, inspections, turnover, remittances, commercial leases, short stays through pos-api's hotel engine | Q2 2027 |
 | R3 | Public marketplace: listings (homes, offices and co-working, shops, warehouses, land) for sale, rent, lease and short stay; search and map; enquiries, viewings, applications; verified listers; featured listings; management tenders | Q3 2027 |
 | R4 | Native apps, smart meters, e-signatures, credit checks, owner voting, amenity booking, channel sync with Airbnb and Booking.com | Later |
@@ -54,7 +54,7 @@ the 2026-10-09 audit, revamps queries and jobs for growth, then builds Release 2
 each sprint file under "Gaps found by the 2026-10-09 audit" and summarised in
 [docs/backlog.md](docs/backlog.md).
 
-## Demo MVP slice (Shaba Village, Sunday 11 October 2026)
+## Demo MVP slice (Mvumo Gardens, Sunday 11 October 2026)
 
 Integrated testing by Friday 9 October. The slice pulls the core of sprints 1 to 4 forward:
 

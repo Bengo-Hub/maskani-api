@@ -42,7 +42,7 @@ func sampleInsights() *analytics.Insights {
 // TestPerformanceReport renders the performance report; $PERFORMANCE_SAMPLE_PDF writes the PDF.
 func TestPerformanceReport(t *testing.T) {
 	r := &reports.Report{Title: "Performance", Subtitle: "Month of September 2026", GeneratedAt: time.Now(), Currency: "KES",
-		TenantName: "Shaba Village Estate", PrimaryColor: "#8E2C76"}
+		TenantName: "Mvumo Gardens Estate", PrimaryColor: "#8E2C76"}
 	performanceReport(r, sampleInsights())
 	if r.Cards[0].Sub != "+3.3 points on last month" {
 		t.Fatalf("collection rate change = %q", r.Cards[0].Sub)

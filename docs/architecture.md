@@ -24,7 +24,7 @@ cmd/
   api/             HTTP server
   migrate/         Atlas versioned migrations, advisory lock 727271007, direct DSN
   seed/            Platform default catalogues, roles and permissions
-  seed-tenant/     Demo tenant dataset (Shaba Village)
+  seed-tenant/     Demo tenant dataset (Mvumo Gardens)
   hashmigrations/  Rewrites atlas.sum after a hand-written migration
 internal/
   app/             Wiring
@@ -63,7 +63,7 @@ assignment to a property is an outlet assignment, so the existing branch scoping
 ### Only property outlets and property people are synced
 
 One auth-api tenant can run several products: codevertex-demo hosts a hotel, shops, a clinic, a
-weighbridge and the Shaba Village estate under one tenant, and role names such as manager,
+weighbridge and the Mvumo Gardens estate under one tenant, and role names such as manager,
 cashier and member are shared by all of them. Two rules keep other products out of Maskani:
 
 - **Outlets.** `SyncOutlets` keeps an outlet only when its use case is a property one
@@ -145,7 +145,7 @@ its jobs; data stays readable and exportable.
 | `marketplace` | properties, leasing or sales | 3 |
 | `amenities` | billing | 4 |
 
-Use case presets: `estate_developer` (Shaba), `developer_sales`, `owners_association`,
+Use case presets: `estate_developer` (Mvumo), `developer_sales`, `owners_association`,
 `residential_manager`, `commercial_manager`, `self_managing_landlord`, `agent_listings`.
 
 ## Money boundaries

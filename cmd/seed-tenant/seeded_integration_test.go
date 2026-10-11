@@ -47,7 +47,7 @@ func TestSeededEstate(t *testing.T) {
 		t.Fatal(err)
 	}
 	tctx := tenantguard.With(ctx, tn.ID)
-	prop, err := client.Property.Query().Where(property.Code("SHABA")).Only(tctx)
+	prop, err := client.Property.Query().Where(property.Code("MVUMO")).Only(tctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestSeededEstate(t *testing.T) {
 		t.Fatalf("vendors: %d %v", len(vs.Data), err)
 	}
 	for _, v := range vs.Data {
-		if v.Name != "Shaba Guard Services Ltd" {
+		if v.Name != "Mvumo Guard Services Ltd" {
 			continue
 		}
 		vd, err := ws.GetVendor(tctx, v.ID, scope, false)

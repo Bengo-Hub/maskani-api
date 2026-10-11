@@ -41,7 +41,7 @@ As of 2026-10-08.
 - [x] HA values: API 2 replicas, HPA 2 to 3, PDB (2026-10-08)
 - [x] PgBouncer fix: no `statement_timeout` startup parameter (it failed every pool connection, `fb46c61`)
 - [ ] fleet-health-watcher URLs
-- [x] `seed-tenant` command: idempotent Shaba Village dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
+- [x] `seed-tenant` command: idempotent Mvumo Gardens dataset, `--dry-run`, built into the image as `/app/seed-tenant` (2026-10-08)
 - [x] `seed-tenant` syncs the tenant and its property outlets from auth-api itself, and takes a real demo resident from `SEED_DEMO_RESIDENT_*` as the B07 owner and invites them (2026-10-08); see `docs/demo-guide.md`
 - [x] Only property outlets and property people are synced into Maskani (outlet filter, `EnsureUser` relevance, generic role names only for property tenants) (2026-10-08)
 - [x] The same rule across the fleet through shared-events v0.7.4 `UserRelevance`, so a Maskani tenant's people no longer land in other services: inventory `ae3ce93`, ordering `1986a68`, logistics `978c1c2`, library `5bc1866`; logistics also skips tenants that have not activated it (`019fdad`) (2026-10-08)

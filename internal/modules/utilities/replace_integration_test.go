@@ -44,7 +44,7 @@ func TestReplaceMeterOnPostgres(t *testing.T) {
 		}
 	}
 	s := NewService(client, zap.NewNop())
-	p, err := client.Property.Create().SetCode("SV").SetName("Shaba").Save(ctx)
+	p, err := client.Property.Create().SetCode("SV").SetName("Mvumo").Save(ctx)
 	must(err)
 	u, err := client.Unit.Create().SetPropertyID(p.ID).SetCode("A01").Save(ctx)
 	must(err)
