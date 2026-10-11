@@ -179,6 +179,7 @@ func New(ctx context.Context) (*App, error) {
 	salesSvc := sales.NewService(orm, tc, accSvc, seq, loc, log)
 	worksSvc := works.NewService(orm, seq, log)
 	worksSvc.SetApprovals(approvalSvc)
+	salesSvc.SetApprovals(approvalSvc, box)
 	gateSvc := gate.NewService(orm, box, seq, log)
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)

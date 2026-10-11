@@ -63,6 +63,10 @@ var audited = map[string]string{
 	"POST /unit-parties/{id}/end": "unit.link_end",
 	"POST /units/{id}/transfer":   "unit.transfer",
 	"POST /imports/{id}/commit":   "register.import_commit",
+	// A sale's payment plan changing.
+	"POST /sale-contracts/{id}/restructure": "restructure.propose",
+	"POST /schedules/{id}/accept":           "restructure.accept_at_office",
+	"POST /me/plans/{id}/accept":            "restructure.accept",
 	// Personal data: identity checks, a person's data leaving the system, and erasure.
 	"POST /privacy/requests/{id}/verify":    "privacy.verify",
 	"GET /privacy/requests/{id}/export":     "privacy.export",

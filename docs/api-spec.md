@@ -172,6 +172,9 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/reservations` `{unit_id, party_id, days}` | Reserve, open the sales account, invoice the fee | `sales.manage` |
 | GET `/sale-contracts` (keyset; `property_id`, `status`); POST `/sale-contracts`; GET `/sale-contracts/{id}` | Contracts; GET one returns the active schedule, `next_due` and `balance` | `sales.view` / `sales.manage` |
 | POST `/sale-contracts/{id}/activate` `{signed_at}` | Sign: sales account, schedule v1, first invoices | `sales.manage` |
+| POST `/sale-contracts/{id}/restructure` `{reason, option: instalments\|outright, frequency, term_months, first_due}` | A new plan for what the active schedule has not billed yet, written as the next version with status `proposed` and sent to the central approvals engine (module `restructure`; default one approval by `sales.manage`, never the proposer). Billed lines stay as they are. One proposal at a time; the first payment cannot be in the past. `outright` is early completion: one balance payment | `sales.manage` |
+| GET `/sale-contracts/{id}/schedules` | Every plan version, newest first, with lines and total. A contract's view (`GET /sale-contracts/{id}`, `/me/purchase`) shows the active plan plus lines billed under earlier versions, and `pending_plan` while an approved plan waits for the buyer | `sales.view` |
+| POST `/schedules/{id}/send-code`; POST `/schedules/{id}/accept` `{code}` | The buyer accepts an approved plan at the office by reading back a code sent to the phone and email on record (5 minutes, 5 tries, 5 codes). Accepting supersedes the old version, makes the new one active, cures a contract in default and invoices anything due | `sales.manage` |
 | POST `/instalments/{id}/release` `{evidence_key}` | Release a milestone | `sales.manage` |
 | GET `/reports/sales-position?property_id=` | Units by sale status, contract value, collected | `reports.view` or `sales.view` |
 | GET `/enquiries` (keyset; `property_id`, `status`); PATCH `/enquiries/{id}` | Showcase enquiries | `sales.view` / `sales.manage` |
@@ -184,7 +187,8 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 |---|---|
 | GET `/me/units` | Units linked to the caller with role, accounts, the last reading, and `pay` (per account id: paybill, pay_account, pay_reference, bank_matched) |
 | GET `/me/accounts/{id}/statement`; GET `/me/accounts/{id}/statement/export?format=`; POST `/me/accounts/{id}/pay` | Statement (with entries), its branded download, and STK payment for an own account |
-| GET `/me/purchase` | Purchase plans with schedule and next due |
+| GET `/me/purchase` | Purchase plans with schedule and next due, and `pending_plan` when a new plan waits for acceptance |
+| POST `/me/plans/{id}/accept` | The signed-in buyer accepts an approved new plan on their own contract (audited) |
 | GET, POST `/me/passes`; POST `/me/passes/{id}/cancel` | Visitor passes for own units |
 | GET, POST `/me/requests`; POST `/me/requests/{id}/actions` | Work requests; confirm or reopen within 7 days |
 | GET `/me/notices`; POST `/me/terms/accept` `{version}`; GET `/me/terms` | Notices; terms acceptance. Each acceptance sets the current version on every party of the caller and adds `{version, privacy_version, at, ip}` to the party's `consents.terms_history` (the estate's privacy version at that moment, the address from the edge; the last 50 kept). GET `/me/terms` reads the history back, newest first, once per acceptance |

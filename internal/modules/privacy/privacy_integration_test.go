@@ -23,6 +23,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/platform/database"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/otp"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -88,7 +89,7 @@ func TestPrivacyRequestsOnPostgres(t *testing.T) {
 		t.Fatal("no export before verification")
 	}
 	must(s.SendCode(ctx, req.ID))
-	ev, err := client.OutboxEvent.Query().Where(outboxevent.EventType(OTPRequested)).Only(ctx)
+	ev, err := client.OutboxEvent.Query().Where(outboxevent.EventType(otp.Requested)).Only(ctx)
 	must(err)
 	var envelope struct {
 		Payload map[string]any `json:"payload"`
@@ -104,7 +105,7 @@ func TestPrivacyRequestsOnPostgres(t *testing.T) {
 	}
 	got, err := s.Get(ctx, req.ID)
 	must(err)
-	if num(got.Metadata["otp_attempts"]) != 1 || got.Metadata["otp_hash"] != nil {
+	if otp.Count(got.Metadata["otp_attempts"]) != 1 || got.Metadata["otp_hash"] != nil {
 		t.Fatalf("attempt counted, hash hidden: %v", got.Metadata)
 	}
 	got, err = s.Verify(ctx, req.ID, staff, code, false, "")

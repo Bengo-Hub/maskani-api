@@ -7,8 +7,7 @@ package privacy
 
 import (
 	"context"
-	"crypto/subtle"
-	"strconv"
+	"maps"
 	"strings"
 	"time"
 
@@ -22,15 +21,14 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/register"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
+	"github.com/bengobox/maskani-api/internal/shared/otp"
 	"github.com/bengobox/maskani-api/internal/shared/page"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
-// Events: the office hears of a new request; the person gets the one-time code.
-const (
-	Requested    = "privacy.requested"
-	OTPRequested = "privacy.otp_requested"
-)
+// Requested tells the office of a new request. The person's one-time code goes out as
+// otp.Requested with purpose "privacy".
+const Requested = "privacy.requested"
 
 // Deadlines from receipt, per the Data Protection (General) Regulations 2021: access within 7
 // days, correction and erasure within 14.
@@ -39,14 +37,6 @@ var dueDays = map[privacyrequest.Kind]int{
 	privacyrequest.KindCorrection: 14,
 	privacyrequest.KindDeletion:   14,
 }
-
-// The one-time code: 6 digits, valid 5 minutes (the shared OTP templates say so), 5 tries per code
-// and 5 codes per request.
-const (
-	codeTTL      = 5 * time.Minute
-	maxAttempts  = 5
-	maxCodesSent = 5
-)
 
 // Service is the privacy service.
 type Service struct {
@@ -171,18 +161,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*ent.PrivacyRequest, e
 }
 
 // hideSecrets drops the code hash from a request before it leaves the service.
-func hideSecrets(r *ent.PrivacyRequest) {
-	if r.Metadata == nil {
-		return
-	}
-	m := make(map[string]any, len(r.Metadata))
-	for k, v := range r.Metadata {
-		if k != "otp_hash" {
-			m[k] = v
-		}
-	}
-	r.Metadata = m
-}
+func hideSecrets(r *ent.PrivacyRequest) { r.Metadata = otp.Hide(r.Metadata) }
 
 // SendCode sends a fresh code to the phone and email on record (never to a number the caller
 // gives, so only the real person can answer it).
@@ -194,10 +173,6 @@ func (s *Service) SendCode(ctx context.Context, id uuid.UUID) error {
 	if req.Status != privacyrequest.StatusReceived || req.PartyID == nil {
 		return httpx.Conflict("only a request waiting for verification takes a code")
 	}
-	meta := copyMeta(req.Metadata)
-	if num(meta["codes_sent"]) >= maxCodesSent {
-		return httpx.Conflict("five codes have been sent; verify this person in person instead")
-	}
 	p, err := s.client.Party.Get(ctx, *req.PartyID)
 	if err != nil {
 		return err
@@ -205,20 +180,16 @@ func (s *Service) SendCode(ctx context.Context, id uuid.UUID) error {
 	if p.Phone == "" && p.Email == "" {
 		return httpx.Invalid("there is no phone or email on record; verify this person in person")
 	}
-	code, err := secure.RandomDigits(6)
+	meta := copyMeta(req.Metadata)
+	code, err := otp.Issue(meta, s.box, req.ID.String())
 	if err != nil {
 		return err
 	}
-	meta["otp_hash"] = s.box.Hash(req.ID.String() + ":" + code)
-	meta["otp_expires_at"] = time.Now().Add(codeTTL)
-	meta["otp_attempts"] = 0
-	meta["codes_sent"] = num(meta["codes_sent"]) + 1
 	if err := s.client.PrivacyRequest.UpdateOneID(req.ID).SetMetadata(meta).Exec(ctx); err != nil {
 		return err
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
-	return events.Publish(ctx, s.client.OutboxEvent, tenantID, req.ID.String()+":code:"+strconv.Itoa(num(meta["codes_sent"])), OTPRequested,
-		map[string]any{"request_id": req.ID, "name": p.DisplayName, "phone": p.Phone, "email": p.Email, "otp": code})
+	return otp.Publish(ctx, s.client.OutboxEvent, tenantID, req.ID.String(), meta, "privacy", p.DisplayName, p.Phone, p.Email, code)
 }
 
 // Verify checks the code, or records an in-person check by the office (an ID document seen).
@@ -239,28 +210,16 @@ func (s *Service) Verify(ctx context.Context, id, by uuid.UUID, code string, inP
 		meta["verified_by"] = "in_person"
 		meta["verified_note"] = strings.TrimSpace(note)
 	} else {
-		hash, _ := meta["otp_hash"].(string)
-		if hash == "" {
-			return nil, httpx.Invalid("send a code first")
-		}
-		if num(meta["otp_attempts"]) >= maxAttempts {
-			return nil, httpx.Conflict("too many wrong codes; send a new one")
-		}
-		if exp, err := time.Parse(time.RFC3339Nano, str(meta["otp_expires_at"])); err != nil || now.After(exp) {
-			return nil, httpx.Invalid("that code has expired; send a new one")
-		}
-		want := s.box.Hash(req.ID.String() + ":" + strings.TrimSpace(code))
-		if subtle.ConstantTimeCompare([]byte(hash), []byte(want)) != 1 {
-			meta["otp_attempts"] = num(meta["otp_attempts"]) + 1
-			if err := s.client.PrivacyRequest.UpdateOneID(req.ID).SetMetadata(meta).Exec(ctx); err != nil {
-				return nil, err
+		if err := otp.Check(meta, s.box, req.ID.String(), code); err != nil {
+			// A wrong try is counted in meta; keep it before refusing.
+			if uerr := s.client.PrivacyRequest.UpdateOneID(req.ID).SetMetadata(meta).Exec(ctx); uerr != nil {
+				return nil, uerr
 			}
-			return nil, httpx.Invalid("that code is not right")
+			return nil, err
 		}
 		meta["verified_by"] = "code"
 	}
-	delete(meta, "otp_hash")
-	delete(meta, "otp_expires_at")
+	otp.Clear(meta)
 	meta["verified_at"] = now
 	meta["verified_by_user"] = by.String()
 	out, err := s.client.PrivacyRequest.UpdateOneID(req.ID).SetStatus(privacyrequest.StatusVerified).SetMetadata(meta).Save(ctx)
@@ -309,7 +268,7 @@ func (s *Service) close(ctx context.Context, req *ent.PrivacyRequest, by uuid.UU
 		meta[key] = text
 	}
 	meta["closed_by"] = by.String()
-	delete(meta, "otp_hash")
+	otp.Clear(meta)
 	out, err := s.client.PrivacyRequest.UpdateOneID(req.ID).SetStatus(status).SetCompletedAt(time.Now()).SetMetadata(meta).Save(ctx)
 	if err == nil {
 		hideSecrets(out)
@@ -338,29 +297,6 @@ func open(r *ent.PrivacyRequest) bool {
 
 func copyMeta(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m)+4)
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 	return out
-}
-
-// num reads a counter that may have come back from JSON as a float.
-func num(v any) int {
-	switch n := v.(type) {
-	case int:
-		return n
-	case float64:
-		return int(n)
-	}
-	return 0
-}
-
-func str(v any) string {
-	switch t := v.(type) {
-	case string:
-		return t
-	case time.Time:
-		return t.Format(time.RFC3339Nano)
-	}
-	return ""
 }

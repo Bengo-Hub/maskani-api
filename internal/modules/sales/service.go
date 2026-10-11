@@ -25,20 +25,24 @@ import (
 	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
+	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
 	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
+	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
 // Service is the sales service.
 type Service struct {
-	client   *ent.Client
-	treasury *treasury.Client
-	accounts *accounts.Service
-	seq      *sequence.Allocator
-	loc      *time.Location
-	log      *zap.Logger
+	client    *ent.Client
+	treasury  *treasury.Client
+	accounts  *accounts.Service
+	seq       *sequence.Allocator
+	approvals *approvals.Service
+	box       *secure.Box // one-time codes (restructure acceptance)
+	loc       *time.Location
+	log       *zap.Logger
 }
 
 // NewService creates the sales service.
@@ -655,21 +659,44 @@ type ContractView struct {
 	Instalments []*ent.Instalment `json:"instalments"`
 	NextDue     *ent.Instalment   `json:"next_due,omitempty"`
 	Balance     decimal.Decimal   `json:"balance"`
+	// PendingPlan is an approved new plan waiting for the buyer to accept.
+	PendingPlan *ScheduleView `json:"pending_plan,omitempty"`
 }
 
-// GetContract returns a contract with its active schedule and the next instalment due.
+// inPlan is what the buyer's plan shows: the active schedule, plus lines already billed under an
+// earlier version (they stay in treasury after a restructure). Billing order is by due date.
+func inPlan() predicate.Instalment {
+	return instalment.Or(instalment.HasScheduleWith(instalmentschedule.StatusEQ(instalmentschedule.StatusActive)),
+		instalment.TreasuryInvoiceIDNotNil())
+}
+
+// GetContract returns a contract with its plan and the next instalment due.
 func (s *Service) GetContract(ctx context.Context, id uuid.UUID) (*ContractView, error) {
 	sc, err := s.client.SaleContract.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	ins, err := s.client.Instalment.Query().Where(instalment.ContractID(id),
-		instalment.HasScheduleWith(instalmentschedule.StatusEQ(instalmentschedule.StatusActive))).
-		Order(ent.Asc(instalment.FieldSeq)).All(ctx)
+	ins, err := s.client.Instalment.Query().Where(instalment.ContractID(id), inPlan()).
+		Order(ent.Asc(instalment.FieldDueDate), ent.Asc(instalment.FieldSeq)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return contractView(sc, ins), nil
+	v := contractView(sc, ins)
+	pending, err := s.pendingPlans(ctx, []uuid.UUID{id})
+	v.PendingPlan = pending[id]
+	return v, err
+}
+
+// pendingPlans returns, per contract, the approved plan waiting for the buyer (one query).
+func (s *Service) pendingPlans(ctx context.Context, contractIDs []uuid.UUID) (map[uuid.UUID]*ScheduleView, error) {
+	rows, err := s.client.InstalmentSchedule.Query().Where(instalmentschedule.ContractIDIn(contractIDs...),
+		instalmentschedule.StatusEQ(instalmentschedule.StatusProposed), instalmentschedule.ApprovedAtNotNil()).
+		WithInstalments(func(q *ent.InstalmentQuery) { q.Order(ent.Asc(instalment.FieldSeq)) }).All(ctx)
+	out := map[uuid.UUID]*ScheduleView{}
+	for _, r := range rows {
+		out[r.ContractID] = toScheduleView(r, r.Edges.Instalments)
+	}
+	return out, err
 }
 
 func contractView(sc *ent.SaleContract, ins []*ent.Instalment) *ContractView {
@@ -697,9 +724,8 @@ func (s *Service) ContractViews(ctx context.Context, cs []*ent.SaleContract) ([]
 	for i, c := range cs {
 		ids[i] = c.ID
 	}
-	ins, err := s.client.Instalment.Query().Where(instalment.ContractIDIn(ids...),
-		instalment.HasScheduleWith(instalmentschedule.StatusEQ(instalmentschedule.StatusActive))).
-		Order(ent.Asc(instalment.FieldSeq)).All(ctx)
+	ins, err := s.client.Instalment.Query().Where(instalment.ContractIDIn(ids...), inPlan()).
+		Order(ent.Asc(instalment.FieldDueDate), ent.Asc(instalment.FieldSeq)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -707,8 +733,14 @@ func (s *Service) ContractViews(ctx context.Context, cs []*ent.SaleContract) ([]
 	for _, in := range ins {
 		byContract[in.ContractID] = append(byContract[in.ContractID], in)
 	}
+	pending, err := s.pendingPlans(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, c := range cs {
-		out = append(out, contractView(c, byContract[c.ID]))
+		v := contractView(c, byContract[c.ID])
+		v.PendingPlan = pending[c.ID]
+		out = append(out, v)
 	}
 	return out, nil
 }

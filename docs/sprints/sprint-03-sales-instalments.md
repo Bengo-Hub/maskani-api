@@ -55,7 +55,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [ ] Instalment reminders 3 days before, on the due date and 7 and 14 days after, publishing `maskani.instalment.due` (FR-24, wave 2.2)
 - [ ] Default after the agreement grace period: status `in_default`, `maskani.sale_contract.defaulted`, sales officer alerted with history (FR-24, wave 2.2)
 - [x] Overpayment reduces the next instalment: held credit pays it when it is issued (SRDD 9.3, wave 2.6). Early completion on request is a restructure (one balance instalment), not a separate path
-- [ ] Restructure as a new schedule version under approval, original kept, buyer acceptance by OTP (FR-23, wave 2.6)
+- [x] Restructure as a new schedule version on the central approvals engine, billed lines kept, buyer acceptance in the portal or by code at the office (FR-23, wave 2.6)
 - [ ] Handover with snag list, meter readings, keys and signatures; publishes `maskani.unit.handed_over` and starts estate billing prorated (FR-25, wave 2.6)
 - [ ] Title stages with dates and documents (FR-25, wave 2.6)
 - [ ] Purchase and completion statements as PDF and spreadsheet (FR-25, FR-35, wave 2.1)
