@@ -69,14 +69,15 @@ func (h *H) exportReport(w http.ResponseWriter, r *http.Request, id string) {
 	if !ok {
 		return
 	}
-	f, ok := scopeFilter(w, r)
+	// The dashboard's filters: the performance report follows them; the others read from and to.
+	sc, df, ok := h.dashboardFilter(w, r)
 	if !ok {
 		return
 	}
 	a := access(r)
 	q := r.URL.Query()
-	file, err := h.Docs.Export(r.Context(), a.TenantID, a.TenantSlug, analytics.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties}, id,
-		docs.ExportParams{Range: analytics.ReportRange{From: q.Get("from"), To: q.Get("to")}, Period: q.Get("period"),
+	file, err := h.Docs.Export(r.Context(), a.TenantID, a.TenantSlug, sc, id,
+		docs.ExportParams{Range: analytics.ReportRange{From: q.Get("from"), To: q.Get("to")}, Dashboard: df,
 			Arrears: arrearsFilter(r), MaskPhones: maskArrearsPhones(r)}, format)
 	if err != nil {
 		httpx.Fail(w, err)

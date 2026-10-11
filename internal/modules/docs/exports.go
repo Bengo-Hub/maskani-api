@@ -16,7 +16,7 @@ import (
 // ExportParams are the filters a report export may take; each report reads the ones it uses.
 type ExportParams struct {
 	Range      analytics.ReportRange
-	Period     string
+	Dashboard  analytics.DashboardFilter
 	Arrears    analytics.ArrearsFilter
 	MaskPhones bool
 }
@@ -33,7 +33,7 @@ func (s *Service) Export(ctx context.Context, tenantID uuid.UUID, slug string, s
 	case def.ID == "arrears":
 		return s.Arrears(ctx, tenantID, slug, sc, p.Arrears, p.MaskPhones, format)
 	case def.ID == "performance":
-		return s.Performance(ctx, tenantID, slug, sc, p.Period, format)
+		return s.Performance(ctx, tenantID, slug, sc, p.Dashboard, format)
 	case def.Source == analytics.SourceTable:
 		return s.tableReport(ctx, tenantID, slug, sc, id, p.Range, format)
 	}

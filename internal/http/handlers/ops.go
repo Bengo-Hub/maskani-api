@@ -691,12 +691,13 @@ func (h *H) NoticeDeliveries(w http.ResponseWriter, r *http.Request) {
 
 // --- Reports and enquiries ---
 
-// Dashboard is GET /reports/dashboard?property_id=&from=&to=&block_id=&fund= (period= still means
-// one month).
-func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
+// dashboardFilter reads the dashboard's filters (from, to, block_id, fund; period= still means one
+// month) with the caller's property scope. A block narrows to its property, which the caller must
+// be able to see. The dashboard, its insights and the performance download all read it here.
+func (h *H) dashboardFilter(w http.ResponseWriter, r *http.Request) (reports.Scope, reports.DashboardFilter, bool) {
 	f, ok := scopeFilter(w, r)
 	if !ok {
-		return
+		return reports.Scope{}, reports.DashboardFilter{}, false
 	}
 	q := r.URL.Query()
 	df := reports.DashboardFilter{From: q.Get("from"), To: q.Get("to"), BlockID: httpx.QueryUUID(r, "block_id")}
@@ -706,17 +707,25 @@ func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
 	blockProp, fundID, err := h.Reports.FilterIDs(r.Context(), df.BlockID, q.Get("fund"))
 	if err != nil {
 		httpx.Fail(w, err)
-		return
+		return reports.Scope{}, df, false
 	}
-	// A block narrows to its property, which the caller must be able to see.
 	if blockProp != nil {
 		if !requireProperty(w, r, *blockProp) {
-			return
+			return reports.Scope{}, df, false
 		}
 		f.PropertyID = blockProp
 	}
 	df.FundID = fundID
-	d, err := h.Reports.Dashboard(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties}, df)
+	return reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties}, df, true
+}
+
+// Dashboard is GET /reports/dashboard?property_id=&from=&to=&block_id=&fund=.
+func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
+	sc, df, ok := h.dashboardFilter(w, r)
+	if !ok {
+		return
+	}
+	d, err := h.Reports.Dashboard(r.Context(), sc, df)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
@@ -724,17 +733,16 @@ func (h *H) Dashboard(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, d)
 }
 
-// Insights is GET /reports/insights?property_id=&period=: trends, comparisons and forecasts for
-// the staff dashboard.
+// Insights is GET /reports/insights with the dashboard's filters: trends, comparisons and forecasts
+// for the staff dashboard.
 func (h *H) Insights(w http.ResponseWriter, r *http.Request) {
-	f, ok := scopeFilter(w, r)
+	sc, df, ok := h.dashboardFilter(w, r)
 	if !ok {
 		return
 	}
-	v, err := h.Reports.Insights(r.Context(), reports.Scope{PropertyID: f.PropertyID, IDs: f.Scope, All: f.AllProperties},
-		r.URL.Query().Get("period"))
+	v, err := h.Reports.Insights(r.Context(), sc, df)
 	if err != nil {
-		httpx.Fail(w, httpx.Invalid(err.Error()))
+		httpx.Fail(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, v)

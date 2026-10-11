@@ -208,10 +208,11 @@ func unitsOfBlock(block uuid.UUID) func(*sql.Selector) {
 	}
 }
 
-func (s *Service) Dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*Dashboard, error) {
-	now := time.Now().In(s.loc).Format("2006-01")
+// filterRange fills a dashboard filter's months (this month when none) and checks them: from on or
+// before to, at most 12 months. The dashboard and its insights read the same range.
+func (s *Service) filterRange(f DashboardFilter) (DashboardFilter, time.Time, time.Time, error) {
 	if f.To == "" {
-		f.To = now
+		f.To = time.Now().In(s.loc).Format("2006-01")
 	}
 	if f.From == "" {
 		f.From = f.To
@@ -219,13 +220,21 @@ func (s *Service) Dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*
 	from, err1 := time.ParseInLocation("2006-01", f.From, s.loc)
 	to, err2 := time.ParseInLocation("2006-01", f.To, s.loc)
 	if err1 != nil || err2 != nil {
-		return nil, httpx.Invalid("from and to must be YYYY-MM")
+		return f, from, to, httpx.Invalid("from and to must be YYYY-MM")
 	}
 	if to.Before(from) {
-		return nil, httpx.Invalid("from is after to")
+		return f, from, to, httpx.Invalid("from is after to")
 	}
 	if from.AddDate(1, 0, 0).Before(to.AddDate(0, 1, 0)) {
-		return nil, httpx.Invalid("choose at most 12 months")
+		return f, from, to, httpx.Invalid("choose at most 12 months")
+	}
+	return f, from, to, nil
+}
+
+func (s *Service) Dashboard(ctx context.Context, sc Scope, f DashboardFilter) (*Dashboard, error) {
+	f, _, _, err := s.filterRange(f)
+	if err != nil {
+		return nil, err
 	}
 	v, err := s.cached(ctx, "dashboard:"+f.key()+":"+sc.key(), func() (any, error) { return s.dashboard(ctx, sc, f) })
 	if err != nil {

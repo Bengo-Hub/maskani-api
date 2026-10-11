@@ -16,16 +16,16 @@ import (
 func sampleInsights() *analytics.Insights {
 	d := func(f float64) decimal.Decimal { return decimal.NewFromFloat(f) }
 	p := func(f float64) *decimal.Decimal { v := decimal.NewFromFloat(f); return &v }
-	v := &analytics.Insights{Period: "2026-09"}
+	v := &analytics.Insights{From: "2026-09", To: "2026-09", Period: "2026-09"}
 	for i := 0; i < 12; i++ {
 		m := time.Date(2025, time.Month(10+i), 1, 0, 0, 0, 0, time.UTC).Format("2006-01")
 		billed := 1_500_000 + float64(i)*20_000
 		v.Months = append(v.Months, analytics.MonthPoint{Period: m, Billed: d(billed), Collected: d(billed * 0.86), CollectionRate: p(86)})
 	}
 	v.KPIs = analytics.InsightKPIs{
-		CollectionRate: analytics.KPI{Value: d(88.4), LastMonth: p(85.1)},
-		Billed:         analytics.KPI{Value: d(1_720_000), LastMonth: p(1_700_000)},
-		Collected:      analytics.KPI{Value: d(1_520_480), LastMonth: p(1_447_000)},
+		CollectionRate: analytics.KPI{Value: d(88.4), Previous: p(85.1)},
+		Billed:         analytics.KPI{Value: d(1_720_000), Previous: p(1_700_000)},
+		Collected:      analytics.KPI{Value: d(1_520_480), Previous: p(1_447_000)},
 		Outstanding:    d(640_000), DaysSalesOutstanding: p(11), Units: 240, Occupied: 212, OccupancyPct: p(88.3), OpenWorkOrders: 14,
 	}
 	v.ForecastBasis.Method = "Instalments due plus three-month average billing times the six-month collection rate."

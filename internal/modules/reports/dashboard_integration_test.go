@@ -136,6 +136,32 @@ func TestDashboardFiltersOnPostgres(t *testing.T) {
 			t.Fatalf("%s: collected %s weekly %s scope %s", name, d.Collected, weekly, d.CollectionsScope)
 		}
 	}
+	// Insights follow the same filters: the range's totals, the months before it, block and fund.
+	dec := func(n int64) decimal.Decimal { return decimal.NewFromInt(n) }
+	in, err := s.Insights(tctx, sc, DashboardFilter{From: "2026-09", To: "2026-09"})
+	must(err)
+	if !in.KPIs.Billed.Value.Equal(dec(1200)) || in.KPIs.Billed.Previous == nil || !in.KPIs.Billed.Previous.Equal(dec(100)) ||
+		in.KPIs.Billed.LastYear == nil || !in.KPIs.Billed.LastYear.IsZero() || len(in.Months) != 12 || in.Months[11].Period != "2026-09" {
+		t.Fatalf("insights one month: billed %v months %d", in.KPIs.Billed, len(in.Months))
+	}
+	in, err = s.Insights(tctx, sc, DashboardFilter{From: "2026-08", To: "2026-09", BlockID: &blockA.ID})
+	must(err)
+	if !in.KPIs.Billed.Value.Equal(dec(300)) || !in.KPIs.Collected.Value.Equal(dec(150)) || !in.KPIs.Outstanding.Equal(dec(500)) ||
+		in.KPIs.Units != 1 || in.KPIs.Billed.Previous == nil || !in.KPIs.Billed.Previous.IsZero() {
+		t.Fatalf("insights block A: %+v", in.KPIs)
+	}
+	if len(in.Blocks) != 1 || in.Blocks[0].Name != "Block A" || !in.Blocks[0].Billed.Equal(dec(300)) || !in.Blocks[0].Owing.Equal(dec(500)) {
+		t.Fatalf("insights block A rows: %+v", in.Blocks)
+	}
+	in, err = s.Insights(tctx, sc, DashboardFilter{From: "2026-09", To: "2026-09", FundID: &sales.ID})
+	must(err)
+	if !in.KPIs.Billed.Value.Equal(dec(1000)) || !in.KPIs.Collected.Value.Equal(dec(400)) || !in.KPIs.Outstanding.Equal(dec(900)) ||
+		in.KPIs.CollectionRate.Value.String() != "40" {
+		t.Fatalf("insights sales fund: %+v", in.KPIs)
+	}
+	if _, err := s.Insights(tctx, sc, DashboardFilter{From: "2025-01", To: "2026-09"}); err == nil {
+		t.Fatal("insights take at most 12 months too")
+	}
 	if _, err := s.Dashboard(tctx, sc, DashboardFilter{From: "2025-01", To: "2026-09"}); err == nil {
 		t.Fatal("a range over 12 months should be refused")
 	}

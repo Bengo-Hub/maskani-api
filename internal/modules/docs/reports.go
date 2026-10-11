@@ -88,17 +88,21 @@ func (s *Service) Arrears(ctx context.Context, tenantID uuid.UUID, slug string, 
 	return s.render(r, format, "arrears")
 }
 
-// Performance renders the business view behind the staff dashboard for a month: headline figures
-// with comparisons, the 12-month trend, the cash-in forecast and its method, revenue by charge,
-// blocks, maintenance and the sales pace.
-func (s *Service) Performance(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, period string, format reports.Format) (*File, error) {
-	v, err := s.analytics.Insights(ctx, sc, period)
+// Performance renders the business view behind the staff dashboard for its filters: headline
+// figures with comparisons, the 12-month trend, the cash-in forecast and its method, revenue by
+// charge, blocks, maintenance and the sales pace.
+func (s *Service) Performance(ctx context.Context, tenantID uuid.UUID, slug string, sc analytics.Scope, f analytics.DashboardFilter, format reports.Format) (*File, error) {
+	v, err := s.analytics.Insights(ctx, sc, f)
 	if err != nil {
 		return nil, err
 	}
-	r := s.newReport(ctx, tenantID, slug, sc, "Performance", "Month of "+monthLabel(v.Period))
+	sub, name := "Month of "+monthLabel(v.To), "performance-"+v.To
+	if v.From != v.To {
+		sub, name = monthLabel(v.From)+" to "+monthLabel(v.To), "performance-"+v.From+"-to-"+v.To
+	}
+	r := s.newReport(ctx, tenantID, slug, sc, "Performance", sub)
 	performanceReport(r, v)
-	return s.render(r, format, "performance-"+v.Period)
+	return s.render(r, format, name)
 }
 
 // performanceReport fills a branded report with the insights.
@@ -106,10 +110,14 @@ func performanceReport(r *reports.Report, v *analytics.Insights) {
 	cur := r.Currency
 	k := v.KPIs
 
+	before := "last month"
+	if v.From != v.To {
+		before = "the months before"
+	}
 	r.Cards = []reports.Card{
-		{Label: "Collection rate", Value: pctText(&k.CollectionRate.Value), Sub: change(k.CollectionRate.Value, k.CollectionRate.LastMonth, "points on last month", true)},
-		{Label: "Billed", Value: moneyText(cur, k.Billed.Value), Sub: change(k.Billed.Value, k.Billed.LastMonth, "on last month", false)},
-		{Label: "Collected", Value: moneyText(cur, k.Collected.Value), Sub: change(k.Collected.Value, k.Collected.LastMonth, "on last month", false)},
+		{Label: "Collection rate", Value: pctText(&k.CollectionRate.Value), Sub: change(k.CollectionRate.Value, k.CollectionRate.Previous, "points on "+before, true)},
+		{Label: "Billed", Value: moneyText(cur, k.Billed.Value), Sub: change(k.Billed.Value, k.Billed.Previous, "on "+before, false)},
+		{Label: "Collected", Value: moneyText(cur, k.Collected.Value), Sub: change(k.Collected.Value, k.Collected.Previous, "on "+before, false)},
 		{Label: "Owing now", Value: moneyText(cur, k.Outstanding), Sub: daysText(k.DaysSalesOutstanding)},
 	}
 
@@ -148,14 +156,14 @@ func performanceReport(r *reports.Report, v *analytics.Insights) {
 			{Header: "Instalments", Weight: 2, Money: true}, {Header: "Recurring charges", Weight: 2, Money: true}, {Header: "Total", Weight: 2, Money: true}}, Rows: forecast},
 	}
 	if len(mix) > 0 {
-		r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionChart, Title: "Revenue by charge", Note: "Billed over the last three complete months", Horizontal: true, Bars: mix, ValueUnit: cur})
+		r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionChart, Title: "Revenue by charge", Note: "Billed over the chosen months", Horizontal: true, Bars: mix, ValueUnit: cur})
 	}
 	if len(blocks) > 0 {
 		r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionTable, Title: "Blocks", Columns: []reports.Column{{Header: "Block", Weight: 2.4},
-			{Header: "Units", Weight: 1, Align: "R"}, {Header: "Billed last month", Weight: 2, Money: true}, {Header: "Owing now", Weight: 2, Money: true}}, Rows: blocks})
+			{Header: "Units", Weight: 1, Align: "R"}, {Header: "Billed", Weight: 2, Money: true}, {Header: "Owing now", Weight: 2, Money: true}}, Rows: blocks})
 	}
 	if len(work) > 0 {
-		r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionTable, Title: "Maintenance by category", Note: "Last 90 days",
+		r.Sections = append(r.Sections, reports.Section{Kind: reports.SectionTable, Title: "Maintenance by category", Note: "Requests opened in the chosen months",
 			Columns: []reports.Column{{Header: "Category", Weight: 2.4}, {Header: "Opened", Weight: 1, Align: "R"}, {Header: "Completed", Weight: 1.2, Align: "R"},
 				{Header: "Past due time", Weight: 1.3, Align: "R"}, {Header: "Average time to close", Weight: 1.8, Align: "R"}}, Rows: work})
 	}
