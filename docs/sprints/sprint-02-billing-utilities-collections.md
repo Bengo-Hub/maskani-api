@@ -55,8 +55,10 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Statements carry a running balance from the API and page through the whole treasury ledger, not the first 50 rows (FR-35, wave 1c and 2.1); credits on a bill show as their own entry (`e7b27c0`)
 - [x] Statement export `?format=pdf|csv|xlsx` on the shared reports module (FR-35, wave 2.1)
 - [x] Arrears ladder driven by `arrears_steps`: reminders on days 1, 7 and 14, a call list at 30, a demand letter at 45, escalation at 60; promise to pay holds the letter and escalation; treasury dunning stays off for Maskani tenants (FR-34, `c699d08`)
-- [ ] Late charge: tenant setting (percent and or fixed, cap, grace days, funds), once a month per account on overdue principal only, never compounded, deduped by a treasury reference (FR-34, wave 2.5, in progress)
-- [ ] Payment plan schedule on an account (the agreement document exists) and clearance certificates (FR-34, wave 2.5)
+- [x] Late charge: tenant setting (percent and or fixed, cap, grace days, funds, day), once a month per account on overdue principal only, never compounded, deduped by a treasury reference (FR-34, api `532a123`, ui `0ee13b4`)
+- [x] Payment plans on accounts: hold the demand letter and escalation while kept, daily check from account collections, broken alert to finance (FR-34, api `52b508a`, ui `7348df0`)
+- [x] Central approvals engine (same shape as treasury and inventory): credits, waivers, manual payment verification and work order quotes, one inbox, rules with ordered role steps (api `c696df5`, ui `3c61702`)
+- [ ] Clearance certificates; alert the next step's approvers when a multi-step approval advances
 - [x] Adjustments and credit notes through treasury under `ApprovalRule` thresholds (levels, roles, no self approval); bill queries within 30 days with a finance queue, 7 day answer date and portal submission (FR-29, FR-30, api `e7b27c0`, treasury `9f45b90`, notifications `fb49156`, ui `e2551f0`)
 - [x] Manual payments (bank, cash, cheque, typed M-Pesa) with review by someone other than the recorder; residents above the KES 250,000 M-Pesa limit give a bank or cheque reference (api `9a1cbda`, treasury `645f060`)
 - [x] Bank paybills: fund paybill account format (`{ref}`, `2362010#{ref}` or the bank account alone), pay instruction on bills, messages, statements and the portal; bank statement CSV import into review (api `d46337b`, `628986d`, ui `d7e43d3`)

@@ -19,9 +19,8 @@ and the record of deliberate deferrals. The plan that closes them is
 
 ServiceSchedule, ServiceVisit, MaintenanceSchedule, GuardPost, Roster, PatrolCheckpoint, PatrolScan,
 OccurrenceEntry, CustomFieldDef, ReminderSchedule, PrivacyRequest, Handover, TitleStage, Portfolio,
-AuditLog. (Adjustment, BillQuery and ApprovalRule went live 2026-10-10; the document tables with
-wave 2.1.) ApprovalRule has no settings screen yet, so every credit needs one `billing.approve`
-approval until rules are added (wave 2.11). VendorContract is only counted on the dashboard; Vehicle has no list
+AuditLog. (Adjustment, BillQuery, ApprovalRule and the new ApprovalRequest went live 2026-10-10 on
+the central approvals engine; the document tables with wave 2.1.) VendorContract is only counted on the dashboard; Vehicle has no list
 or delete; `daily_stats` fills 2 of its 19 metrics. Each is picked up by a wave 2 or wave 4 item.
 
 ## Deliberate deferrals
