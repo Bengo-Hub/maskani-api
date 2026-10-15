@@ -72,13 +72,13 @@ func (s *Service) bookWorkOrders(ctx context.Context, evs []*ent.GateEvent, pass
 // belongs to a work order is linked to it instead of booking another. The work order id replaces
 // the request on the event, so the office sees the visit beside the job and nothing books twice.
 func (s *Service) bookWorkOrder(ctx context.Context, ev *ent.GateEvent, pass *ent.VisitorPass) {
-	req, ok := ev.Metadata["work_order_request"].(map[string]any)
-	if !ok {
-		return
-	}
+	req, asked := ev.Metadata["work_order_request"].(map[string]any)
 	var woID uuid.UUID
 	if pass != nil && pass.WorkOrderID != nil {
 		woID = *pass.WorkOrderID
+	}
+	if !asked && woID == uuid.Nil {
+		return
 	}
 	if woID == uuid.Nil && s.booker != nil {
 		w := WorkOrderAtGate{}
@@ -107,7 +107,8 @@ func (s *Service) bookWorkOrder(ctx context.Context, ev *ent.GateEvent, pass *en
 	if woID == uuid.Nil {
 		return
 	}
-	meta := maps.Clone(ev.Metadata)
+	meta := map[string]any{}
+	maps.Copy(meta, ev.Metadata)
 	delete(meta, "work_order_request")
 	meta["work_order_id"] = woID.String()
 	if err := s.client.GateEvent.UpdateOneID(ev.ID).SetMetadata(meta).Exec(ctx); err == nil {

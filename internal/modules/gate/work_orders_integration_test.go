@@ -82,7 +82,7 @@ func TestWorkOrdersBookedAtGateOnPostgres(t *testing.T) {
 			WorkOrder: &gate.WorkOrderAtGate{Category: "electrical", Description: "Sockets in the kitchen"}},
 		{ClientEventID: "e2", Kind: "entry", VisitorName: "Pump Masters crew",
 			WorkOrder: &gate.WorkOrderAtGate{Title: "Borehole pump service", Category: "water_supply", Area: "Pump house", VendorID: &vendor.ID}},
-		{ClientEventID: "e3", Kind: "entry", PassID: &pass.ID, WorkOrder: &gate.WorkOrderAtGate{Title: "Fix leak"}},
+		{ClientEventID: "e3", Kind: "entry", PassID: &pass.ID},
 		{ClientEventID: "e4", Kind: "entry", VisitorName: "Guest"},
 	}
 	n, err := g.Record(ctx, dev, batch)
