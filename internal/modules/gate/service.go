@@ -43,8 +43,8 @@ type Service struct {
 	seq    *sequence.Allocator
 	log    *zap.Logger
 	rt     realtime.Publisher
-	// bookWorkOrder raises a work order from a gate entry (work_orders.go).
-	bookWorkOrder WorkOrderBooker
+	// booker raises a work order for a provider let in at the gate (work_orders.go).
+	booker WorkOrderBooker
 }
 
 // SetRealtime sets the publisher for gate hints (nil disables them).
@@ -440,7 +440,7 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		if in.Kind == string(gateevent.KindWalkInRequest) {
 			c.SetDecision(gateevent.DecisionPending)
 		}
-		if in.Kind == string(gateevent.KindEntry) && in.WorkOrder != nil {
+		if (in.Kind == string(gateevent.KindEntry) || in.Kind == string(gateevent.KindWalkInRequest)) && in.WorkOrder != nil {
 			c.SetMetadata(requestMeta(in.WorkOrder))
 		}
 		rows = append(rows, c)
@@ -467,7 +467,7 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		return 0, err
 	}
 	s.consumePasses(ctx, evs)
-	s.bookWorkOrders(ctx, d, evs, passes)
+	s.bookWorkOrders(ctx, evs, passes)
 	look := s.arrivalLookups(ctx, evs)
 	for _, ev := range evs {
 		switch {
@@ -730,6 +730,9 @@ func (s *Service) Decide(ctx context.Context, eventID uuid.UUID, approve bool) (
 	ev, err = ev.Update().SetDecision(d).SetDecidedBy("host").SetDecidedAt(time.Now()).Save(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if d == gateevent.DecisionApproved {
+		s.bookWorkOrder(ctx, ev, nil)
 	}
 	s.emit(ctx, realtime.WalkInDecided, ev)
 	return ev, nil

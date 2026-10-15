@@ -458,6 +458,7 @@ func (s *Service) ResolveWalkIn(ctx context.Context, d *ent.GateDevice, eventID 
 	}
 	s.emit(ctx, realtime.WalkInDecided, ev)
 	if admit {
+		s.bookWorkOrder(ctx, ev, nil)
 		tenantID, _ := tenantguard.TenantID(ctx)
 		_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, ev.ID.String(), events.VisitorArrived, s.arrival(ctx, ev))
 	}

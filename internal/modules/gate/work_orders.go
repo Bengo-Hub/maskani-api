@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/bengobox/maskani-api/internal/ent"
 	"github.com/bengobox/maskani-api/internal/ent/gateevent"
@@ -40,9 +41,9 @@ type Booking struct {
 type WorkOrderBooker func(ctx context.Context, b Booking) (uuid.UUID, error)
 
 // SetWorkOrderBooker wires work order booking at the gate.
-func (s *Service) SetWorkOrderBooker(f WorkOrderBooker) { s.bookWorkOrder = f }
+func (s *Service) SetWorkOrderBooker(f WorkOrderBooker) { s.booker = f }
 
-// requestMeta keeps a booking request on the entry until it is booked.
+// requestMeta keeps a booking request on the entry or walk-in until it is booked.
 func requestMeta(w *WorkOrderAtGate) map[string]any {
 	if w == nil {
 		return nil
@@ -52,47 +53,64 @@ func requestMeta(w *WorkOrderAtGate) map[string]any {
 		"vendor_id": w.VendorID}}
 }
 
-// bookWorkOrders raises the work orders requested on entries just stored. An entry on a contractor
-// pass that already belongs to a work order is linked to it instead of booking another. The work
-// order id is kept on the entry, so the office sees the visit beside the job.
-func (s *Service) bookWorkOrders(ctx context.Context, d *ent.GateDevice, evs []*ent.GateEvent, passes map[uuid.UUID]*ent.VisitorPass) {
+// bookWorkOrders raises the work orders requested on entries just stored.
+func (s *Service) bookWorkOrders(ctx context.Context, evs []*ent.GateEvent, passes map[uuid.UUID]*ent.VisitorPass) {
 	for _, ev := range evs {
-		req, ok := ev.Metadata["work_order_request"].(map[string]any)
-		if !ok || ev.Kind != gateevent.KindEntry {
+		if ev.Kind != gateevent.KindEntry {
 			continue
 		}
-		var woID uuid.UUID
+		var pass *ent.VisitorPass
 		if ev.PassID != nil {
-			if p := passes[*ev.PassID]; p != nil && p.WorkOrderID != nil {
-				woID = *p.WorkOrderID
+			pass = passes[*ev.PassID]
+		}
+		s.bookWorkOrder(ctx, ev, pass)
+	}
+}
+
+// bookWorkOrder raises the work order an admitted visitor came for: on an entry, or on a walk-in
+// once the host or the guard lets the provider in. An entry on a contractor pass that already
+// belongs to a work order is linked to it instead of booking another. The work order id replaces
+// the request on the event, so the office sees the visit beside the job and nothing books twice.
+func (s *Service) bookWorkOrder(ctx context.Context, ev *ent.GateEvent, pass *ent.VisitorPass) {
+	req, ok := ev.Metadata["work_order_request"].(map[string]any)
+	if !ok {
+		return
+	}
+	var woID uuid.UUID
+	if pass != nil && pass.WorkOrderID != nil {
+		woID = *pass.WorkOrderID
+	}
+	if woID == uuid.Nil && s.booker != nil {
+		w := WorkOrderAtGate{}
+		w.Title, _ = req["title"].(string)
+		w.Category, _ = req["category"].(string)
+		w.Description, _ = req["description"].(string)
+		w.Priority, _ = req["priority"].(string)
+		w.Area, _ = req["area"].(string)
+		if v, _ := req["vendor_id"].(string); v != "" {
+			if id, err := uuid.Parse(v); err == nil {
+				w.VendorID = &id
 			}
 		}
-		if woID == uuid.Nil && s.bookWorkOrder != nil {
-			w := WorkOrderAtGate{}
-			w.Title, _ = req["title"].(string)
-			w.Category, _ = req["category"].(string)
-			w.Description, _ = req["description"].(string)
-			w.Priority, _ = req["priority"].(string)
-			w.Area, _ = req["area"].(string)
-			if v, _ := req["vendor_id"].(string); v != "" {
-				if id, err := uuid.Parse(v); err == nil {
-					w.VendorID = &id
-				}
-			}
-			id, err := s.bookWorkOrder(ctx, Booking{PropertyID: d.PropertyID, UnitID: ev.HostUnitID, WorkOrder: w,
-				ProviderName: ev.VisitorName, ProviderPhone: ev.VisitorPhone, GateEventID: ev.ID, DeviceID: d.ID})
-			if err != nil {
-				s.log.Warn("work order not booked at the gate")
-				continue
-			}
-			woID = id
+		var device uuid.UUID
+		if ev.DeviceID != nil {
+			device = *ev.DeviceID
 		}
-		if woID == uuid.Nil {
-			continue
+		id, err := s.booker(ctx, Booking{PropertyID: ev.PropertyID, UnitID: ev.HostUnitID, WorkOrder: w,
+			ProviderName: ev.VisitorName, ProviderPhone: ev.VisitorPhone, GateEventID: ev.ID, DeviceID: device})
+		if err != nil {
+			s.log.Warn("work order not booked at the gate", zap.Error(err))
+			return
 		}
-		meta := maps.Clone(ev.Metadata)
-		delete(meta, "work_order_request")
-		meta["work_order_id"] = woID.String()
-		_ = s.client.GateEvent.UpdateOneID(ev.ID).SetMetadata(meta).Exec(ctx)
+		woID = id
+	}
+	if woID == uuid.Nil {
+		return
+	}
+	meta := maps.Clone(ev.Metadata)
+	delete(meta, "work_order_request")
+	meta["work_order_id"] = woID.String()
+	if err := s.client.GateEvent.UpdateOneID(ev.ID).SetMetadata(meta).Exec(ctx); err == nil {
+		ev.Metadata = meta
 	}
 }

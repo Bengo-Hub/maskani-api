@@ -136,9 +136,37 @@ func TestWorkOrdersBookedAtGateOnPostgres(t *testing.T) {
 	if n, _ := client.WorkOrder.Query().Where(workorder.SourceEQ(workorder.SourceGate)).Count(ctx); n != 2 {
 		t.Fatalf("a replay books nothing twice: %d", n)
 	}
+	// A walk-in asked of the host books the job only once someone lets the provider in.
+	asks := []gate.EventInput{
+		{ClientEventID: "w1", Kind: "walk_in_request", VisitorName: "Gas refill", HostUnitID: &u.ID, WorkOrder: &gate.WorkOrderAtGate{Category: "general"}},
+		{ClientEventID: "w2", Kind: "walk_in_request", VisitorName: "Painter", HostUnitID: &u.ID, WorkOrder: &gate.WorkOrderAtGate{Title: "Repaint door"}},
+		{ClientEventID: "w3", Kind: "walk_in_request", VisitorName: "Hawker", HostUnitID: &u.ID, WorkOrder: &gate.WorkOrderAtGate{}},
+	}
+	_, err = g.Record(ctx, dev, asks)
+	must(err)
+	if n, _ := client.WorkOrder.Query().Where(workorder.SourceEQ(workorder.SourceGate)).Count(ctx); n != 2 {
+		t.Fatalf("a pending walk-in books nothing: %d", n)
+	}
+	w1, err := g.DeviceEvent(ctx, dev.ID, "w1")
+	must(err)
+	w2, err := g.DeviceEvent(ctx, dev.ID, "w2")
+	must(err)
+	w3, err := g.DeviceEvent(ctx, dev.ID, "w3")
+	must(err)
+	_, err = g.Decide(ctx, w1.ID, true)
+	must(err)
+	_, err = g.ResolveWalkIn(ctx, dev, w2.ID, true, "")
+	must(err)
+	_, err = g.ResolveWalkIn(ctx, dev, w2.ID, true, "")
+	must(err)
+	_, err = g.Decide(ctx, w3.ID, false)
+	must(err)
+	if n, _ := client.WorkOrder.Query().Where(workorder.SourceEQ(workorder.SourceGate)).Count(ctx); n != 4 {
+		t.Fatalf("approved walk-ins book once each, a declined one never: %d", n)
+	}
 	listed, err := w.List(ctx, works.Filter{Source: "gate", AllProperties: true}, page.Params{Limit: 10})
 	must(err)
-	if len(listed.Data) != 2 {
+	if len(listed.Data) != 4 {
 		t.Fatalf("office lists gate bookings: %d", len(listed.Data))
 	}
 	if _, err := w.List(ctx, works.Filter{Source: "walk_in", AllProperties: true}, page.Params{Limit: 10}); err == nil {
