@@ -189,6 +189,17 @@ func New(ctx context.Context) (*App, error) {
 		return err
 	})
 	gateSvc := gate.NewService(orm, box, seq, log)
+	// The gate books a work order when it lets a service provider in.
+	gateSvc.SetWorkOrderBooker(func(ctx context.Context, b gate.Booking) (uuid.UUID, error) {
+		wo, err := worksSvc.BookFromGate(ctx, works.GateBooking{PropertyID: b.PropertyID, UnitID: b.UnitID, Area: b.WorkOrder.Area,
+			Category: b.WorkOrder.Category, Title: b.WorkOrder.Title, Description: b.WorkOrder.Description, Priority: b.WorkOrder.Priority,
+			VendorID: b.WorkOrder.VendorID, ProviderName: b.ProviderName, ProviderPhone: b.ProviderPhone, GateEventID: b.GateEventID,
+			DeviceID: b.DeviceID})
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return wo.ID, nil
+	})
 	noticeSvc := notices.NewService(orm, nt, loc, log)
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
 	portalSvc := portal.NewService(orm, log)

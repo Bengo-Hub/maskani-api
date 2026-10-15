@@ -77,6 +77,8 @@ type RequestInput struct {
 	MaintenanceScheduleID *uuid.UUID `json:"-"`
 	VendorID              *uuid.UUID `json:"-"`
 	AssetRef              string     `json:"-"`
+	// Set only by the gate booking: who came and from which gate entry.
+	Meta map[string]any `json:"-"`
 }
 
 // Actor identifies who acts on a work order.
@@ -111,6 +113,8 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 		src, status = workorder.SourceResident, workorder.StatusRequested
 	case "schedule":
 		src = workorder.SourceSchedule
+	case "gate":
+		src = workorder.SourceGate
 	}
 	tx, err := s.client.Tx(ctx)
 	if err != nil {
@@ -131,6 +135,12 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 	}
 	if in.VendorID != nil {
 		c.SetVendorID(*in.VendorID).SetAssigneeKind(workorder.AssigneeKindVendor)
+	}
+	if in.Meta != nil {
+		c.SetMetadata(in.Meta)
+	}
+	if src == workorder.SourceGate {
+		c.SetRespondedAt(now) // the provider is already on site
 	}
 	if a.PartyID != nil {
 		c.SetRequestedByPartyID(*a.PartyID)
@@ -337,6 +347,7 @@ type Filter struct {
 	PropertyID    *uuid.UUID
 	Status        string
 	Priority      string
+	Source        string // tenant, staff, gate, schedule...; gate lists the jobs booked as providers came in
 	Overdue       bool
 	PartyID       *uuid.UUID
 	Scope         []uuid.UUID
@@ -358,6 +369,12 @@ func (s *Service) List(ctx context.Context, f Filter, p page.Params) (page.Resul
 	}
 	if f.Priority != "" {
 		q = q.Where(workorder.PriorityEQ(workorder.Priority(f.Priority)))
+	}
+	if f.Source != "" {
+		if err := workorder.SourceValidator(workorder.Source(f.Source)); err != nil {
+			return page.Result[*ent.WorkOrder]{}, httpx.Invalid("source must be resident, staff, schedule, inspection or gate")
+		}
+		q = q.Where(workorder.SourceEQ(workorder.Source(f.Source)))
 	}
 	if f.Overdue {
 		q = q.Where(workorder.ResolutionDueAtLT(time.Now()),

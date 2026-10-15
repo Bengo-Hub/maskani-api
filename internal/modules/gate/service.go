@@ -22,6 +22,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/incident"
 	"github.com/bengobox/maskani-api/internal/ent/party"
 	"github.com/bengobox/maskani-api/internal/ent/unit"
+	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
 	"github.com/bengobox/maskani-api/internal/events"
@@ -42,6 +43,8 @@ type Service struct {
 	seq    *sequence.Allocator
 	log    *zap.Logger
 	rt     realtime.Publisher
+	// bookWorkOrder raises a work order from a gate entry (work_orders.go).
+	bookWorkOrder WorkOrderBooker
 }
 
 // SetRealtime sets the publisher for gate hints (nil disables them).
@@ -355,6 +358,8 @@ type EventInput struct {
 	// in the same offline batch. An exit that closes nothing is not recorded.
 	EntryEventID       *uuid.UUID `json:"entry_event_id"`
 	EntryClientEventID string     `json:"entry_client_event_id"`
+	// WorkOrder books a work order for a service provider let in (entries only).
+	WorkOrder *WorkOrderAtGate `json:"work_order"`
 }
 
 // Record stores events idempotently on (device, client_event_id). Entries against a pass consume it
@@ -435,6 +440,9 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		if in.Kind == string(gateevent.KindWalkInRequest) {
 			c.SetDecision(gateevent.DecisionPending)
 		}
+		if in.Kind == string(gateevent.KindEntry) && in.WorkOrder != nil {
+			c.SetMetadata(requestMeta(in.WorkOrder))
+		}
 		rows = append(rows, c)
 		fresh = append(fresh, in.ClientEventID)
 	}
@@ -459,6 +467,7 @@ func (s *Service) Record(ctx context.Context, d *ent.GateDevice, batch []EventIn
 		return 0, err
 	}
 	s.consumePasses(ctx, evs)
+	s.bookWorkOrders(ctx, d, evs, passes)
 	look := s.arrivalLookups(ctx, evs)
 	for _, ev := range evs {
 		switch {
@@ -733,6 +742,15 @@ type SyncPayload struct {
 	Passes       []CachedPass  `json:"passes"`
 	Badges       []CachedBadge `json:"badges"`
 	WalkInPolicy string        `json:"walk_in_policy"`
+	// Vendors and WorkCategories let the guard book a work order for a provider offline.
+	Vendors        []CachedOption `json:"vendors"`
+	WorkCategories []CachedOption `json:"work_categories"`
+}
+
+// CachedOption is a vendor or a work order category as the tablet's pickers show it.
+type CachedOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // CachedBadge is an active badge deployed to the device's property, with the holder's name. The
@@ -859,6 +877,21 @@ func (s *Service) Sync(ctx context.Context, d *ent.GateDevice) (*SyncPayload, er
 	}
 	if out.Passes == nil {
 		out.Passes = []CachedPass{}
+	}
+	out.Vendors, out.WorkCategories = []CachedOption{}, []CachedOption{}
+	vendors, err := s.client.Vendor.Query().Where(vendor.StatusEQ(vendor.StatusActive)).Order(ent.Asc(vendor.FieldName)).
+		Select(vendor.FieldID, vendor.FieldName).Limit(500).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range vendors {
+		out.Vendors = append(out.Vendors, CachedOption{ID: v.ID.String(), Name: v.Name})
+	}
+	tenantID, _ := tenantguard.TenantID(ctx)
+	if cats, err := settings.NewService(s.client, s.log).Catalogue(ctx, tenantID, "wo_category"); err == nil {
+		for _, c := range cats {
+			out.WorkCategories = append(out.WorkCategories, CachedOption{ID: c.Code, Name: c.Name})
+		}
 	}
 	return out, nil
 }

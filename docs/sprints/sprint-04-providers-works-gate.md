@@ -36,7 +36,7 @@ API state as of 2026-10-08. Screens and the gate tablet app are in maskani-ui sp
 - [x] Vendor detail `GET /vendors/{id}`, `has_pin` on personnel, vendor routes gated on the `providers` module (2026-10-08)
 - [x] Guard PIN: `PUT /vendors/{id}/personnel/{pid}/pin`, tablet `POST /gate/sign-on` (rate limited), named badges in `/gate/sync` (2026-10-08)
 - [x] Keyset passes and incidents with property scope; live hints `work_order.updated`, `gate.event`, `walk_in.requested`, `walk_in.decided` (2026-10-08)
-- [ ] Schedules and visits, preventive maintenance, vendor invoices (after demo)
+- [ ] Vendor invoices (schedules, visits and preventive maintenance done in `9fe7088`)
 - [x] maskani-ui works screens and gate tablet app
 
 ### Gaps found by the 2026-10-09 audit
@@ -50,9 +50,10 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Portal pass cancel is one conditional update on id and host (`b8be252`)
 - [x] Gate log list order and index agree; gate events indexed by age for the retention purge (`3ae57a5`)
 - [x] Partial indexes for system jobs: open SLA work orders by due time, devices by `last_seen_at`, reservations by expiry, scheduled notices, stuck billing runs (`3ae57a5`)
-- [ ] Vendor linked to a treasury vendor by S2S lookup, not free text (FR-51, wave 2.8)
-- [ ] Vendor contracts with SLA, fee basis, service credits and renewal (FR-52, wave 2.8)
-- [ ] Service schedules and visits with photos and a missed-visit job; preventive maintenance schedules raising work orders (FR-53, FR-58, wave 2.8)
+- [x] Vendor linked to a treasury vendor by S2S lookup, not free text (FR-51, `0fc6027`)
+- [x] Vendor contracts with SLA, fee basis, service credits and renewal (FR-52, `0fc6027`)
+- [x] Service schedules and visits with photos and a missed-visit job; preventive maintenance schedules raising work orders (FR-53, FR-58, `9fe7088`; console screens pending)
+- [x] Work orders booked at the gate: an entry for a service provider carries the job (unit or estate area, known vendor or the provider's name and phone, no quote or cost) and books a `source: gate` work order once, even on an offline replay; a contractor pass tied to a work order links to it; `GET /work-orders?source=gate` lists them for follow-up (2026-10-15; tablet form pending)
 - [ ] Vendor invoices: entered in the vendor portal with the eTIMS number, compared with contract, visits and coverage, confirmed by the manager, then `maskani.vendor_invoice.approved` makes treasury raise the bill through a new subscriber modelled on `arpa/service_delivery_bill_subscriber.go`; `treasury.payout.completed` marks it paid (FR-56, wave 2.8)
 - [ ] Vendor supervisor phone sign-in and vendor portal (FR-18, wave 2.8)
 - [ ] ERP staff picker through an erp-api S2S employee list; casual payments linked to the work order cost line (FR-63, wave 2.8)

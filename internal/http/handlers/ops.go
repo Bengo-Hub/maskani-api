@@ -213,7 +213,7 @@ func (h *H) ListWorkOrders(w http.ResponseWriter, r *http.Request) {
 	a := access(r)
 	res, err := h.Works.List(r.Context(), works.Filter{PropertyID: httpx.QueryUUID(r, "property_id"),
 		Status: r.URL.Query().Get("status"), Priority: r.URL.Query().Get("priority"),
-		Overdue: r.URL.Query().Get("overdue") == "true", Scope: a.PropertyIDs, AllProperties: a.AllProperties}, page.Parse(r))
+		Source: r.URL.Query().Get("source"), Overdue: r.URL.Query().Get("overdue") == "true", Scope: a.PropertyIDs, AllProperties: a.AllProperties}, page.Parse(r))
 	if err != nil {
 		httpx.Fail(w, err)
 		return

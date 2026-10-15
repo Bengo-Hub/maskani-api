@@ -106,6 +106,7 @@ var CatalogDefaults = []CatalogDefault{
 	{"wo_category", "common_areas", "Common areas", map[string]any{"default_priority": "low"}},
 	{"wo_category", "appliances", "Appliances", map[string]any{"default_priority": "normal"}},
 	{"wo_category", "landscaping", "Landscaping", map[string]any{"default_priority": "low"}},
+	{"wo_category", "general", "General service", map[string]any{"default_priority": "low"}},
 
 	{"vendor_category", "security", "Security agency", map[string]any{"required_docs": []string{"psra", "business_permit", "kra", "insurance"}}},
 	{"vendor_category", "garbage", "Garbage collection", map[string]any{"required_docs": []string{"nema", "business_permit", "kra"}}},
