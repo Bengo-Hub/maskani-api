@@ -59,7 +59,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Handover with checklist, keys, snags (tracked after completion) and meter readings that start the owner's water; publishes `maskani.unit.handed_over`, makes the buyer the owner and starts estate billing prorated (FR-25, wave 2.6). Signed handover form: through the documents module, still to wire
 - [x] Title stages from the estate's catalogue with dates, references and documents; title released marks the sale titled (FR-25, wave 2.6)
 - [ ] Purchase and completion statements as PDF and spreadsheet (FR-25, FR-35, wave 2.1)
-- [ ] Console price list editor, reservations list and milestone release (wave 2.6)
+- [ ] Console screens (wave 2.6, API done): price list editor, reservations list, milestone release, restructure sheet and plan history, portal plan acceptance, handover and title
 
 ## Acceptance
 
