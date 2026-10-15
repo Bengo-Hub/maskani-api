@@ -242,6 +242,40 @@ func (s *Service) Signatures(ctx context.Context, docID uuid.UUID) ([]*ent.Docum
 		Order(ent.Asc(documentsignature.FieldSignedAt)).All(ctx)
 }
 
+// DocumentView is a document as lists return it: code hashes hidden, whether it is an agreement,
+// and (portal) whether the caller has already accepted it.
+type DocumentView struct {
+	*ent.Document
+	NeedsSignature bool `json:"needs_signature"`
+	AcceptedByMe   bool `json:"accepted_by_me,omitempty"`
+}
+
+// Views builds list views; with partyIDs it marks the documents those parties accepted, from one
+// query over the listed documents.
+func (s *Service) Views(ctx context.Context, rows []*ent.Document, partyIDs []uuid.UUID) ([]DocumentView, error) {
+	out := make([]DocumentView, 0, len(rows))
+	accepted := map[uuid.UUID]bool{}
+	if len(partyIDs) > 0 && len(rows) > 0 {
+		ids := make([]uuid.UUID, len(rows))
+		for i, d := range rows {
+			ids[i] = d.ID
+		}
+		sigs, err := s.client.DocumentSignature.Query().Where(documentsignature.DocumentIDIn(ids...),
+			documentsignature.PartyIDIn(partyIDs...)).Select(documentsignature.FieldDocumentID).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, sg := range sigs {
+			accepted[sg.DocumentID] = true
+		}
+	}
+	for _, d := range rows {
+		k, _ := DocKindOf(d.Kind)
+		out = append(out, DocumentView{Document: HideCodes(d), NeedsSignature: k.NeedsSignature, AcceptedByMe: accepted[d.ID]})
+	}
+	return out, nil
+}
+
 // HideCodes drops one-time code hashes from a document before it leaves the API.
 func HideCodes(d *ent.Document) *ent.Document {
 	if d == nil || d.Metadata == nil {

@@ -118,6 +118,12 @@ func TestSigningOnPostgres(t *testing.T) {
 		t.Fatalf("executed events: %d", n)
 	}
 
+	views, err := s.Views(ctx, []*ent.Document{plan, notice}, []uuid.UUID{a.ID})
+	must(err)
+	if !views[0].NeedsSignature || !views[0].AcceptedByMe || views[1].NeedsSignature || views[1].AcceptedByMe {
+		t.Fatalf("views: %+v %+v", views[0].NeedsSignature, views[1].NeedsSignature)
+	}
+
 	offer := doc("offer_letter", a.ID)
 	if _, err := s.RecordWetSigned(ctx, offer.ID, stranger, []string{"elsewhere/x.jpg"}); err == nil {
 		t.Fatal("scans must be the tenant's document uploads")
