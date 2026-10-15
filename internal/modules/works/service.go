@@ -73,6 +73,10 @@ type RequestInput struct {
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	Photos      []string   `json:"photos"`
+	// Set only by the preventive maintenance job, never from a request body.
+	MaintenanceScheduleID *uuid.UUID `json:"-"`
+	VendorID              *uuid.UUID `json:"-"`
+	AssetRef              string     `json:"-"`
 }
 
 // Actor identifies who acts on a work order.
@@ -102,8 +106,11 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 	now := time.Now()
 	src := workorder.SourceStaff
 	status := workorder.StatusTriaged
-	if a.Kind == "resident" {
+	switch a.Kind {
+	case "resident":
 		src, status = workorder.SourceResident, workorder.StatusRequested
+	case "schedule":
+		src = workorder.SourceSchedule
 	}
 	tx, err := s.client.Tx(ctx)
 	if err != nil {
@@ -118,6 +125,12 @@ func (s *Service) Create(ctx context.Context, a Actor, in RequestInput) (*ent.Wo
 	}
 	if in.Photos != nil {
 		c.SetPhotosBefore(in.Photos)
+	}
+	if in.MaintenanceScheduleID != nil {
+		c.SetMaintenanceScheduleID(*in.MaintenanceScheduleID).SetAssetRef(in.AssetRef)
+	}
+	if in.VendorID != nil {
+		c.SetVendorID(*in.VendorID).SetAssigneeKind(workorder.AssigneeKindVendor)
 	}
 	if a.PartyID != nil {
 		c.SetRequestedByPartyID(*a.PartyID)

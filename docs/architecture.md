@@ -192,6 +192,8 @@ period and panic recovery.
 | `sla-breaches` | 5 min | maintenance on | Flag work orders past their resolution target and publish the breach |
 | `vendor-doc-expiry` | daily | providers or maintenance on | Alert at 30, 14 and 7 days and on expiry |
 | `vendor-contracts` | daily | providers or maintenance on | Renewal notice once in the notice period; past the end, renew for the same length (`auto_renew`, history in metadata) or expire |
+| `service-visits` | daily | providers or maintenance on | Plan each active visit plan a week ahead (each day once); visits whose day passed unrecorded become missed |
+| `preventive-maintenance` | daily | maintenance on | A work order a week before each preventive plan falls due; the plan moves on one period |
 | `gate-offline` | 5 min | gate on | Alert once when a tablet has not been seen for 15 minutes |
 | `retention` | daily | all tenants | The retention schedule (`privacy/retention.go`) in batches: gate events and patrol scans after 90 days, visitor passes 90 days after they end, returning visitors not seen for a year (never banned ones, never one a kept pass names), document access logs and the audit trail after a year. Bills, payments, contracts and account history are never on it |
 | `scheduled-notices` | 5 min | communication on (new sends) | Send notices whose time has come; direct sends a pod left mid-way resume for every tenant |

@@ -211,6 +211,24 @@ func New(d Deps) *Runner {
 			_, err = d.Works.FlagBreaches(sys(ctx), on)
 			return err
 		}},
+		// Service visits a week ahead from each plan; past visits never recorded become missed.
+		{"maskani:service-visits", 24 * time.Hour, func(ctx context.Context) error {
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
+			if err != nil {
+				return err
+			}
+			_, _, err = d.Works.PlanVisits(sys(ctx), on)
+			return err
+		}},
+		// Preventive maintenance: a work order a week before each plan falls due.
+		{"maskani:preventive-maintenance", 24 * time.Hour, func(ctx context.Context) error {
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "maintenance")
+			if err != nil {
+				return err
+			}
+			_, err = d.Works.RaisePreventive(sys(ctx), on)
+			return err
+		}},
 		// Vendor contracts: renewal notice once, auto renewal or expiry past the end date.
 		{"maskani:vendor-contracts", 24 * time.Hour, func(ctx context.Context) error {
 			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
