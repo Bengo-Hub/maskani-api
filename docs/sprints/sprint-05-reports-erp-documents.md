@@ -54,7 +54,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Plan limits on units and staff users from the subscription tier, 402 `usage_limit_exceeded` (wave 2.4, `94ffc36`)
 - [x] Terms acceptance history with privacy version, time and address, read back in the portal (FR-19, wave 2.4, `88ca9c0`)
 - [x] Privacy requests with code or in-person identity, 7 and 14 day deadlines, export built on demand and anonymisation, statutory records kept (FR-67, wave 2.4, `5136872`); retention schedule in one daily job (NFR-10)
-- [ ] Documents: templates with merge fields, versions and approval; generation with reference and verification code; OTP acceptance; wet-signed upload; access log; public verify route (FR-46 to FR-49, wave 2.1)
+- [x] Documents: templates with merge fields, versions and approval; generation with reference and verification code; access log; public verify route (`e9eb18a`); acceptance by code in the portal or at the office and wet-signed copies, executed once everyone named has signed (wave 2.1). Still open: key-date reminders on `document.executed`
 - [ ] Budgets against actual, income and expenditure and the sinking fund statement read from treasury budgets, ledger and cost-centre S2S; AGM pack (FR-65, wave 2.10)
 - [ ] ERP client: no client exists yet although `ERP_URL` is configured (FR-63, wave 2.8)
 - [ ] Swagger annotations: `/v1/docs/` is a route table today, not Swagger UI (wave 2.13)

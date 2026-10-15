@@ -67,6 +67,10 @@ var audited = map[string]string{
 	"POST /sale-contracts/{id}/restructure": "restructure.propose",
 	"POST /schedules/{id}/accept":           "restructure.accept_at_office",
 	"POST /me/plans/{id}/accept":            "restructure.accept",
+	// Agreements accepted or signed.
+	"POST /documents/{id}/accept":      "document.accept_at_office",
+	"POST /documents/{id}/signed-copy": "document.signed_copy",
+	"POST /me/documents/{id}/accept":   "document.accept",
 	// Ownership moving at the end of a sale.
 	"POST /handovers/{id}/complete":          "unit.handover",
 	"PUT /sale-contracts/{id}/title/{stage}": "unit.title_stage",

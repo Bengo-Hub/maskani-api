@@ -27,6 +27,9 @@ type DocKind struct {
 	Fields     []string `json:"merge_fields"`
 	// Inputs are fields the issuer types in when issuing (not read from records).
 	Inputs []string `json:"inputs,omitempty"`
+	// NeedsSignature marks an agreement: the people named accept it by code or the office records a
+	// signed paper copy, and it is executed once everyone has.
+	NeedsSignature bool `json:"needs_signature,omitempty"`
 }
 
 var accountFields = []string{"estate_name", "property_name", "unit_code", "account_ref", "owner_name", "fund_name",
@@ -41,11 +44,11 @@ var DocKinds = []DocKind{
 	{Code: "demand_letter", Name: "Demand letter", EntityType: "unit_account", Fields: accountFields},
 	{Code: "payment_plan", Name: "Payment plan agreement", EntityType: "unit_account",
 		Fields: append(append([]string{}, accountFields...), "instalments", "instalment_amount", "first_due"),
-		Inputs: []string{"instalments", "instalment_amount", "first_due"}},
+		Inputs: []string{"instalments", "instalment_amount", "first_due"}, NeedsSignature: true},
 	{Code: "bill_to_consent", Name: "Bill-to consent", EntityType: "unit_account",
 		Fields: append(append([]string{}, accountFields...), "occupant_name", "charges", "from_date"),
-		Inputs: []string{"occupant_name", "charges", "from_date"}},
-	{Code: "offer_letter", Name: "Letter of offer", EntityType: "sale_contract", Fields: contractFields},
+		Inputs: []string{"occupant_name", "charges", "from_date"}, NeedsSignature: true},
+	{Code: "offer_letter", Name: "Letter of offer", EntityType: "sale_contract", Fields: contractFields, NeedsSignature: true},
 }
 
 // DocKindOf returns a document kind by code.

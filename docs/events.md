@@ -41,7 +41,7 @@ envelope first and are idempotent on event ID.
 | `maskani.incident.reported` | Incident recorded | incident_id, number, category, severity, title, urgent | notifications to the tenant contact when urgent |
 | `maskani.vendor.document_expiring` | 30, 14, 7 days before expiry | vendor_id, vendor, doc_type, expires_at, days_left | notifications: email to the tenant contact |
 | `maskani.notice.published` | Notice sent | notice, audience size, priority | notifications fan-out |
-| `maskani.document.executed` | Document fully signed | document, entity, key dates | key-date reminders |
+| `maskani.document.executed` | An agreement is fully accepted by code or a signed copy was recorded | document_id, number, kind, title, entity_type, entity_id, executed_at | key-date reminders (planned); `party.otp_requested` with purpose `document` carries the acceptance codes |
 | `maskani.vendor_invoice.approved` | Manager confirms a vendor invoice (wave 2.8) | invoice_id, treasury_vendor_id, amount (net of service credit), etims_number, cost_center, budget_line, fund, wht | treasury: new arpa subscriber raises the vendor bill, idempotent on invoice_id |
 | `maskani.arrears.step` | Arrears ladder step reached (wave 2.2) | account_ref, unit_code, step (reminder_1, reminder_7, reminder_14, call_list, demand_letter, escalation), balance, days_overdue | notifications: reminders by email and WhatsApp |
 | `maskani.link.ended` | An occupancy or ownership link reached its end date (wave 2.7) | unit, party, role, end_date | gate pass revocation, final reading request |

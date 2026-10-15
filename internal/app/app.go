@@ -229,6 +229,7 @@ func New(ctx context.Context) (*App, error) {
 	// Documents brand from auth-api's tenant record through the shared Redis tenant cache (in-cluster).
 	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, reportSvc, loc)
 	// Issued documents are stored under the media root and checked on maskani-ui's public verify page.
+	docSvc.SetSigning(box)
 	docSvc.SetIssuing(docs.Storage{Root: cfg.Media.Root, VerifyURL: strings.TrimRight(cfg.HTTP.AppURL, "/") + "/verify/"}, seq)
 	// The collections ladder and instalment reminders (one engine per customer; treasury dunning stays off).
 	remindSvc := reminders.NewService(orm, sqlDB, docSvc, loc, log)

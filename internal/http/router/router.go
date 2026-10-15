@@ -282,6 +282,11 @@ func mount(r chi.Router, d Deps) {
 	r.With(perm(rbac.PermDocumentsIssue, rbac.PermDocumentsManage), export).Post("/documents", h.IssueDocument)
 	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Get("/documents", h.ListDocuments)
 	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage), export).Get("/documents/{id}/file", h.DocumentFile)
+	// Agreements: acceptance by code (at the office here, or in the portal) or a signed paper copy.
+	r.With(perm(rbac.PermDocumentsView, rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Get("/documents/{id}/signatures", h.DocumentSignatures)
+	r.With(perm(rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Post("/documents/{id}/send-code", h.SendDocumentCode)
+	r.With(perm(rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Post("/documents/{id}/accept", h.AcceptDocumentAtOffice)
+	r.With(perm(rbac.PermDocumentsIssue, rbac.PermDocumentsManage)).Post("/documents/{id}/signed-copy", h.RecordSignedCopy)
 	r.Get("/catalogues/{kind}", h.Catalogue)
 	// Settings managers edit any list; the people who use a list may add to it (CatalogueManagePerms).
 	r.Put("/catalogues/{kind}/{code}", h.UpsertCatalogue)
@@ -507,5 +512,7 @@ func mount(r chi.Router, d Deps) {
 		m.Post("/units/{id}/vehicles", h.MyAddVehicle)
 		m.Post("/units/{id}/vehicles/{vehicle}/remove", h.MyRemoveVehicle)
 		m.With(export).Get("/documents/{id}/file", h.MyDocumentFile)
+		m.Post("/documents/{id}/send-code", h.MySendDocumentCode)
+		m.Post("/documents/{id}/accept", h.MyAcceptDocument)
 	})
 }

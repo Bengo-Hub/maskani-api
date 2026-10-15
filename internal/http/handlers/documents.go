@@ -109,7 +109,7 @@ func (h *H) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	out := make([]*ent.Document, 0, len(rows))
 	for _, d := range rows {
 		if a.AllProperties || a.Bypass || slices.Contains(a.PropertyIDs, docs.PropertyOf(d)) {
-			out = append(out, d)
+			out = append(out, docs.HideCodes(d))
 		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": out})
@@ -139,6 +139,9 @@ func (h *H) MyDocuments(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.Fail(w, err)
 		return
+	}
+	for _, d := range rows {
+		docs.HideCodes(d)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"data": rows})
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	analytics "github.com/bengobox/maskani-api/internal/modules/reports"
+	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
 // Service builds Maskani's documents.
@@ -27,6 +28,7 @@ type Service struct {
 	loc         *time.Location
 	store       Storage
 	num         Numberer
+	box         *secure.Box // one-time codes for accepting agreements
 }
 
 // NewService creates the documents service.
