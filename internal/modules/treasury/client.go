@@ -408,6 +408,26 @@ type ManualPaymentRequest struct {
 	SourceService string          `json:"source_service"`
 }
 
+// Vendor is a supplier as treasury keeps it for payables: the id vendor bills are raised against.
+type Vendor struct {
+	VendorID    *uuid.UUID      `json:"vendor_id,omitempty"`
+	Name        string          `json:"vendor_name"`
+	BalanceOwed decimal.Decimal `json:"balance_owed"`
+	Currency    string          `json:"currency"`
+}
+
+// Vendors searches the tenant's payable suppliers by name (S2S, read only), at most limit rows.
+func (c *Client) Vendors(ctx context.Context, tenantID uuid.UUID, search string, limit int) ([]Vendor, error) {
+	var out struct {
+		Data []Vendor `json:"data"`
+	}
+	q := url.Values{"search": {search}, "limit": {fmt.Sprint(limit)}}
+	if err := c.get(ctx, tenantID, "/ap/vendors?"+q.Encode(), &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
 // RecordManualPayment books a verified manual payment; treasury settles it through the paybill
 // path (oldest due first) and is idempotent on method and reference. Returns the intent id.
 func (c *Client) RecordManualPayment(ctx context.Context, tenantID uuid.UUID, accountRef string, req ManualPaymentRequest) (uuid.UUID, error) {

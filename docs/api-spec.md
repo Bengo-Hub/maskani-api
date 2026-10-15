@@ -211,6 +211,8 @@ GET `/parties/{id}` returns the party fields plus `national_id_masked`, `kra_pin
 | POST `/vendors/{id}/documents` `{doc_type, number, issued_at, expires_at, file_key}` | Compliance document | `vendors.manage` |
 | POST `/vendors/{id}/personnel` `{full_name, role, phone, badge_number, property_ids}` | Personnel badge | `vendors.manage` |
 | PUT `/vendors/{id}/personnel/{pid}/pin` `{pin}` | Set a guard's gate PIN (4 to 6 digits, stored as a bcrypt hash); returns the personnel row with `has_pin: true` | `vendors.manage` |
+| GET `/vendors/treasury-lookup?search=`; PUT `/vendors/{id}/treasury` `{treasury_vendor_id, name}` | Link a vendor to its payable supplier in treasury, picked by name from treasury's S2S `/ap/vendors` (at most 20; two letters at least), never a typed id. The supplier's name is kept in `metadata.treasury_vendor_name` | `vendors.manage` |
+| POST `/vendors/{id}/contracts`; PUT `/vendor-contracts/{id}`; POST `/vendor-contracts/{id}/terminate` `{reason}` | Service contracts per property: `service_category`, `fee_basis` (fixed_monthly, per_visit, per_post, rate_card), `fee_amount`, `sla` (`response_hours`, `resolution_hours`, `visits_per_month`), `service_credits` `[{breach, percent}]`, `starts_on`, `ends_on`, `renewal_notice_days` (default 30), `auto_renew` (needs an end date), `budget_line_code`. Only a live contract changes; termination keeps the reason in metadata. `GET /vendors/{id}` lists them within the caller's properties | `vendors.manage` |
 | PATCH `/vendors/{id}`; `/vendors/{id}/contracts`, `/visits`; `/service-visits/{id}/check-in`, `/check-out`; `/maintenance-schedules` | | planned (sprint 4) |
 
 ## Gate and security

@@ -23,6 +23,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/approvals"
 	"github.com/bengobox/maskani-api/internal/modules/sequence"
+	"github.com/bengobox/maskani-api/internal/modules/treasury"
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
@@ -45,6 +46,7 @@ type Service struct {
 	log       *zap.Logger
 	rt        realtime.Publisher
 	approvals *approvals.Service
+	treasury  *treasury.Client // supplier lookup and vendor bills (contracts.go)
 }
 
 // SetRealtime sets the publisher for work order hints (nil disables them).
@@ -639,7 +641,8 @@ func (s *Service) SetGuardPIN(ctx context.Context, vendorID, personnelID uuid.UU
 // VendorDetail is one vendor with documents and personnel.
 type VendorDetail struct {
 	VendorView
-	Personnel []PersonnelView `json:"personnel"`
+	Personnel []PersonnelView       `json:"personnel"`
+	Contracts []*ent.VendorContract `json:"contracts"`
 }
 
 // GetVendor returns a vendor with its documents and personnel. When scope is limited, personnel
@@ -670,6 +673,9 @@ func (s *Service) GetVendor(ctx context.Context, id uuid.UUID, scope []uuid.UUID
 		}
 	}
 	out.Personnel = ViewPersonnel(people)
+	if out.Contracts, err = s.vendorContracts(ctx, v.ID, scope, all); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

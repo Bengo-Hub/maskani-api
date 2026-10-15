@@ -179,6 +179,7 @@ func New(ctx context.Context) (*App, error) {
 	salesSvc := sales.NewService(orm, tc, accSvc, seq, loc, log)
 	worksSvc := works.NewService(orm, seq, log)
 	worksSvc.SetApprovals(approvalSvc)
+	worksSvc.SetTreasury(tc)
 	salesSvc.SetApprovals(approvalSvc, box)
 	salesSvc.SetCatalogue(settingsSvc.Catalogue)
 	// At handover the buyer becomes the owner through the register's one link path.

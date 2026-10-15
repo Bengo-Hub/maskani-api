@@ -40,6 +40,7 @@ envelope first and are idempotent on event ID.
 | `maskani.walk_in.requested` | Walk-in at the gate | event_id, visitor_name, unit_code, host_name, host_phone, host_email | notifications to host, "Allow or Decline" button to `/portal/walk-ins/{event_id}` |
 | `maskani.incident.reported` | Incident recorded | incident_id, number, category, severity, title, urgent | notifications to the tenant contact when urgent |
 | `maskani.vendor.document_expiring` | 30, 14, 7 days before expiry | vendor_id, vendor, doc_type, expires_at, days_left | notifications: email to the tenant contact |
+| `maskani.vendor_contract.renewal_due` | A vendor contract enters its notice period (once per end date) | contract_id, contract_number, vendor_id, vendor, service, ends_on, days_left, auto_renew, property_id, property, responders (property managers) | notifications: email to the responders, else the estate contact |
 | `maskani.notice.published` | Notice sent | notice, audience size, priority | notifications fan-out |
 | `maskani.document.executed` | An agreement is fully accepted by code or a signed copy was recorded | document_id, number, kind, title, entity_type, entity_id, executed_at | key-date reminders (planned); `party.otp_requested` with purpose `document` carries the acceptance codes |
 | `maskani.vendor_invoice.approved` | Manager confirms a vendor invoice (wave 2.8) | invoice_id, treasury_vendor_id, amount (net of service credit), etims_number, cost_center, budget_line, fund, wht | treasury: new arpa subscriber raises the vendor bill, idempotent on invoice_id |

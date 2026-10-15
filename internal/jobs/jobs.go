@@ -211,6 +211,15 @@ func New(d Deps) *Runner {
 			_, err = d.Works.FlagBreaches(sys(ctx), on)
 			return err
 		}},
+		// Vendor contracts: renewal notice once, auto renewal or expiry past the end date.
+		{"maskani:vendor-contracts", 24 * time.Hour, func(ctx context.Context) error {
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
+			if err != nil {
+				return err
+			}
+			_, _, _, err = d.Works.RenewContracts(sys(ctx), on)
+			return err
+		}},
 		{"maskani:vendor-doc-expiry", 24 * time.Hour, func(ctx context.Context) error {
 			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
 			if err != nil {
