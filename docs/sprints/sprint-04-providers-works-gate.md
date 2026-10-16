@@ -36,7 +36,7 @@ API state as of 2026-10-08. Screens and the gate tablet app are in maskani-ui sp
 - [x] Vendor detail `GET /vendors/{id}`, `has_pin` on personnel, vendor routes gated on the `providers` module (2026-10-08)
 - [x] Guard PIN: `PUT /vendors/{id}/personnel/{pid}/pin`, tablet `POST /gate/sign-on` (rate limited), named badges in `/gate/sync` (2026-10-08)
 - [x] Keyset passes and incidents with property scope; live hints `work_order.updated`, `gate.event`, `walk_in.requested`, `walk_in.decided` (2026-10-08)
-- [ ] Vendor invoices (schedules, visits and preventive maintenance done in `9fe7088`)
+- [x] Vendor invoices (2026-10-16; schedules, visits and preventive maintenance done in `9fe7088`)
 - [x] maskani-ui works screens and gate tablet app
 
 ### Gaps found by the 2026-10-09 audit
@@ -54,7 +54,7 @@ Plan: `.claude/plans/maskani-r1-completion-r2-rentals-2026-10-09.md` (wave in br
 - [x] Vendor contracts with SLA, fee basis, service credits and renewal (FR-52, `0fc6027`)
 - [x] Service schedules and visits with photos and a missed-visit job; preventive maintenance schedules raising work orders (FR-53, FR-58, `9fe7088`; console screens pending)
 - [x] Work orders booked at the gate: an entry for a service provider carries the job (unit or estate area, known vendor or the provider's name and phone, no quote or cost) and books a `source: gate` work order once, even on an offline replay; a contractor pass tied to a work order links to it; a walk-in asked of the host books on approval, never on a refusal; `GET /work-orders?source=gate` lists them for follow-up (2026-10-15, api `47e17df` `e073233` `9504f4e`, ui `08c48b9` `5cdd4c2`)
-- [ ] Vendor invoices: entered in the vendor portal with the eTIMS number, compared with contract, visits and coverage, confirmed by the manager, then `maskani.vendor_invoice.approved` makes treasury raise the bill through a new subscriber modelled on `arpa/service_delivery_bill_subscriber.go`; `treasury.payout.completed` marks it paid (FR-56, wave 2.8)
+- [x] Vendor invoices: entered as issued with the eTIMS number, checked against contract fee, visits and the missed-visit credit, approved on the central engine (module `vendor_bill`), then `maskani.vendor_invoice.approved` makes treasury raise the bill as invoiced through `arpa/maskani_vendor_invoice_subscriber.go` and the shared bill submit path (eTIMS purchase as for any bill); cancel voids it; paid is read back hourly from treasury `GET /ap/bills/by-source` (not `payout.completed`). Credits are never netted into the bill, so the eTIMS purchase matches the supplier's sale (FR-56; treasury `1011017a`, 2026-10-16). Entry in the vendor portal waits on FR-18
 - [ ] Vendor supervisor phone sign-in and vendor portal (FR-18, wave 2.8)
 - [x] ERP staff picker through an erp-api S2S employee lookup (`GET /hrm/employees/lookup`, erp `f5a9fd6`), gated on the plan's ERP feature `hr_management`: without it nothing is fetched from or saved to ERP (api `7835bed` `2950108`, ui `acd22bc`, 2026-10-16)
 - [ ] Casual payments linked to the work order cost line (FR-63, wave 2.8; behind the same ERP plan check)

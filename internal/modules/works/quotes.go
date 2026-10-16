@@ -36,6 +36,7 @@ func (s *Service) SetApprovals(ap *approvals.Service) {
 		}
 		return s.applyQuote(ctx, req.ObjectID, req.Status == approvalrequest.StatusApproved, by, last.Comment)
 	})
+	s.setInvoiceApprovals(ap)
 }
 
 // submitQuote sends a newly entered quote for approval; with nothing to approve it is approved at once.

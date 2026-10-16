@@ -150,16 +150,30 @@ Treasury has no S2S vendor-bill create route, but it already raises payables fro
 `SubscribeQueueWithRebind` on `inventory.service_delivery.created`) and the PO and goods-receipt bill
 subscribers. Maskani follows the same shape:
 
-1. The vendor supervisor enters the monthly invoice in the vendor portal with its eTIMS number.
-2. maskani shows it beside the contract fee, visits delivered and missed, post coverage and the
-   service credit due; the estate manager confirms.
-3. maskani publishes `maskani.vendor_invoice.approved` (vendor's treasury id, amount net of the
-   service credit, eTIMS number, cost centre, budget line, fund, withholding flag) in the same
-   transaction as the status change.
-4. A new treasury subscriber (`arpa/maskani_vendor_bill_subscriber.go`) creates the bill through the
-   existing arpa service, idempotent on the maskani invoice id. Approval and payout follow treasury's
-   per-flow approval policy.
-5. `treasury.payout.completed` marks the maskani invoice paid and notifies the vendor.
+Built 2026-10-16 (maskani `works/vendor_invoices.go`, treasury `1011017a`):
+
+1. Staff (later the vendor supervisor in the vendor portal) enter the invoice exactly as the vendor
+   issued it: number, eTIMS (CU) number, date, period, total with VAT and the VAT. The vendor must
+   be linked to its treasury supplier first. One number per vendor (unique index).
+2. `GET /vendor-invoices/{id}/check` sets it beside the contract: the fee for the period (a fixed
+   monthly fee times the calendar months touched, or a per visit fee times visits done), visits
+   done, part done and missed, and the credit for missed visits. The credit is never netted into
+   the bill: KRA matches a purchase to the supplier's own eTIMS sale by PIN and total, so a credit
+   is honoured by approving only an invoice that already reflects it, or rejecting it for a
+   corrected one. (The earlier plan said "amount net of the service credit"; that would break the
+   eTIMS match.)
+3. Approval is on the central engine (module `vendor_bill`, default one approval by
+   `vendors.manage`, never the person who entered it). The final approval publishes
+   `maskani.vendor_invoice.approved` in the same transaction as the status change.
+4. Treasury's `arpa/maskani_vendor_invoice_subscriber.go` raises the bill as invoiced (VAT on the
+   line) and submits it through `handlers.SubmitVendorBill`, the same path as the tenant route, so
+   treasury's own bill approval rules and the eTIMS purchase apply. Idempotent per invoice.
+5. Cancelling an approved, unpaid invoice publishes `maskani.vendor_invoice.cancelled`; treasury voids
+   the bill with `VoidBill` (refused once paid or once KRA may hold the purchase).
+6. Paid: the hourly `maskani:vendor-invoice-payments` job reads `GET /s2s/{tenant}/ap/bills/by-source`
+   (200 ids a call) for approved invoices, keeps the bill number and status in metadata and marks an
+   invoice paid when its bill is. `treasury.payout.completed` is not used: it covers settlement
+   payouts, not bill payments.
 
 Vendors are linked to treasury vendors by lookup (`GET /api/v1/s2s/{tenant}/ap/vendors`), never by a
 typed id.

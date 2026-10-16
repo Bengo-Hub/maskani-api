@@ -107,6 +107,43 @@ func (VendorContract) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("tenant_id", "property_id", "status"), index.Fields("tenant_id", "ends_on")}
 }
 
+// VendorInvoice is a vendor's invoice for work under a contract, exactly as the vendor issued it
+// (with its KRA eTIMS number), so treasury's bill matches the supplier's own eTIMS sale. It is
+// compared with the contract fee, visits delivered and missed and the service credit due, then
+// approved on the central approvals engine (module vendor_bill); approval publishes
+// maskani.vendor_invoice.approved and treasury raises the bill. Paid when treasury's bill is paid.
+type VendorInvoice struct{ ent.Schema }
+
+func (VendorInvoice) Mixin() []ent.Mixin { return []ent.Mixin{TenantMixin{}} }
+
+func (VendorInvoice) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("vendor_id", uuid.UUID{}),
+		field.UUID("contract_id", uuid.UUID{}),
+		field.UUID("property_id", uuid.UUID{}),
+		field.String("invoice_number").NotEmpty().Comment("the vendor's own number"),
+		field.String("etims_number").Optional().Comment("KRA eTIMS (CU) invoice number"),
+		field.Time("invoice_date"),
+		field.Time("period_start"),
+		field.Time("period_end"),
+		money("amount"), // total as invoiced, VAT included
+		money("vat_amount"),
+		field.Strings("attachments").Optional().Comment("media keys of the invoice copy"),
+		field.Enum("status").Values("submitted", "approved", "rejected", "cancelled", "paid").Default("submitted"),
+		field.Time("decided_at").Optional().Nillable(),
+		field.Time("paid_at").Optional().Nillable(),
+	}
+}
+
+func (VendorInvoice) Indexes() []ent.Index {
+	return []ent.Index{
+		// One invoice number per vendor: a re-entered invoice is refused, never billed twice.
+		index.Fields("tenant_id", "vendor_id", "invoice_number").Unique(),
+		index.Fields("tenant_id", "property_id", "status"),
+		index.Fields("tenant_id", "contract_id", "period_start"),
+	}
+}
+
 // ServiceSchedule is a recurring visit plan under a contract (garbage days, cleaning rosters).
 type ServiceSchedule struct{ ent.Schema }
 

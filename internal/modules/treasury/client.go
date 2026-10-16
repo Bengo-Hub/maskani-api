@@ -428,6 +428,36 @@ func (c *Client) Vendors(ctx context.Context, tenantID uuid.UUID, search string,
 	return out.Data, nil
 }
 
+// SourceBill is a bill treasury raised from one of maskani's documents, with its payment state.
+type SourceBill struct {
+	SourceReferenceID uuid.UUID       `json:"source_reference_id"`
+	BillNumber        string          `json:"bill_number"`
+	Status            string          `json:"status"` // received, approved, partial, paid, overdue, cancelled
+	TotalAmount       decimal.Decimal `json:"total_amount"`
+	AmountPaid        decimal.Decimal `json:"amount_paid"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
+// BillsBySource reads the bills treasury raised for maskani documents (vendor invoices), at most
+// 200 ids per call (S2S, read only).
+func (c *Client) BillsBySource(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) ([]SourceBill, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = id.String()
+	}
+	var out struct {
+		Data []SourceBill `json:"data"`
+	}
+	q := url.Values{"source_service": {"maskani"}, "ids": {strings.Join(parts, ",")}}
+	if err := c.get(ctx, tenantID, "/ap/bills/by-source?"+q.Encode(), &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
 // RecordManualPayment books a verified manual payment; treasury settles it through the paybill
 // path (oldest due first) and is idempotent on method and reference. Returns the intent id.
 func (c *Client) RecordManualPayment(ctx context.Context, tenantID uuid.UUID, accountRef string, req ManualPaymentRequest) (uuid.UUID, error) {

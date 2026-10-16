@@ -222,6 +222,9 @@ type VendorContract func(*sql.Selector)
 // VendorDocument is the predicate function for vendordocument builders.
 type VendorDocument func(*sql.Selector)
 
+// VendorInvoice is the predicate function for vendorinvoice builders.
+type VendorInvoice func(*sql.Selector)
+
 // VendorPersonnel is the predicate function for vendorpersonnel builders.
 type VendorPersonnel func(*sql.Selector)
 

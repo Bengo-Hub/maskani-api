@@ -88,6 +88,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
+	"github.com/bengobox/maskani-api/internal/ent/vendorinvoice"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
@@ -244,6 +245,8 @@ type Client struct {
 	VendorContract *VendorContractClient
 	// VendorDocument is the client for interacting with the VendorDocument builders.
 	VendorDocument *VendorDocumentClient
+	// VendorInvoice is the client for interacting with the VendorInvoice builders.
+	VendorInvoice *VendorInvoiceClient
 	// VendorPersonnel is the client for interacting with the VendorPersonnel builders.
 	VendorPersonnel *VendorPersonnelClient
 	// Visitor is the client for interacting with the Visitor builders.
@@ -337,6 +340,7 @@ func (c *Client) init() {
 	c.Vendor = NewVendorClient(c.config)
 	c.VendorContract = NewVendorContractClient(c.config)
 	c.VendorDocument = NewVendorDocumentClient(c.config)
+	c.VendorInvoice = NewVendorInvoiceClient(c.config)
 	c.VendorPersonnel = NewVendorPersonnelClient(c.config)
 	c.Visitor = NewVisitorClient(c.config)
 	c.VisitorPass = NewVisitorPassClient(c.config)
@@ -506,6 +510,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Vendor:              NewVendorClient(cfg),
 		VendorContract:      NewVendorContractClient(cfg),
 		VendorDocument:      NewVendorDocumentClient(cfg),
+		VendorInvoice:       NewVendorInvoiceClient(cfg),
 		VendorPersonnel:     NewVendorPersonnelClient(cfg),
 		Visitor:             NewVisitorClient(cfg),
 		VisitorPass:         NewVisitorPassClient(cfg),
@@ -602,6 +607,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Vendor:              NewVendorClient(cfg),
 		VendorContract:      NewVendorContractClient(cfg),
 		VendorDocument:      NewVendorDocumentClient(cfg),
+		VendorInvoice:       NewVendorInvoiceClient(cfg),
 		VendorPersonnel:     NewVendorPersonnelClient(cfg),
 		Visitor:             NewVisitorClient(cfg),
 		VisitorPass:         NewVisitorPassClient(cfg),
@@ -651,8 +657,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.SaleContract, c.ServiceSchedule, c.ServiceVisit, c.Tenant, c.TenantModule,
 		c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount, c.UnitCharge,
 		c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor, c.VendorContract,
-		c.VendorDocument, c.VendorPersonnel, c.Visitor, c.VisitorPass, c.WorkOrder,
-		c.WorkOrderEvent,
+		c.VendorDocument, c.VendorInvoice, c.VendorPersonnel, c.Visitor, c.VisitorPass,
+		c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -677,8 +683,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.SaleContract, c.ServiceSchedule, c.ServiceVisit, c.Tenant, c.TenantModule,
 		c.TenantSetting, c.TitleStage, c.Unit, c.UnitAccount, c.UnitCharge,
 		c.UnitParty, c.UserRoleAssignment, c.Vehicle, c.Vendor, c.VendorContract,
-		c.VendorDocument, c.VendorPersonnel, c.Visitor, c.VisitorPass, c.WorkOrder,
-		c.WorkOrderEvent,
+		c.VendorDocument, c.VendorInvoice, c.VendorPersonnel, c.Visitor, c.VisitorPass,
+		c.WorkOrder, c.WorkOrderEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -831,6 +837,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.VendorContract.mutate(ctx, m)
 	case *VendorDocumentMutation:
 		return c.VendorDocument.mutate(ctx, m)
+	case *VendorInvoiceMutation:
+		return c.VendorInvoice.mutate(ctx, m)
 	case *VendorPersonnelMutation:
 		return c.VendorPersonnel.mutate(ctx, m)
 	case *VisitorMutation:
@@ -11354,6 +11362,141 @@ func (c *VendorDocumentClient) mutate(ctx context.Context, m *VendorDocumentMuta
 	}
 }
 
+// VendorInvoiceClient is a client for the VendorInvoice schema.
+type VendorInvoiceClient struct {
+	config
+}
+
+// NewVendorInvoiceClient returns a client for the VendorInvoice from the given config.
+func NewVendorInvoiceClient(c config) *VendorInvoiceClient {
+	return &VendorInvoiceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `vendorinvoice.Hooks(f(g(h())))`.
+func (c *VendorInvoiceClient) Use(hooks ...Hook) {
+	c.hooks.VendorInvoice = append(c.hooks.VendorInvoice, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `vendorinvoice.Intercept(f(g(h())))`.
+func (c *VendorInvoiceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VendorInvoice = append(c.inters.VendorInvoice, interceptors...)
+}
+
+// Create returns a builder for creating a VendorInvoice entity.
+func (c *VendorInvoiceClient) Create() *VendorInvoiceCreate {
+	mutation := newVendorInvoiceMutation(c.config, OpCreate)
+	return &VendorInvoiceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VendorInvoice entities.
+func (c *VendorInvoiceClient) CreateBulk(builders ...*VendorInvoiceCreate) *VendorInvoiceCreateBulk {
+	return &VendorInvoiceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VendorInvoiceClient) MapCreateBulk(slice any, setFunc func(*VendorInvoiceCreate, int)) *VendorInvoiceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VendorInvoiceCreateBulk{err: fmt.Errorf("calling to VendorInvoiceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VendorInvoiceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VendorInvoiceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VendorInvoice.
+func (c *VendorInvoiceClient) Update() *VendorInvoiceUpdate {
+	mutation := newVendorInvoiceMutation(c.config, OpUpdate)
+	return &VendorInvoiceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VendorInvoiceClient) UpdateOne(_m *VendorInvoice) *VendorInvoiceUpdateOne {
+	mutation := newVendorInvoiceMutation(c.config, OpUpdateOne, withVendorInvoice(_m))
+	return &VendorInvoiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VendorInvoiceClient) UpdateOneID(id uuid.UUID) *VendorInvoiceUpdateOne {
+	mutation := newVendorInvoiceMutation(c.config, OpUpdateOne, withVendorInvoiceID(id))
+	return &VendorInvoiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VendorInvoice.
+func (c *VendorInvoiceClient) Delete() *VendorInvoiceDelete {
+	mutation := newVendorInvoiceMutation(c.config, OpDelete)
+	return &VendorInvoiceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VendorInvoiceClient) DeleteOne(_m *VendorInvoice) *VendorInvoiceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VendorInvoiceClient) DeleteOneID(id uuid.UUID) *VendorInvoiceDeleteOne {
+	builder := c.Delete().Where(vendorinvoice.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VendorInvoiceDeleteOne{builder}
+}
+
+// Query returns a query builder for VendorInvoice.
+func (c *VendorInvoiceClient) Query() *VendorInvoiceQuery {
+	return &VendorInvoiceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVendorInvoice},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VendorInvoice entity by its id.
+func (c *VendorInvoiceClient) Get(ctx context.Context, id uuid.UUID) (*VendorInvoice, error) {
+	return c.Query().Where(vendorinvoice.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VendorInvoiceClient) GetX(ctx context.Context, id uuid.UUID) *VendorInvoice {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VendorInvoiceClient) Hooks() []Hook {
+	hooks := c.hooks.VendorInvoice
+	return append(hooks[:len(hooks):len(hooks)], vendorinvoice.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *VendorInvoiceClient) Interceptors() []Interceptor {
+	inters := c.inters.VendorInvoice
+	return append(inters[:len(inters):len(inters)], vendorinvoice.Interceptors[:]...)
+}
+
+func (c *VendorInvoiceClient) mutate(ctx context.Context, m *VendorInvoiceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VendorInvoiceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VendorInvoiceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VendorInvoiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VendorInvoiceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VendorInvoice mutation op: %q", m.Op())
+	}
+}
+
 // VendorPersonnelClient is a client for the VendorPersonnel schema.
 type VendorPersonnelClient struct {
 	config
@@ -12093,7 +12236,8 @@ type (
 		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
 		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
 		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, Visitor, VisitorPass, WorkOrder, WorkOrderEvent []ent.Hook
+		VendorInvoice, VendorPersonnel, Visitor, VisitorPass, WorkOrder,
+		WorkOrderEvent []ent.Hook
 	}
 	inters struct {
 		AccountCollection, Adjustment, ApprovalRequest, ApprovalRule, AuditLog,
@@ -12109,7 +12253,7 @@ type (
 		RolePermission, Roster, SaleContract, ServiceSchedule, ServiceVisit, Tenant,
 		TenantModule, TenantSetting, TitleStage, Unit, UnitAccount, UnitCharge,
 		UnitParty, UserRoleAssignment, Vehicle, Vendor, VendorContract, VendorDocument,
-		VendorPersonnel, Visitor, VisitorPass, WorkOrder,
+		VendorInvoice, VendorPersonnel, Visitor, VisitorPass, WorkOrder,
 		WorkOrderEvent []ent.Interceptor
 	}
 )

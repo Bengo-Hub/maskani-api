@@ -77,6 +77,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/vendor"
 	"github.com/bengobox/maskani-api/internal/ent/vendorcontract"
 	"github.com/bengobox/maskani-api/internal/ent/vendordocument"
+	"github.com/bengobox/maskani-api/internal/ent/vendorinvoice"
 	"github.com/bengobox/maskani-api/internal/ent/vendorpersonnel"
 	"github.com/bengobox/maskani-api/internal/ent/visitor"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
@@ -2532,6 +2533,41 @@ func init() {
 	vendordocumentDescID := vendordocumentMixinFields0[0].Descriptor()
 	// vendordocument.DefaultID holds the default value on creation for the id field.
 	vendordocument.DefaultID = vendordocumentDescID.Default.(func() uuid.UUID)
+	vendorinvoiceMixin := schema.VendorInvoice{}.Mixin()
+	vendorinvoiceMixinHooks0 := vendorinvoiceMixin[0].Hooks()
+	vendorinvoice.Hooks[0] = vendorinvoiceMixinHooks0[0]
+	vendorinvoiceMixinInters0 := vendorinvoiceMixin[0].Interceptors()
+	vendorinvoice.Interceptors[0] = vendorinvoiceMixinInters0[0]
+	vendorinvoiceMixinFields0 := vendorinvoiceMixin[0].Fields()
+	_ = vendorinvoiceMixinFields0
+	vendorinvoiceFields := schema.VendorInvoice{}.Fields()
+	_ = vendorinvoiceFields
+	// vendorinvoiceDescCreatedAt is the schema descriptor for created_at field.
+	vendorinvoiceDescCreatedAt := vendorinvoiceMixinFields0[2].Descriptor()
+	// vendorinvoice.DefaultCreatedAt holds the default value on creation for the created_at field.
+	vendorinvoice.DefaultCreatedAt = vendorinvoiceDescCreatedAt.Default.(func() time.Time)
+	// vendorinvoiceDescUpdatedAt is the schema descriptor for updated_at field.
+	vendorinvoiceDescUpdatedAt := vendorinvoiceMixinFields0[3].Descriptor()
+	// vendorinvoice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	vendorinvoice.DefaultUpdatedAt = vendorinvoiceDescUpdatedAt.Default.(func() time.Time)
+	// vendorinvoice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	vendorinvoice.UpdateDefaultUpdatedAt = vendorinvoiceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// vendorinvoiceDescInvoiceNumber is the schema descriptor for invoice_number field.
+	vendorinvoiceDescInvoiceNumber := vendorinvoiceFields[3].Descriptor()
+	// vendorinvoice.InvoiceNumberValidator is a validator for the "invoice_number" field. It is called by the builders before save.
+	vendorinvoice.InvoiceNumberValidator = vendorinvoiceDescInvoiceNumber.Validators[0].(func(string) error)
+	// vendorinvoiceDescAmount is the schema descriptor for amount field.
+	vendorinvoiceDescAmount := vendorinvoiceFields[8].Descriptor()
+	// vendorinvoice.DefaultAmount holds the default value on creation for the amount field.
+	vendorinvoice.DefaultAmount = vendorinvoiceDescAmount.Default.(func() decimal.Decimal)
+	// vendorinvoiceDescVatAmount is the schema descriptor for vat_amount field.
+	vendorinvoiceDescVatAmount := vendorinvoiceFields[9].Descriptor()
+	// vendorinvoice.DefaultVatAmount holds the default value on creation for the vat_amount field.
+	vendorinvoice.DefaultVatAmount = vendorinvoiceDescVatAmount.Default.(func() decimal.Decimal)
+	// vendorinvoiceDescID is the schema descriptor for id field.
+	vendorinvoiceDescID := vendorinvoiceMixinFields0[0].Descriptor()
+	// vendorinvoice.DefaultID holds the default value on creation for the id field.
+	vendorinvoice.DefaultID = vendorinvoiceDescID.Default.(func() uuid.UUID)
 	vendorpersonnelMixin := schema.VendorPersonnel{}.Mixin()
 	vendorpersonnelMixinHooks0 := vendorpersonnelMixin[0].Hooks()
 	vendorpersonnel.Hooks[0] = vendorpersonnelMixinHooks0[0]

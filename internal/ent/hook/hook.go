@@ -873,6 +873,18 @@ func (f VendorDocumentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VendorDocumentMutation", m)
 }
 
+// The VendorInvoiceFunc type is an adapter to allow the use of ordinary
+// function as VendorInvoice mutator.
+type VendorInvoiceFunc func(context.Context, *ent.VendorInvoiceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VendorInvoiceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VendorInvoiceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VendorInvoiceMutation", m)
+}
+
 // The VendorPersonnelFunc type is an adapter to allow the use of ordinary
 // function as VendorPersonnel mutator.
 type VendorPersonnelFunc func(context.Context, *ent.VendorPersonnelMutation) (ent.Value, error)

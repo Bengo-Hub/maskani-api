@@ -3005,6 +3005,51 @@ var (
 			},
 		},
 	}
+	// VendorInvoicesColumns holds the columns for the "vendor_invoices" table.
+	VendorInvoicesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "vendor_id", Type: field.TypeUUID},
+		{Name: "contract_id", Type: field.TypeUUID},
+		{Name: "property_id", Type: field.TypeUUID},
+		{Name: "invoice_number", Type: field.TypeString},
+		{Name: "etims_number", Type: field.TypeString, Nullable: true},
+		{Name: "invoice_date", Type: field.TypeTime},
+		{Name: "period_start", Type: field.TypeTime},
+		{Name: "period_end", Type: field.TypeTime},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
+		{Name: "vat_amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(18,2)"}},
+		{Name: "attachments", Type: field.TypeJSON, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"submitted", "approved", "rejected", "cancelled", "paid"}, Default: "submitted"},
+		{Name: "decided_at", Type: field.TypeTime, Nullable: true},
+		{Name: "paid_at", Type: field.TypeTime, Nullable: true},
+	}
+	// VendorInvoicesTable holds the schema information for the "vendor_invoices" table.
+	VendorInvoicesTable = &schema.Table{
+		Name:       "vendor_invoices",
+		Columns:    VendorInvoicesColumns,
+		PrimaryKey: []*schema.Column{VendorInvoicesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "vendorinvoice_tenant_id_vendor_id_invoice_number",
+				Unique:  true,
+				Columns: []*schema.Column{VendorInvoicesColumns[1], VendorInvoicesColumns[5], VendorInvoicesColumns[8]},
+			},
+			{
+				Name:    "vendorinvoice_tenant_id_property_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{VendorInvoicesColumns[1], VendorInvoicesColumns[7], VendorInvoicesColumns[16]},
+			},
+			{
+				Name:    "vendorinvoice_tenant_id_contract_id_period_start",
+				Unique:  false,
+				Columns: []*schema.Column{VendorInvoicesColumns[1], VendorInvoicesColumns[6], VendorInvoicesColumns[11]},
+			},
+		},
+	}
 	// VendorPersonnelsColumns holds the columns for the "vendor_personnels" table.
 	VendorPersonnelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -3379,6 +3424,7 @@ var (
 		VendorsTable,
 		VendorContractsTable,
 		VendorDocumentsTable,
+		VendorInvoicesTable,
 		VendorPersonnelsTable,
 		VisitorsTable,
 		VisitorPassesTable,

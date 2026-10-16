@@ -43,7 +43,8 @@ envelope first and are idempotent on event ID.
 | `maskani.vendor_contract.renewal_due` | A vendor contract enters its notice period (once per end date) | contract_id, contract_number, vendor_id, vendor, service, ends_on, days_left, auto_renew, property_id, property, responders (property managers) | notifications: email to the responders, else the estate contact |
 | `maskani.notice.published` | Notice sent | notice, audience size, priority | notifications fan-out |
 | `maskani.document.executed` | An agreement is fully accepted by code or a signed copy was recorded | document_id, number, kind, title, entity_type, entity_id, executed_at | key-date reminders (planned); `party.otp_requested` with purpose `document` carries the acceptance codes |
-| `maskani.vendor_invoice.approved` | Manager confirms a vendor invoice (wave 2.8) | invoice_id, treasury_vendor_id, amount (net of service credit), etims_number, cost_center, budget_line, fund, wht | treasury: new arpa subscriber raises the vendor bill, idempotent on invoice_id |
+| `maskani.vendor_invoice.approved` | A vendor invoice's approval completes (module `vendor_bill`), written with the status change | invoice_id, treasury_vendor_id, vendor_name, invoice_number, etims_number, invoice_date, amount (as invoiced, VAT included), vat_amount, currency, description, property_id, contract_id, budget_line | treasury `arpa/maskani_vendor_invoice_subscriber.go` raises the bill as invoiced and submits it like any bill (approval rules, eTIMS purchase); idempotent on invoice_id |
+| `maskani.vendor_invoice.cancelled` | An approved, unpaid invoice is cancelled | invoice_id, reason | treasury voids the bill unless it is paid or KRA may hold its purchase |
 | `maskani.arrears.step` | Arrears ladder step reached (wave 2.2) | account_ref, unit_code, step (reminder_1, reminder_7, reminder_14, call_list, demand_letter, escalation), balance, days_overdue | notifications: reminders by email and WhatsApp |
 | `maskani.link.ended` | An occupancy or ownership link reached its end date (wave 2.7) | unit, party, role, end_date | gate pass revocation, final reading request |
 | `maskani.lease.*` (R2), `maskani.listing.*`, `maskani.enquiry.created`, `maskani.tender.*` (R3) | Later releases | | |
@@ -64,7 +65,7 @@ but never published; waves 2.2 and 2.6 wire them.
 | `treasury.payment.succeeded` | treasury | `reference_type` in (`account_payment`, `invoice`) and `source_service = maskani`: refresh `unit_accounts.balance` from treasury, update instalment and contract paid totals, timeline entry, publish `maskani.payment.applied` |
 | `treasury.payment.failed` | treasury | Portal shows the failure; no state change |
 | `invoice.payment` | treasury | Invoice-level paid amounts for run lines and instalments |
-| `treasury.payout.completed` | treasury | Mark vendor invoice paid (sprint 4 remainder) |
+| (none) | treasury | Vendor invoice paid: not an event. Treasury publishes nothing per bill payment, so the hourly `maskani:vendor-invoice-payments` job reads `GET /s2s/{tenant}/ap/bills/by-source` for approved invoices and marks paid ones |
 | `auth.tenant.created` | auth | Tenant projection, default settings when the tenant subscribes to Maskani |
 | `auth.outlet.created`, `.updated`, `.archived` | auth | Outlet projection used by properties |
 | `auth.user.created`, `.updated`, `.deleted` | auth | User projection |

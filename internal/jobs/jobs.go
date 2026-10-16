@@ -238,6 +238,15 @@ func New(d Deps) *Runner {
 			_, _, _, err = d.Works.RenewContracts(sys(ctx), on)
 			return err
 		}},
+		// Vendor invoices: record which approved invoices treasury has paid (read only S2S lookup).
+		{"maskani:vendor-invoice-payments", time.Hour, func(ctx context.Context) error {
+			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
+			if err != nil {
+				return err
+			}
+			_, err = d.Works.SyncInvoicePayments(sys(ctx), on)
+			return err
+		}},
 		{"maskani:vendor-doc-expiry", 24 * time.Hour, func(ctx context.Context) error {
 			on, err := d.Settings.TenantsWithModule(sys(ctx), "providers", "maintenance")
 			if err != nil {

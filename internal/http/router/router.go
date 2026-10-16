@@ -459,6 +459,13 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermWorksView)).Get("/maintenance-schedules", h.ListMaintenancePlans)
 		g.With(perm(rbac.PermWorksManage)).Post("/maintenance-schedules", h.CreateMaintenancePlan)
 		g.With(perm(rbac.PermWorksManage)).Put("/maintenance-schedules/{id}", h.UpdateMaintenancePlan)
+		// Vendor invoices: recorded as issued, checked against contract and visits, approved on the
+		// central engine (module vendor_bill), then billed and paid in treasury.
+		g.With(perm(rbac.PermVendorsView, rbac.PermWorksView)).Get("/vendor-invoices", h.ListVendorInvoices)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendor-invoices", h.CreateVendorInvoice)
+		g.With(perm(rbac.PermVendorsView, rbac.PermWorksView)).Get("/vendor-invoices/{id}/check", h.CheckVendorInvoice)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendor-invoices/{id}/decide", h.DecideVendorInvoice)
+		g.With(perm(rbac.PermVendorsManage)).Post("/vendor-invoices/{id}/cancel", h.CancelVendorInvoice)
 		g.With(perm(rbac.PermVendorsManage)).Post("/vendors/{id}/personnel", h.AddPersonnel)
 		g.With(perm(rbac.PermVendorsManage)).Put("/vendors/{id}/personnel/{pid}/pin", h.SetPersonnelPIN)
 	})
