@@ -148,6 +148,18 @@ its jobs; data stays readable and exportable.
 Use case presets: `estate_developer` (Mvumo), `developer_sales`, `owners_association`,
 `residential_manager`, `commercial_manager`, `self_managing_landlord`, `agent_listings`.
 
+### ERP integration
+
+Everything maskani reads from or sends to erp-api goes through `modules/erp` and is gated on the
+tenant's plan: ERP staff records come with the `hr_management` feature (Maskani plans carry it
+from the first tier). When the plan does not include it, `requireERP` answers 403
+`feature_not_available` with `upgrade: true`: the staff picker asks erp nothing and no
+`erp_employee_id` is saved on a work order or staff assignment, until the tenant upgrades. Exempt
+tenants (platform owner, demo, subscription exempt) and S2S callers pass. The check must sit in
+maskani because maskani's service key passes erp's own plan gate. Maskani keeps only the employee
+id and the name the picker showed; the employee record stays in erp. A future background sync with
+erp must check the tenant's plan the same way before it runs, never only at the screen.
+
 ## Money boundaries
 
 maskani-api never collects, holds or pays money.
