@@ -423,6 +423,9 @@ func (h *H) AssignStaff(w http.ResponseWriter, r *http.Request) {
 	if in.PropertyRole == "" {
 		in.PropertyRole = "other"
 	}
+	if in.ERPEmployeeID != "" && !requireERP(w, r) {
+		return
+	}
 	row, err := h.Register.AssignStaff(r.Context(), id, in.AuthUserID, actor(r), in.PropertyRole, in.ERPEmployeeID)
 	if err != nil {
 		httpx.Fail(w, err)

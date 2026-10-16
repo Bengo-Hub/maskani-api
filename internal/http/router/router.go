@@ -435,6 +435,9 @@ func mount(r chi.Router, d Deps) {
 		g.With(perm(rbac.PermWorksManage)).Post("/work-orders/{id}/actions", h.ActWorkOrder)
 	})
 
+	// ERP staff for the work order and staff pickers; the handler checks the plan includes ERP.
+	r.With(perm(rbac.PermWorksManage, rbac.PermUsersManage)).Get("/erp/employees", h.ERPEmployees)
+
 	// Vendors (service providers module).
 	r.Group(func(g chi.Router) {
 		g.Use(mod(settings.ModProviders))

@@ -4,6 +4,7 @@ package works
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -193,13 +194,16 @@ type ActionInput struct {
 	Action        string     `json:"action"` // assign, quote, approve_quote, start, complete, confirm, reopen, cancel, close
 	VendorID      *uuid.UUID `json:"vendor_id"`
 	ERPEmployeeID string     `json:"erp_employee_id"`
-	AssignedUser  *uuid.UUID `json:"assigned_user_id"`
-	QuoteAmount   *float64   `json:"quote_amount"`
-	CostAmount    *float64   `json:"cost_amount"`
-	Recharge      *bool      `json:"recharge"`
-	Photos        []string   `json:"photos"`
-	MinutesOnSite *int       `json:"minutes_on_site"`
-	Note          string     `json:"note"`
+	// ERPEmployeeName is the name the staff picker showed, kept in metadata so the work order shows
+	// its assignee without asking erp (the employee record stays in erp).
+	ERPEmployeeName string     `json:"erp_employee_name"`
+	AssignedUser    *uuid.UUID `json:"assigned_user_id"`
+	QuoteAmount     *float64   `json:"quote_amount"`
+	CostAmount      *float64   `json:"cost_amount"`
+	Recharge        *bool      `json:"recharge"`
+	Photos          []string   `json:"photos"`
+	MinutesOnSite   *int       `json:"minutes_on_site"`
+	Note            string     `json:"note"`
 }
 
 var transitions = map[string][]workorder.Status{
@@ -252,11 +256,19 @@ func (s *Service) Act(ctx context.Context, id uuid.UUID, a Actor, in ActionInput
 	switch in.Action {
 	case "assign":
 		to = workorder.StatusAssigned
+		meta := map[string]any{}
+		for k, v := range wo.Metadata {
+			meta[k] = v
+		}
+		delete(meta, "erp_employee_name")
 		switch {
 		case in.VendorID != nil:
-			u.SetAssigneeKind(workorder.AssigneeKindVendor).SetVendorID(*in.VendorID)
+			u.SetAssigneeKind(workorder.AssigneeKindVendor).SetVendorID(*in.VendorID).SetMetadata(meta)
 		case in.ERPEmployeeID != "" || in.AssignedUser != nil:
-			u.SetAssigneeKind(workorder.AssigneeKindStaff).SetErpEmployeeID(in.ERPEmployeeID)
+			if name := strings.TrimSpace(in.ERPEmployeeName); in.ERPEmployeeID != "" && name != "" {
+				meta["erp_employee_name"] = name
+			}
+			u.SetAssigneeKind(workorder.AssigneeKindStaff).SetErpEmployeeID(in.ERPEmployeeID).SetMetadata(meta)
 			if in.AssignedUser != nil {
 				u.SetAssignedUserID(*in.AssignedUser)
 			}

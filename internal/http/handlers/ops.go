@@ -269,6 +269,9 @@ func (h *H) ActWorkOrder(w http.ResponseWriter, r *http.Request) {
 	if !h.scopeOf(w, r, register.RecordWorkOrder, id) {
 		return
 	}
+	if in.ERPEmployeeID != "" && !requireERP(w, r) {
+		return
+	}
 	var wo *ent.WorkOrder
 	var err error
 	switch in.Action {

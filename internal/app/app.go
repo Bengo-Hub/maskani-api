@@ -36,6 +36,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/docs"
+	"github.com/bengobox/maskani-api/internal/modules/erp"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/market"
@@ -249,7 +250,7 @@ func New(ctx context.Context) (*App, error) {
 		Collections: collSvc, Approvals: approvalSvc, Audit: auditSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Privacy: privacySvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
 		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
-		RT:    rt, Tenants: syncer}
+		RT:    rt, Tenants: syncer, ERP: erp.NewClient(cfg.Services.ERPURL, cfg.Auth.APIKey, log)}
 
 	var limiter *ratelimit.Limiter
 	if rdb != nil {

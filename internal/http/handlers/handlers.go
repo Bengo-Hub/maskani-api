@@ -17,6 +17,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/modules/billing"
 	"github.com/bengobox/maskani-api/internal/modules/collections"
 	"github.com/bengobox/maskani-api/internal/modules/docs"
+	"github.com/bengobox/maskani-api/internal/modules/erp"
 	"github.com/bengobox/maskani-api/internal/modules/gate"
 	"github.com/bengobox/maskani-api/internal/modules/imports"
 	"github.com/bengobox/maskani-api/internal/modules/market"
@@ -65,6 +66,8 @@ type H struct {
 	RT *realtime.Hub
 	// Tenants lists the tenants a platform owner can switch between.
 	Tenants *tenant.Syncer
+	// ERP is the erp-api client, used only behind requireERP (the tenant's plan includes ERP).
+	ERP *erp.Client
 }
 
 func access(r *http.Request) *mw.Access { return mw.FromContext(r.Context()) }
