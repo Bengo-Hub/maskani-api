@@ -20,7 +20,6 @@ type Config struct {
 	Events   EventsConfig
 	Auth     AuthConfig
 	Services ServicesConfig
-	Media    MediaConfig
 	Security SecurityConfig
 }
 
@@ -95,14 +94,10 @@ type ServicesConfig struct {
 	SubscriptionsURL string `envconfig:"SUBSCRIPTION_BASE_URL" default:"http://subscription-api.subscriptions.svc.cluster.local:4000"`
 }
 
-type MediaConfig struct {
-	Root    string `envconfig:"MEDIA_ROOT" default:"./media"`
-	URLBase string `envconfig:"MEDIA_URL_BASE" default:""`
-	MaxMB   int    `envconfig:"MEDIA_MAX_MB" default:"8"`
-}
-
-// SecurityConfig carries keys for field encryption, phone hashing and signed media links. Each
-// falls back to INTERNAL_SERVICE_KEY only in development so a local run starts without extra setup.
+// SecurityConfig carries keys for field encryption, phone hashing and signed media links (the
+// links only matter in local development, where media sits under MEDIA_ROOT; production uses
+// presigned object storage links). Each falls back to INTERNAL_SERVICE_KEY only in development so
+// a local run starts without extra setup.
 type SecurityConfig struct {
 	FieldEncryptionKey string `envconfig:"FIELD_ENCRYPTION_KEY" default:""`
 	MediaSigningSecret string `envconfig:"MEDIA_SIGNING_SECRET" default:""`

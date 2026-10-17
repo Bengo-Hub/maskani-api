@@ -128,7 +128,7 @@ func TestSigningOnPostgres(t *testing.T) {
 	if _, err := s.RecordWetSigned(ctx, offer.ID, stranger, []string{"elsewhere/x.jpg"}); err == nil {
 		t.Fatal("scans must be the tenant's document uploads")
 	}
-	got, err = s.RecordWetSigned(ctx, offer.ID, stranger, []string{"tenants/" + tenant.String() + "/documents/2026-10/p1.jpg"})
+	got, err = s.RecordWetSigned(ctx, offer.ID, stranger, []string{"maskani/" + tenant.String() + "/documents/2026/10/p1.jpg"})
 	must(err)
 	if got.Status != "executed" {
 		t.Fatalf("signed copy executes: %s", got.Status)

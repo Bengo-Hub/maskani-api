@@ -90,7 +90,7 @@ func TestVisitsAndPreventiveOnPostgres(t *testing.T) {
 	if len(visits) != 1 {
 		t.Fatalf("today's visits: %d", len(visits))
 	}
-	rec, err := s.RecordVisit(ctx, visits[0].ID, VisitInput{Status: "completed", Photos: []string{"tenants/x/works/p.jpg"},
+	rec, err := s.RecordVisit(ctx, visits[0].ID, VisitInput{Status: "completed", Photos: []string{"maskani/x/works/2026/10/p.jpg"},
 		Checklist: []map[string]any{{"item": "Stairs mopped", "done": true}}})
 	must(err)
 	if rec.Status != servicevisit.StatusCompleted || rec.CheckedInAt == nil || len(rec.Photos) != 1 {

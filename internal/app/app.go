@@ -13,6 +13,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/Bengo-Hub/httpware"
+	"github.com/Bengo-Hub/httpware/objectstore"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
 	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
@@ -205,7 +206,16 @@ func New(ctx context.Context) (*App, error) {
 	reportSvc := reports.NewService(roOrm, roSQL, utilities.NewService(roOrm, log), loc, log)
 	portalSvc := portal.NewService(orm, log)
 	privacySvc := privacy.NewService(orm, regSvc, box, log)
-	marketSvc := market.NewService(orm, box, log, cfg.Media.URLBase)
+	// Uploads and issued documents on the shared object storage (httpware/objectstore): estate and
+	// unit photos public, everything else private with presigned links. Local development keeps
+	// files under MEDIA_ROOT with links signed by the media key.
+	handlers.RegisterMediaTypes()
+	mediaStore, err := objectstore.New("maskani", objectstore.FromEnv(),
+		objectstore.WithLocalSigner(httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)))
+	if err != nil {
+		return nil, fmt.Errorf("object storage: %w", err)
+	}
+	marketSvc := market.NewService(orm, box, log, mediaStore)
 
 	consumer := collections.NewConsumer(orm, collSvc, salesSvc.SyncProgress, loc, log)
 	consumer.OnApplied = reportSvc.Invalidate
@@ -237,19 +247,19 @@ func New(ctx context.Context) (*App, error) {
 		authMW = authclient.NewAuthMiddlewareWithAPIKey(validator, authclient.NewAPIKeyValidator(cfg.Auth.ServiceURL, nil))
 	}
 
-	signer := httpware.NewMediaSigner(cfg.Security.MediaSigningSecret, 12*time.Hour)
 	importSvc := imports.NewService(orm, regSvc, log)
 	// Documents brand from auth-api's tenant record through the shared Redis tenant cache (in-cluster).
 	docSvc := docs.NewService(orm, docs.NewBrander(sharedcache.New(rdb, log), cfg.Auth.APIURL, settingsSvc, log), collSvc, reportSvc, loc)
-	// Issued documents are stored under the media root and checked on maskani-ui's public verify page.
+	// Issued documents are stored privately on the media store and checked on maskani-ui's public
+	// verify page.
 	docSvc.SetSigning(box)
-	docSvc.SetIssuing(docs.Storage{Root: cfg.Media.Root, VerifyURL: strings.TrimRight(cfg.HTTP.AppURL, "/") + "/verify/"}, seq)
+	docSvc.SetIssuing(docs.Storage{Media: mediaStore, VerifyURL: strings.TrimRight(cfg.HTTP.AppURL, "/") + "/verify/"}, seq)
 	// The collections ladder and instalment reminders (one engine per customer; treasury dunning stays off).
 	remindSvc := reminders.NewService(orm, sqlDB, docSvc, loc, log)
 	h := &handlers.H{RBAC: rbacSvc, Settings: settingsSvc, Register: regSvc, Accounts: accSvc, Billing: billSvc,
 		Collections: collSvc, Approvals: approvalSvc, Audit: auditSvc, Utilities: utilSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Notices: noticeSvc,
 		Reports: reportSvc, Portal: portalSvc, Privacy: privacySvc, Market: marketSvc, Imports: importSvc, Docs: docSvc, Sequences: seq, Reminders: remindSvc, PortalURL: strings.TrimRight(cfg.HTTP.AppURL, "/"),
-		Media: &handlers.Media{Root: cfg.Media.Root, URLBase: cfg.Media.URLBase, MaxMB: cfg.Media.MaxMB, Signer: signer, Log: log},
+		Media: &handlers.Media{Store: mediaStore, Log: log},
 		RT:    rt, Tenants: syncer, ERP: erp.NewClient(cfg.Services.ERPURL, cfg.Auth.APIKey, log)}
 
 	var limiter *ratelimit.Limiter
@@ -258,7 +268,7 @@ func New(ctx context.Context) (*App, error) {
 	}
 	mux := router.New(router.Deps{Log: log, Limiter: limiter, Auth: authMW, AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		Ent: orm, RBAC: rbacSvc, Settings: settingsSvc, TenantSyncer: syncer, H: h,
-		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaRoot: cfg.Media.Root, MediaSigner: signer, Audit: auditSvc,
+		Health: &handlers.Health{DB: pool, Cache: rdb, Events: nc}, MediaFiles: mediaStore.MediaHandler(), Audit: auditSvc,
 		InternalKey: cfg.Auth.APIKey})
 
 	runner := jobs.New(jobs.Deps{Client: orm, SQL: sqlDB, Loc: loc, Accounts: accSvc, Billing: billSvc, Imports: importSvc, Sales: salesSvc, Works: worksSvc, Gate: gateSvc, Privacy: privacySvc, Notices: noticeSvc, Settings: settingsSvc, Reminders: remindSvc, Collections: collSvc, Register: regSvc, Log: log})

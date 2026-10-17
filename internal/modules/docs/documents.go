@@ -5,15 +5,15 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
+	"github.com/Bengo-Hub/httpware/objectstore"
 	"github.com/Bengo-Hub/reports"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -32,8 +32,8 @@ import (
 
 // Storage is where issued documents are kept and how they are verified.
 type Storage struct {
-	Root      string // media root; files go under tenants/{tenant}/documents/{yyyy-mm}/
-	VerifyURL string // public page, the code is appended: https://.../verify/
+	Media     *objectstore.Store // private; files go under maskani/{tenant}/documents/{yyyy}/{mm}/
+	VerifyURL string             // public page, the code is appended: https://.../verify/
 }
 
 // Numberer allocates document numbers (the sequence allocator).
@@ -140,7 +140,7 @@ func partyName(p *ent.Party) string {
 // Issue renders the document from the template in use, numbers it, stores the PDF with its hash
 // and a verification code, and records it as issued. sub comes from Subject, already authorised.
 func (s *Service) Issue(ctx context.Context, actor uuid.UUID, slug string, k DocKind, entityID uuid.UUID, sub *Subject, inputs map[string]string) (*ent.Document, error) {
-	if s.num == nil || s.store.Root == "" {
+	if s.num == nil || !s.store.Media.Enabled() {
 		return nil, httpx.Unavailable("document storage is not set up")
 	}
 	tenantID, err := tenantguard.MustTenant(ctx)
@@ -192,8 +192,11 @@ func (s *Service) Issue(ctx context.Context, actor uuid.UUID, slug string, k Doc
 		return nil, err
 	}
 	sum := sha256.Sum256(body)
-	key := filepath.ToSlash(filepath.Join("tenants", tenantID.String(), "documents", now.Format("2006-01"), uuid.New().String()+".pdf"))
-	if err := writeFile(filepath.Join(s.store.Root, filepath.FromSlash(key)), body); err != nil {
+	key, err := s.store.Media.NewKey(objectstore.Owner{TenantID: tenantID.String()}, objectstore.TypeDocuments, ".pdf")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.store.Media.Put(ctx, key, body, reports.MimePDF); err != nil {
 		return nil, fmt.Errorf("store document: %w", err)
 	}
 
@@ -249,10 +252,13 @@ func PropertyOf(d *ent.Document) uuid.UUID {
 
 // File reads a document's PDF and records who downloaded it.
 func (s *Service) File(ctx context.Context, d *ent.Document, actor *uuid.UUID, actorKind, ip string) (*File, error) {
-	if d.FileKey == "" || s.store.Root == "" {
+	if d.FileKey == "" || !s.store.Media.Owned(d.FileKey) {
 		return nil, httpx.Unavailable("the document file is not available")
 	}
-	body, err := os.ReadFile(filepath.Join(s.store.Root, filepath.FromSlash(d.FileKey)))
+	body, _, err := s.store.Media.Get(ctx, d.FileKey)
+	if errors.Is(err, objectstore.ErrNotFound) {
+		return nil, httpx.Unavailable("the document file is not available")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("read document: %w", err)
 	}
@@ -314,13 +320,6 @@ func verificationCode() (string, error) {
 		}
 	}
 	return string(out), nil
-}
-
-func writeFile(path string, body []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, body, 0o644)
 }
 
 func firstNonEmpty(v ...string) string {

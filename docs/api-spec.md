@@ -326,10 +326,12 @@ Verify, export, erasure and reject are in the audit allowlist (the export is the
 | GET `/units/{id}` | planned (sprint 8) |
 
 ## Media visibility
-Estate and unit photos (`kind=properties` and `kind=units`) are published images: `/media/...` serves
-them without a signature, with immutable caching, and the market projection returns them as absolute
-links. Every other kind (documents, readings, works, incidents, vendors, evidence) needs a signed
-link from `POST /media/sign` and is never cached by shared caches.
+Uploads and issued documents live on the shared object storage under
+`maskani/{tenant_id}/{kind}/{yyyy}/{mm}/{uuid}.{ext}`; rows keep the key. Estate and unit photos
+(`kind=properties` and `kind=units`) are on the public bucket (`https://media.codevertexafrica.com/<key>`,
+immutable caching), and the market projection returns those links. Every other kind (documents,
+readings, works, incidents, vendors, evidence) is on the private bucket and is reached only through a
+presigned link from `POST /media/sign`. `POST /media/upload` answers `{key, url}`.
 
 ## Late payment charge
 Off unless an estate switches it on (`late_charge.enabled`). The hourly job `maskani:late-charges`

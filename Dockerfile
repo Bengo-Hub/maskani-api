@@ -19,9 +19,10 @@ COPY --from=builder /out/maskani-seed /usr/local/bin/maskani-seed
 COPY --from=builder /out/maskani-seed-tenant /usr/local/bin/maskani-seed-tenant
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 # /app/seed-tenant is the documented path for: kubectl exec ... -- /app/seed-tenant --tenant <slug>
-RUN chmod +x /usr/local/bin/entrypoint.sh && mkdir -p /app/media && chown app:app /app/media && \
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
     ln -s /usr/local/bin/maskani-seed-tenant /app/seed-tenant
 USER app
-ENV TZ=Africa/Nairobi HTTP_PORT=4000 MEDIA_ROOT=/app/media
+# Uploads and issued documents use the shared object storage (OBJECT_STORAGE_*).
+ENV TZ=Africa/Nairobi HTTP_PORT=4000
 EXPOSE 4000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

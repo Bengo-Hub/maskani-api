@@ -14,8 +14,8 @@
 | subscriptions-api | Existing | Plans, feature entitlements, limits |
 | marketflow-api, maps | Existing, R3 | Leads from enquiries; geocoding and map tiles |
 
-Platform: PostgreSQL behind PgBouncer (transaction pooling), Redis, NATS JetStream, local media
-volume (object storage later), Cloudflare, k3s, ArgoCD.
+Platform: PostgreSQL behind PgBouncer (transaction pooling), Redis, NATS JetStream, the shared
+object storage (Cloudflare R2 through httpware/objectstore), Cloudflare, k3s, ArgoCD.
 
 ## Code layout
 
@@ -99,7 +99,7 @@ cashier and member are shared by all of them. Two rules keep other products out 
 | Query guard | Ent interceptor adds `tenant_id = ctx tenant` to every query on a tenant-owned type; a query without tenant context fails closed |
 | Write guard | Ent hook stamps `tenant_id` on create and rejects a mismatch on update or delete |
 | System jobs | Opt out explicitly with `tenantguard.System(ctx)`; each job then filters per tenant itself |
-| Files | Media keys prefixed `tenants/{tenant_id}/...`; served only through signed, short-lived URLs |
+| Files | Keys `maskani/{tenant_id}/{kind}/{yyyy}/{mm}/{uuid}.{ext}` on the shared object storage. Estate and unit photos (`properties`, `units`) are on the public bucket for the showcase; every other kind and every issued document is private, reached only through presigned, short-lived links (`POST /media/sign`) |
 | Events | `tenant_id` on the envelope; consumers resolve tenant from the envelope first |
 | Cache | Keys prefixed `maskani:{tenant_id}:` |
 | Tests | Cross-tenant suite: two tenants with overlapping unit codes, every route checked |

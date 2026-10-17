@@ -189,7 +189,7 @@ func (s *Service) RecordWetSigned(ctx context.Context, docID, by uuid.UUID, keys
 	if err != nil {
 		return nil, err
 	}
-	prefix := "tenants/" + tenantID.String() + "/documents/"
+	prefix := "maskani/" + tenantID.String() + "/documents/"
 	for _, k := range keys {
 		if !strings.HasPrefix(k, prefix) || strings.Contains(k, "..") {
 			return nil, httpx.Invalid("upload the signed pages through the documents upload first")

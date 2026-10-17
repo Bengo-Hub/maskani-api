@@ -22,7 +22,6 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/handlers"
 	mw "github.com/bengobox/maskani-api/internal/http/middleware"
 	"github.com/bengobox/maskani-api/internal/modules/audit"
-	"github.com/bengobox/maskani-api/internal/modules/market"
 	"github.com/bengobox/maskani-api/internal/modules/rbac"
 	"github.com/bengobox/maskani-api/internal/modules/settings"
 	"github.com/bengobox/maskani-api/internal/modules/tenant"
@@ -41,8 +40,8 @@ type Deps struct {
 	TenantSyncer   *tenant.Syncer
 	H              *handlers.H
 	Health         *handlers.Health
-	MediaRoot      string
-	MediaSigner    *httpware.MediaSigner
+	// MediaFiles is objectstore's /media handler (nil when there is nothing to serve).
+	MediaFiles http.Handler
 	// InternalKey is the fleet INTERNAL_SERVICE_KEY sibling services present on /api/v1/internal.
 	InternalKey string
 }
@@ -74,12 +73,10 @@ func New(d Deps) http.Handler {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/v1/docs/", http.StatusFound) })
 	r.Get("/v1/docs/*", docsHandler)
 
-	if d.MediaRoot != "" {
-		r.Handle("/media/*", http.StripPrefix("/media", httpware.StaticMedia(d.MediaRoot, httpware.MediaOptions{
-			// Estate and unit photos are published images; every other upload needs a signed link.
-			Private: func(name string) bool { return !market.PublicMediaKind(name) },
-			Signer:  d.MediaSigner,
-		})))
+	// Estate and unit photos are on the public bucket (/media redirects their keys there); every
+	// other upload is private and reached only through presigned links from /media/sign.
+	if d.MediaFiles != nil {
+		r.Handle("/media/*", http.StripPrefix("/media", d.MediaFiles))
 	}
 
 	h := d.H

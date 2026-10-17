@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Bengo-Hub/httpware/objectstore"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -25,23 +26,23 @@ import (
 
 // Service is the public market service.
 type Service struct {
-	client    *ent.Client
-	box       *secure.Box
-	log       *zap.Logger
-	mediaBase string
+	client *ent.Client
+	box    *secure.Box
+	log    *zap.Logger
+	media  *objectstore.Store
 }
 
-// NewService creates the market service. mediaBase is the API's public origin (MEDIA_URL_BASE),
-// so photo keys go out as absolute links the public site can load.
-func NewService(client *ent.Client, box *secure.Box, log *zap.Logger, mediaBase string) *Service {
-	return &Service{client: client, box: box, log: log.Named("market"), mediaBase: strings.TrimRight(mediaBase, "/")}
+// NewService creates the market service. media turns photo keys into public links the public
+// site can load.
+func NewService(client *ent.Client, box *secure.Box, log *zap.Logger, media *objectstore.Store) *Service {
+	return &Service{client: client, box: box, log: log.Named("market"), media: media}
 }
 
-// PublicMediaKind reports whether a media key holds estate or unit photos, the only uploads served
-// without a signed link (they are published marketing images under unguessable names).
+// PublicMediaKind reports whether a media key holds estate or unit photos
+// (maskani/<tenant>/<properties|units>/...), the only uploads published without a signed link.
 func PublicMediaKind(key string) bool {
-	parts := strings.SplitN(strings.TrimPrefix(key, "/"), "/", 4)
-	return len(parts) == 4 && parts[0] == "tenants" && (parts[2] == "properties" || parts[2] == "units")
+	parts := strings.SplitN(key, "/", 4)
+	return len(parts) == 4 && parts[0] == "maskani" && (parts[2] == "properties" || parts[2] == "units")
 }
 
 // photoURLs turns stored photo keys into public links; anything else (another kind, a stray
@@ -49,8 +50,8 @@ func PublicMediaKind(key string) bool {
 func (s *Service) photoURLs(keys []string) []string {
 	out := make([]string, 0, len(keys))
 	for _, k := range keys {
-		if PublicMediaKind(k) && !strings.Contains(k, "..") {
-			out = append(out, s.mediaBase+"/media/"+k)
+		if PublicMediaKind(k) && s.media.Owned(k) {
+			out = append(out, s.media.URL(k))
 		}
 	}
 	return out
