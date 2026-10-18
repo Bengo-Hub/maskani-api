@@ -44,6 +44,8 @@ type Deps struct {
 	MediaFiles http.Handler
 	// InternalKey is the fleet INTERNAL_SERVICE_KEY sibling services present on /api/v1/internal.
 	InternalKey string
+	// TenantExport streams one tenant's rows for auth-api's SSO tenant backups (httpware/tenantexport).
+	TenantExport http.Handler
 }
 
 // New returns the HTTP handler.
@@ -108,6 +110,11 @@ func New(d Deps) http.Handler {
 		ir.Use(mw.RequireInternalKey(d.InternalKey))
 		ir.Get("/residents/reach", h.InternalResidentsReach)
 	})
+	// Tenant export for auth-api's SSO tenant backups, behind the same internal key (refused when
+	// no key is set).
+	if d.TenantExport != nil {
+		r.With(mw.RequireInternalKey(d.InternalKey)).Get("/api/v1/s2s/tenant-export", d.TenantExport.ServeHTTP)
+	}
 
 	// Gate tablets authenticate with their device key.
 	r.Route("/api/v1/gate", func(gr chi.Router) {
