@@ -3,7 +3,7 @@ module github.com/bengobox/maskani-api
 go 1.26.0
 
 // The auth client's module path differs from its repo name; pinned to the fleet tag.
-replace github.com/Bengo-Hub/shared-auth-client => github.com/Bengo-Hub/auth-client v0.15.1
+replace github.com/Bengo-Hub/shared-auth-client => github.com/Bengo-Hub/auth-client v0.16.1
 
 require (
 	ariga.io/atlas v1.1.0

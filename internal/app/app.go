@@ -154,7 +154,8 @@ func New(ctx context.Context) (*App, error) {
 		log.Warn("rbac seed failed (seed binary retries on deploy)", zap.Error(err))
 	}
 	settingsSvc := settings.NewService(orm, log)
-	syncer := tenant.NewSyncer(orm, cfg.Auth.APIURL, sqlDB, log)
+	syncer := tenant.NewSyncer(orm, cfg.Auth.APIURL, sqlDB, log).
+		WithEntitlements(authclient.NewEntitlementClient(cfg.Services.SubscriptionsURL, cfg.Auth.APIKey))
 	syncer.OnFirstSeen(func(ctx context.Context, id uuid.UUID, slug string) {
 		if err := settingsSvc.EnsureTenantDefaults(ctx, id); err != nil {
 			log.Warn("tenant defaults failed", zap.String("slug", slug), zap.Error(err))

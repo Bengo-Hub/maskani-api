@@ -152,6 +152,8 @@ func New(d Deps) http.Handler {
 	r.Route("/api/v1/{tenant}/maskani", func(tr chi.Router) {
 		tr.Use(mw.StreamQueryToken) // acts on GET .../stream only
 		tr.Use(d.Auth.RequireAuth)
+		// The whole module is closed to a tenant whose plan does not include maskani (reads too).
+		tr.Use(authclient.RequireServiceAccess("maskani"))
 		tr.Use(authclient.RequireActiveSubscriptionForMutationsWithGrace(7))
 		tr.Use(httpware.TenantV2(httpware.TenantConfig{
 			ClaimsExtractor: func(ctx context.Context) (string, string, bool, bool) {

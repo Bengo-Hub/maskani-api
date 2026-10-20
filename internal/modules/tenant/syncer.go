@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	authclient "github.com/Bengo-Hub/shared-auth-client"
 	serviceclient "github.com/Bengo-Hub/shared-service-client"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -43,6 +44,7 @@ type Syncer struct {
 	api, probe *serviceclient.Client
 	slugs      *sharedcache.Local[string, uuid.UUID]
 
+	entitle     *authclient.EntitlementClient
 	onFirstSeen FirstSeenFunc
 	seenMu      sync.Mutex
 	seen        map[uuid.UUID]bool
@@ -64,6 +66,16 @@ func NewSyncer(client *ent.Client, authURL string, db *sql.DB, log *zap.Logger) 
 	pcfg.Timeout = 5 * time.Second
 	return &Syncer{client: client, authURL: authURL, db: db, log: log, api: serviceclient.New(cfg),
 		probe: serviceclient.New(pcfg), slugs: sharedcache.NewLocal[string, uuid.UUID](5000, slugTTL)}
+}
+
+// ServiceTag is the subscriptions service tag of every maskani plan.
+const ServiceTag = "maskani"
+
+// WithEntitlements attaches the plan check: a tenant whose plan does not include maskani gets no
+// tenant row, defaults or outlet mirror (SyncTenant answers authclient.ErrServiceNotEntitled).
+func (s *Syncer) WithEntitlements(c *authclient.EntitlementClient) *Syncer {
+	s.entitle = c
+	return s
 }
 
 // Forget drops a slug from memory (a tenant event changed it).
@@ -106,6 +118,9 @@ type authAPITenant struct {
 func (s *Syncer) SyncTenant(ctx context.Context, slug string) (uuid.UUID, error) {
 	id, err := s.syncTenantID(ctx, slug)
 	if err == nil && id != uuid.Nil {
+		if err := s.entitle.Require(ctx, id.String(), ServiceTag); err != nil {
+			return uuid.Nil, err
+		}
 		s.firstSeen(ctx, id, slug)
 	}
 	return id, err
@@ -167,6 +182,10 @@ func (s *Syncer) resolveTenantID(ctx context.Context, slug string) (uuid.UUID, e
 	realID, err := uuid.Parse(remote.ID)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("tenant: invalid uuid %q: %w", remote.ID, err)
+	}
+	// Nothing is written for a tenant whose plan does not include maskani.
+	if err := s.entitle.Require(ctx, realID.String(), ServiceTag); err != nil {
+		return uuid.Nil, err
 	}
 	status := remote.Status
 	if status == "" {
