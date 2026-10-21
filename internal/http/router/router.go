@@ -14,7 +14,6 @@ import (
 	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -57,14 +56,7 @@ func New(d Deps) http.Handler {
 	r.Use(httpware.Logging(d.Log))
 	r.Use(httpware.Recover(d.Log))
 	r.Use(httpware.BypassForStreaming(middleware.Timeout(60 * time.Second)))
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   d.AllowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Origin", "X-Request-ID", "X-Tenant-ID", "X-Tenant-Slug", "X-API-Key", "Idempotency-Key", "X-Outlet-ID", "X-Device-Key"},
-		ExposedHeaders:   []string{"Link", "Retry-After", "X-Module-Read-Only"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	r.Use(httpware.CORS(httpware.StandardCORS(d.AllowedOrigins, "X-Device-Key")))
 	if d.Limiter != nil {
 		r.Use(d.Limiter.Middleware(ratelimit.IPKey, 300, time.Minute))
 	}
