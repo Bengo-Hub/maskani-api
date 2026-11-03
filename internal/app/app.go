@@ -142,6 +142,16 @@ func New(ctx context.Context) (*App, error) {
 			eventslib.PollerConfig{BatchSize: cfg.Events.OutboxBatchSize, PollPeriod: cfg.Events.OutboxPollPeriod})
 		outbox.Start(ctx)
 	}
+	if nc != nil {
+		if js, err := nc.JetStream(); err == nil {
+			// tenant.purge (dormancy, a deleted tenant, a declined registration): delete every row this
+			// service holds for the tenant, by the shared schema-driven purger.
+			purger := &eventslib.TenantPurger{DB: sqlDB, Log: log.Named("tenant-purge"), Service: "maskani"}
+			if err := purger.Subscribe(js); err != nil {
+				log.Warn("tenant purge consumer not started", zap.Error(err))
+			}
+		}
+	}
 
 	box, err := secure.NewBox(cfg.Security.FieldEncryptionKey)
 	if err != nil {
