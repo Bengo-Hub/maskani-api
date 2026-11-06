@@ -218,11 +218,31 @@ func (s *Service) CreatePass(ctx context.Context, createdByKind string, createdB
 		return nil, err
 	}
 	tenantID, _ := tenantguard.TenantID(ctx)
+	// Who booked the visit and to which unit, so the visitor's message reads as a confirmation of an
+	// arrangement made for them (WhatsApp UTILITY), resolved the same way the gate's verify shows them.
+	unitCode, hostName := s.passHostDetails(ctx, p)
 	_ = events.Publish(ctx, s.client.OutboxEvent, tenantID, p.ID.String(), events.PassCreated, map[string]any{
 		"pass_id": p.ID, "visitor_name": p.VisitorName, "visitor_phone": p.VisitorPhone, "code": code,
 		"valid_from": p.ValidFrom, "valid_to": p.ValidTo, "property_id": p.PropertyID,
+		"unit_code": unitCode, "host_name": hostName,
 	})
 	return &IssuedPass{VisitorPass: p, Code: code, QRToken: qr}, nil
+}
+
+// passHostDetails returns the pass's unit code and the host's name: the party that issued it, or
+// else the unit's host. Either is empty when unknown (a staff pass with no unit).
+func (s *Service) passHostDetails(ctx context.Context, p *ent.VisitorPass) (unitCode, hostName string) {
+	if p.UnitID != nil {
+		unitCode = s.unitCodes(ctx, func(add func(uuid.UUID)) { add(*p.UnitID) })[*p.UnitID].code
+	}
+	if p.HostPartyID != nil {
+		if h, err := s.client.Party.Query().Where(party.ID(*p.HostPartyID)).Select(party.FieldDisplayName).Only(ctx); err == nil {
+			hostName = h.DisplayName
+		}
+	} else if p.UnitID != nil {
+		hostName = s.unitHosts(ctx, []uuid.UUID{*p.UnitID})[*p.UnitID].Name
+	}
+	return unitCode, hostName
 }
 
 // CancelPass cancels a pass.
@@ -280,13 +300,7 @@ func (s *Service) Verify(ctx context.Context, d *ent.GateDevice, code, qr string
 		info := s.unitCodes(ctx, func(add func(uuid.UUID)) { add(*p.UnitID) })[*p.UnitID]
 		res.UnitCode, res.Block = info.code, info.block
 	}
-	if p.HostPartyID != nil {
-		if h, err := s.client.Party.Query().Where(party.ID(*p.HostPartyID)).Select(party.FieldDisplayName).Only(ctx); err == nil {
-			res.HostName = h.DisplayName
-		}
-	} else if p.UnitID != nil {
-		res.HostName = s.unitHosts(ctx, []uuid.UUID{*p.UnitID})[*p.UnitID].Name
-	}
+	_, res.HostName = s.passHostDetails(ctx, p)
 	if p.VisitorID != nil {
 		if v, err := s.client.Visitor.Get(ctx, *p.VisitorID); err == nil {
 			res.Visitor = &VisitorMatch{ID: v.ID, Name: v.Name, Plate: v.VehiclePlate, Visits: v.Visits, LastAt: v.LastVisitAt,
