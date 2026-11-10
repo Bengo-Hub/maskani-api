@@ -250,8 +250,21 @@ Used directly only for notices to an audience. Everything else is event driven.
   `GET /api/v1/tenants/{id}/subscription` (cached). A lapsed subscription keeps data readable and
   blocks new records.
 
-## marketflow-api and maps (R3)
+## marketflow-api (customer identity, November 2026)
 
-Enquiries become CRM leads with the source listing through marketflow's S2S
-`POST /internal/contacts/upsert` (create or get by phone); geocoding and map search use the
-Codevertex maps service (`@bengo-hub/maps`). Not wired in R1.
+marketflow-api owns customer identity. maskani links billed parties only (tenants and payers who
+are invoiced), and a party keeps just the contact id.
+
+- **Client.** `github.com/Bengo-Hub/shared-service-client/crm` (v0.5.0), configured with
+  `MARKETFLOW_SERVICE_URL` (default is the in-cluster marketflow-api service) and `INTERNAL_SERVICE_KEY`.
+- **Creating a party.** The contact is upserted within a 2 second budget. A CRM answer of 400 or 422
+  is shown to the user. An outage saves the party unlinked.
+- **Anonymising.** Anonymising a party clears its link and emits the ids-only event
+  `privacy.party_anonymised`. It never deletes the CRM contact, because the same contact can carry
+  loyalty points, balances or orders in other services. Nothing consumes the event yet.
+- **Enquiries.** Enquiries become CRM leads with the source listing through marketflow's S2S
+  `POST /internal/contacts/upsert` (create or get by phone). Not wired in R1.
+
+## maps (R3)
+
+Geocoding and map search use the Codevertex maps service (`@bengo-hub/maps`). Not wired in R1.
