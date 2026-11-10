@@ -81,7 +81,8 @@ func TestOccupancyOnPostgres(t *testing.T) {
 	if got, _ := client.VisitorPass.Get(ctx, pass.ID); got.Status != "cancelled" {
 		t.Fatalf("the tenant's pass should be cancelled, got %s", got.Status)
 	}
-	if n, _ := client.OutboxEvent.Query().Where(outboxevent.EventType(events.FinalReadingNeeded)).Count(ctx); n != 1 {
+	// The outbox has no tenant guard, so scope to this run's tenant; earlier runs leave rows behind.
+	if n, _ := client.OutboxEvent.Query().Where(outboxevent.TenantID(tid), outboxevent.EventType(events.FinalReadingNeeded)).Count(ctx); n != 1 {
 		t.Fatalf("one final reading request, got %d", n)
 	}
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Bengo-Hub/shared-service-client/crm"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -25,6 +26,7 @@ import (
 type Service struct {
 	client   *ent.Client
 	treasury *treasury.Client
+	crm      *crm.Client
 	log      *zap.Logger
 }
 
@@ -33,12 +35,18 @@ func NewService(client *ent.Client, tc *treasury.Client, log *zap.Logger) *Servi
 	return &Service{client: client, treasury: tc, log: log.Named("accounts")}
 }
 
+// SetCRM links billed parties to the tenant's CRM contact. Without it no party is linked.
+func (s *Service) SetCRM(c *crm.Client) { s.crm = c }
+
 // Party is who the account bills.
 type Party struct {
 	ID    uuid.UUID
 	Name  string
 	Phone string
 	Email string // kept in metadata.customer_email for message delivery
+	// Role is the party's role on the unit, such as owner or buyer. When empty, the party's
+	// active links on the unit decide.
+	Role string
 }
 
 // withEmail returns metadata carrying the bill-to email (merged, so other keys survive).
@@ -61,7 +69,17 @@ func CustomerEmail(acc *ent.UnitAccount) string {
 
 // Ensure returns the unit's account in the fund, creating it (and its outbox event) if missing.
 // The treasury route is registered after commit; RegisterPending retries any that failed.
+// When p is the account's primary party it is linked to the CRM if it is not yet; a CRM failure
+// never fails Ensure, and the next Ensure for the party tries again.
 func (s *Service) Ensure(ctx context.Context, unit *ent.Unit, fundCode string, p *Party) (*ent.UnitAccount, error) {
+	acc, err := s.ensure(ctx, unit, fundCode, p)
+	if err == nil && p != nil && acc.PrimaryPartyID != nil && *acc.PrimaryPartyID == p.ID {
+		s.linkCRM(ctx, unit.ID, p)
+	}
+	return acc, err
+}
+
+func (s *Service) ensure(ctx context.Context, unit *ent.Unit, fundCode string, p *Party) (*ent.UnitAccount, error) {
 	f, err := s.client.Fund.Query().Where(fund.Code(fundCode)).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fund %q not configured: %w", fundCode, err)

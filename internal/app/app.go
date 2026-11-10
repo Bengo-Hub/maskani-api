@@ -18,6 +18,7 @@ import (
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
 	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
+	"github.com/Bengo-Hub/shared-service-client/crm"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
@@ -180,7 +181,9 @@ func New(ctx context.Context) (*App, error) {
 	ac := authapi.NewClient(cfg.Auth.APIURL, cfg.Auth.APIKey, log)
 	nt := notify.NewClient(cfg.Services.NotificationsURL, cfg.Auth.APIKey, log)
 	seq := sequence.NewAllocator(orm, loc)
+	crmClient := crm.New(cfg.Services.MarketflowURL, cfg.Auth.APIKey, log)
 	accSvc := accounts.NewService(orm, tc, log)
+	accSvc.SetCRM(crmClient)
 	regSvc := register.NewService(orm, ac, accSvc, box, log)
 	billSvc := billing.NewService(orm, tc, accSvc, loc, log)
 	if rdb != nil {

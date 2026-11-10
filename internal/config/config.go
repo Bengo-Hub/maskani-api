@@ -92,6 +92,8 @@ type ServicesConfig struct {
 	ERPURL           string `envconfig:"ERP_SERVICE_URL" default:"http://erp-api.erp.svc.cluster.local:80"`
 	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"http://notifications-api.notifications.svc.cluster.local:4000"`
 	SubscriptionsURL string `envconfig:"SUBSCRIPTION_BASE_URL" default:"http://subscription-api.subscriptions.svc.cluster.local:4000"`
+	// MarketflowURL is the CRM that owns customer identity; billed parties keep only its contact id.
+	MarketflowURL string `envconfig:"MARKETFLOW_SERVICE_URL" default:"http://marketflow-api.marketflow.svc.cluster.local:4000"`
 }
 
 // SecurityConfig carries keys for field encryption, phone hashing and signed media links (the

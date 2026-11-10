@@ -206,7 +206,7 @@ func (s *Service) Reserve(ctx context.Context, actor uuid.UUID, in ReserveInput)
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email})
+	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email, Role: "buyer"})
 	if err == nil && it.ReservationFee.IsPositive() {
 		inv, ierr := s.invoice(ctx, acc, treasury.RefReservationFee, res.ID, "Reservation fee "+u.Code, it.ReservationFee, now, now.AddDate(0, 0, days))
 		if ierr == nil {
@@ -374,7 +374,7 @@ func (s *Service) Activate(ctx context.Context, contractID uuid.UUID, signedAt t
 	if err != nil {
 		return nil, err
 	}
-	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email})
+	acc, err := s.accounts.Ensure(ctx, u, "sales", &accounts.Party{ID: buyer.ID, Name: buyer.DisplayName, Phone: buyer.Phone, Email: buyer.Email, Role: "buyer"})
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/ent/unitparty"
 	"github.com/bengobox/maskani-api/internal/ent/vehicle"
 	"github.com/bengobox/maskani-api/internal/ent/visitorpass"
+	"github.com/bengobox/maskani-api/internal/events"
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 )
 
@@ -43,6 +44,11 @@ func (s *Service) Anonymise(ctx context.Context, id, by uuid.UUID) (*ent.Privacy
 		return nil, httpx.Conflict("this person holds a reservation; cancel it first")
 	}
 
+	pt, err := s.client.Party.Get(ctx, pid)
+	if err != nil {
+		return nil, err
+	}
+
 	name := "Former resident " + pid.String()[:8]
 	now := time.Now()
 	tx, err := s.client.Tx(ctx)
@@ -50,6 +56,14 @@ func (s *Service) Anonymise(ctx context.Context, id, by uuid.UUID) (*ent.Privacy
 		return nil, err
 	}
 	err = func() error {
+		// The CRM contact may also carry other services' history, so maskani only unlinks it and
+		// tells the CRM owner, with ids only, who decides whether to delete it.
+		if pt.CrmContactID != nil {
+			if err := events.Publish(ctx, tx.OutboxEvent, pt.TenantID, pid.String(), PartyAnonymised, map[string]any{
+				"party_id": pid, "crm_contact_id": *pt.CrmContactID, "tenant_id": pt.TenantID}); err != nil {
+				return err
+			}
+		}
 		if err := tx.Party.UpdateOneID(pid).SetDisplayName(name).ClearFirstName().ClearLastName().ClearCompanyName().
 			ClearRegistrationNumber().ClearPhone().ClearPhoneHash().ClearAltPhone().ClearEmail().ClearNationalIDEnc().
 			ClearKraPinEnc().ClearNationality().ClearPostalAddress().ClearAuthUserID().ClearCrmContactID().
@@ -90,3 +104,7 @@ func (s *Service) Anonymise(ctx context.Context, id, by uuid.UUID) (*ent.Privacy
 	}
 	return s.close(ctx, req, by, privacyrequest.StatusCompleted, "outcome", "details erased; financial records kept")
 }
+
+// PartyAnonymised is published, with ids only, when an erased party had a CRM contact. The
+// contact is left in the CRM for its owner to decide on; maskani only drops the link.
+const PartyAnonymised = "privacy.party_anonymised"
