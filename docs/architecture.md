@@ -85,6 +85,8 @@ cashier and member are shared by all of them. Two rules keep other products out 
 2. `RequireAuth` (JWKS, or `X-API-Key` for S2S), subscription mutation gate.
 3. JIT user provisioning (`rbac.EnsureUser`, limited to property people as described above).
 4. `httpware.TenantV2`: tenant from the signed token, URL slug only for platform owners.
+   A tenant in the header or URL that differs from the token's is logged as `tenant mismatch
+   (report-only)` for now and will be refused with 403 once the logs show no legitimate caller.
 5. Tenant sync: slug to UUID, local `tenants` projection (Redis cached).
 6. Tenant guard context: `tenantguard.With(ctx, tenantID)`.
 7. Property scope: property-level roles see only their assigned properties.

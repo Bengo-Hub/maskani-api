@@ -156,6 +156,22 @@ func New(d Deps) http.Handler {
 				return c.TenantID, c.GetTenantSlug(), c.IsPlatformOwner, true
 			},
 			URLParamFunc: chi.URLParam, URLParamName: "tenant", Required: true,
+			// Report-only until the logs show no legitimate caller is refused, then remove
+			// ReportOnly so a tenant that differs from the token's gets a 403.
+			ReportOnly: true,
+			OnMismatch: func(r *http.Request, source, supplied, claimed string) {
+				fields := []zap.Field{
+					zap.String("source", source),
+					zap.String("supplied", supplied),
+					zap.String("claimed", claimed),
+					zap.String("method", r.Method),
+					zap.String("path", r.URL.Path),
+				}
+				if c, ok := authclient.ClaimsFromContext(r.Context()); ok && c != nil {
+					fields = append(fields, zap.String("subject", c.Subject))
+				}
+				d.Log.Warn("tenant mismatch (report-only)", fields...)
+			},
 		}))
 		tr.Use(tenantSync(d))
 		tr.Use(mw.ResolveAccess(d.Ent, d.RBAC, d.Log))
