@@ -107,6 +107,10 @@ func New(d Deps) http.Handler {
 	if d.TenantExport != nil {
 		r.With(mw.RequireInternalKey(d.InternalKey)).Get("/api/v1/s2s/tenant-export", d.TenantExport.ServeHTTP)
 	}
+	// marketflow's erasure check: does any party still link a CRM contact (S2-8 review M-12).
+	if d.Ent != nil {
+		r.With(mw.RequireInternalKey(d.InternalKey)).Get("/api/v1/s2s/{tenant}/crm-links/{contactID}", handlers.CRMLinks(d.Ent, d.Log))
+	}
 
 	// Gate tablets authenticate with their device key.
 	r.Route("/api/v1/gate", func(gr chi.Router) {
