@@ -20,7 +20,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
-	"github.com/bengobox/maskani-api/internal/shared/richtext"
+	"github.com/Bengo-Hub/httpware/richtext"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 )
 
@@ -178,7 +178,7 @@ func (s *Service) estates(ctx context.Context, props []*ent.Property, withUnits 
 	for i, p := range props {
 		// The description may be editor HTML; the public site gets readable plain text.
 		out[i] = PublicEstate{ID: p.ID, TenantID: p.TenantID, Slug: p.PublicSlug, Name: p.Name,
-			Description: richtext.PlainText(p.Description), Area: p.Area, Town: p.Town, County: p.County,
+			Description: richtext.PlainTextBlocks(p.Description), Area: p.Area, Town: p.Town, County: p.County,
 			Latitude: p.Latitude, Longitude: p.Longitude, Amenities: p.Amenities, Photos: s.photoURLs(p.Photos), Verified: true,
 			Units: []PublicUnit{}}
 		index[p.ID] = i

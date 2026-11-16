@@ -18,7 +18,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/http/httpx"
 	"github.com/bengobox/maskani-api/internal/modules/accounts"
 	"github.com/bengobox/maskani-api/internal/modules/authapi"
-	"github.com/bengobox/maskani-api/internal/shared/richtext"
+	"github.com/Bengo-Hub/httpware/richtext"
 	"github.com/bengobox/maskani-api/internal/shared/secure"
 	"github.com/bengobox/maskani-api/internal/shared/sqlx"
 )

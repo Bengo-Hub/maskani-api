@@ -28,7 +28,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
-	"github.com/bengobox/maskani-api/internal/shared/richtext"
+	"github.com/Bengo-Hub/httpware/richtext"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -28,7 +28,7 @@ import (
 	"github.com/bengobox/maskani-api/internal/platform/realtime"
 	"github.com/bengobox/maskani-api/internal/platform/tenantguard"
 	"github.com/bengobox/maskani-api/internal/shared/page"
-	"github.com/bengobox/maskani-api/internal/shared/richtext"
+	"github.com/Bengo-Hub/httpware/richtext"
 )
 
 // Service is the notices service.
@@ -279,7 +279,7 @@ func (s *Service) sendAsBroadcast(ctx context.Context, tenantID uuid.UUID, slug 
 	if n.Priority == notice.PriorityEmergency {
 		subject = "Urgent: " + n.Title
 	}
-	text := richtext.PlainText(n.Body)
+	text := richtext.PlainTextBlocks(n.Body)
 	audience := map[string]any{"type": "maskani_residents"}
 	if a.PropertyID != nil {
 		audience["property_id"] = a.PropertyID.String()
